@@ -53,4 +53,29 @@
   <div *ngIf="!customer && !isNewMode" class="loading">
     Loading customer details...
   </div>
+
+  <div *ngIf="customer && !isNewMode" class="attachments-section">
+    <h3>Attachments</h3>
+    <div class="upload-controls">
+      <label class="me-2">Type:</label>
+      <select [(ngModel)]="uploadType">
+        <option value="document">Document</option>
+        <option value="prescription">Prescription</option>
+        <option value="image">Image</option>
+        <option value="excel">Excel</option>
+        <option value="csv">CSV</option>
+        <option value="word">Word</option>
+      </select>
+      <input type="file" multiple (change)="onFileSelected($event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,image/*" class="ms-2" />
+      <button class="btn btn-primary ms-2" (click)="uploadFiles()" [disabled]="selectedFiles.length===0">Upload</button>
+    </div>
+
+    <ul class="attachments-list mt-3" *ngIf="attachments.length > 0">
+      <li *ngFor="let f of attachments" class="d-flex align-items-center justify-content-between">
+        <a [href]="f.url" target="_blank" rel="noopener">{{ f.filename }}</a>
+        <button class="btn btn-danger btn-sm" (click)="deleteAttachment(f)">Delete</button>
+      </li>
+    </ul>
+    <div *ngIf="attachments.length === 0" class="no-attachments">No attachments uploaded yet.</div>
+  </div>
 </div>

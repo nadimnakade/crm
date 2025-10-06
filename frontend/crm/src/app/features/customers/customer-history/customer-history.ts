@@ -1,0 +1,329 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterModule, ActivatedRoute } from '@angular/router';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { CustomerService } from '../../../shared/services/customer';
+import { CallService } from '../../../shared/services/call';
+import Swal from 'sweetalert2';
+
+@Component({
+  selector: 'app-customer-history',
+  standalone: true,
+  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+  templateUrl: './customer-history.html',
+  styleUrls: ['./customer-history.scss']
+})
+export class CustomerHistoryComponent implements OnInit {
+  customerId!: number;
+  customer: any;
+  calls: any[] = [];
+  historyForm!: FormGroup;
+  isLoading = false;
+  // Category/Sub Category options keyed by call type
+  callTypeOptions = [
+    { value: 'inbound', label: 'Inbound' },
+    { value: 'outbound', label: 'Outbound' }
+  ];
+
+  categoryMap: Record<string, Array<{ value: string; label: string; subs: Array<{ value: string; label: string }> }>> = {
+    inbound: [
+      { value: 'existing-order', label: 'Existing Order', subs: [
+        { value: 'agent-comment', label: 'Agent Comment' },
+        { value: 'refund-status', label: 'Refund Status' },
+        { value: 'refund-generation', label: 'Refund Generation' }
+      ]},
+      { value: 'new-order-related', label: 'New Order Related', subs: [
+        { value: 'discount-query', label: 'Discount Query' },
+        { value: 'follow-up-scheduled', label: 'Follow-up Scheduled' }
+      ]},
+      { value: 'return-related', label: 'Return Related', subs: [
+        { value: 'for-return', label: 'For Return' }
+      ]}
+    ],
+    outbound: [
+      { value: 'sales-call', label: 'Sales Call', subs: [
+        { value: 'positive', label: 'Yes' },
+        { value: 'negative', label: 'No' }
+      ]},
+      { value: 'previous-order-history', label: 'Previous Order History', subs: [
+        { value: 'order-entry', label: 'Order Entry' },
+        { value: 'other-details', label: 'Other Details' }
+      ]}
+    ]
+  };
+
+  currentCategories: Array<{ value: string; label: string }> = [];
+  currentSubCategories: Array<{ value: string; label: string }> = [];
+
+  // Refund Generation modal state
+  showRefundModal = false;
+  refundForm!: FormGroup;
+  refundImageFile: File | null = null;
+
+  // Order Details modal state
+  showOrderModal = false;
+  orderDetailsForm!: FormGroup;
+
+  // Listing data captured via modals (UI-only for now)
+  orderDetailsList: Array<{ customerName: string; customerMobileNo: string; mrp: string; pay: string; orderId: string; followupDate: string; alternate: 'Yes' | 'No' }> = [];
+  refundDetailsList: Array<{ customerName: string; customerNumber: string; customerOrderId: string; medicineName: string; medicineQty: string; returnReason: string; accountHolderName: string; accountNumber: string; ifscCode: string; imageName?: string }> = [];
+
+  // Expanded interaction details row state
+  expandedId: number | null = null;
+
+  constructor(
+    private route: ActivatedRoute,
+    private customerService: CustomerService,
+    private callService: CallService,
+    private fb: FormBuilder
+  ) {}
+
+  ngOnInit(): void {
+    const idParam = this.route.snapshot.paramMap.get('id');
+    this.customerId = idParam ? parseInt(idParam, 10) : 0;
+    this.initForm();
+    this.initRefundForm();
+    this.initOrderDetailsForm();
+    this.loadCustomer();
+    this.loadHistory();
+  }
+
+  initForm(): void {
+    this.historyForm = this.fb.group({
+      callType: ['inbound', Validators.required],
+      category: ['', Validators.required],
+      subCategory: ['', Validators.required],
+      orderId: [''],
+      date: [new Date().toISOString().slice(0, 16), Validators.required],
+      notes: ['', [Validators.required, Validators.minLength(5)]]
+    });
+
+    // Initialize category/subcategory options
+    this.updateCategoryOptions('inbound');
+    // React to changes
+    this.historyForm.get('callType')?.valueChanges.subscribe((val) => {
+      this.updateCategoryOptions(val);
+      this.historyForm.patchValue({ category: '', subCategory: '' });
+    });
+    this.historyForm.get('category')?.valueChanges.subscribe((val) => {
+      this.updateSubCategoryOptions(this.historyForm.get('callType')?.value, val);
+      this.historyForm.patchValue({ subCategory: '' });
+    });
+    this.historyForm.get('subCategory')?.valueChanges.subscribe((val) => {
+      if (val === 'refund-generation') {
+        this.showRefundModal = true;
+      }
+    });
+  }
+
+  updateCategoryOptions(callType: string): void {
+    const defs = this.categoryMap[callType] || [];
+    this.currentCategories = defs.map(d => ({ value: d.value, label: d.label }));
+    // Reset subcategories based on first category
+    if (defs.length > 0) {
+      this.updateSubCategoryOptions(callType, defs[0].value);
+    } else {
+      this.currentSubCategories = [];
+    }
+  }
+
+  updateSubCategoryOptions(callType: string, category: string): void {
+    const defs = this.categoryMap[callType] || [];
+    const match = defs.find(d => d.value === category);
+    this.currentSubCategories = (match?.subs || []).map(s => ({ value: s.value, label: s.label }));
+  }
+
+  initRefundForm(): void {
+    this.refundForm = this.fb.group({
+      customerName: ['', Validators.required],
+      customerNumber: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
+      customerOrderId: ['', Validators.required],
+      medicineName: ['', Validators.required],
+      medicineQty: ['', [Validators.required, Validators.pattern(/^[0-9]+$/)]],
+      returnReason: ['', Validators.required],
+      accountHolderName: ['', Validators.required],
+      accountNumber: ['', [Validators.required, Validators.pattern(/^[0-9]{9,18}$/)]],
+      ifscCode: ['', [Validators.required, Validators.pattern(/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/)]]
+    });
+  }
+
+  initOrderDetailsForm(): void {
+    this.orderDetailsForm = this.fb.group({
+      customerName: ['', Validators.required],
+      customerMobileNo: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
+      mrp: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
+      pay: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
+      orderId: ['', Validators.required],
+      followupDate: ['', Validators.required],
+      alternate: ['No', Validators.required]
+    });
+  }
+
+  toggleDetails(id: number): void {
+    this.expandedId = this.expandedId === id ? null : id;
+  }
+
+  onRefundImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    this.refundImageFile = files.length > 0 ? files[0] : null;
+  }
+
+  cancelRefundModal(): void {
+    this.showRefundModal = false;
+    this.refundImageFile = null;
+  }
+
+  submitRefundModal(): void {
+    if (this.refundForm.invalid) {
+      Swal.fire({ icon: 'warning', title: 'Incomplete details', text: 'Please fill all required fields.' });
+      return;
+    }
+    // Map orderId from modal into interaction form
+    const orderId = this.refundForm.value.customerOrderId;
+    this.historyForm.patchValue({ orderId });
+    // Append refund details into notes for persistence
+    const v = this.refundForm.value;
+    const summary = `Refund Details: Customer Name=${v.customerName}, Number=${v.customerNumber}, OrderId=${v.customerOrderId}, Medicine=${v.medicineName}, Qty=${v.medicineQty}, Reason=${v.returnReason}, Account Holder=${v.accountHolderName}, Account No=${v.accountNumber}, IFSC=${v.ifscCode}`;
+    const existingNotes = this.historyForm.value.notes || '';
+    const combinedNotes = existingNotes ? `${existingNotes}\n${summary}` : summary;
+    this.historyForm.patchValue({ notes: combinedNotes });
+
+    // Track for UI listing
+    this.refundDetailsList.push({
+      customerName: v.customerName,
+      customerNumber: v.customerNumber,
+      customerOrderId: v.customerOrderId,
+      medicineName: v.medicineName,
+      medicineQty: v.medicineQty,
+      returnReason: v.returnReason,
+      accountHolderName: v.accountHolderName,
+      accountNumber: v.accountNumber,
+      ifscCode: v.ifscCode,
+      imageName: this.refundImageFile?.name
+    });
+    this.showRefundModal = false;
+    // Proceed with main submission
+    this.submitHistory();
+  }
+
+  openOrderModal(): void {
+    this.showOrderModal = true;
+  }
+
+  cancelOrderModal(): void {
+    this.showOrderModal = false;
+  }
+
+  submitOrderModal(): void {
+    if (this.orderDetailsForm.invalid) {
+      Swal.fire({ icon: 'warning', title: 'Incomplete details', text: 'Please fill all required fields.' });
+      return;
+    }
+    const v = this.orderDetailsForm.value;
+    // Patch main interaction form with OrderId from modal
+    this.historyForm.patchValue({ orderId: v.orderId });
+    // Track in UI list
+    this.orderDetailsList.push({
+      customerName: v.customerName,
+      customerMobileNo: v.customerMobileNo,
+      mrp: v.mrp,
+      pay: v.pay,
+      orderId: v.orderId,
+      followupDate: v.followupDate,
+      alternate: v.alternate
+    });
+    this.showOrderModal = false;
+  }
+
+  loadCustomer(): void {
+    if (!this.customerId) return;
+    this.customerService.getCustomer(this.customerId).subscribe({
+      next: (data) => this.customer = data,
+      error: (err) => console.error('Failed to load customer', err)
+    });
+  }
+
+  loadHistory(): void {
+    if (!this.customerId) return;
+    this.isLoading = true;
+    this.callService.getCalls({ customerId: this.customerId, pageSize: 100, sortBy: 'date', sortOrder: 'DESC' }).subscribe({
+      next: (resp) => {
+        this.calls = resp.data || [];
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load history', err);
+        this.isLoading = false;
+      }
+    });
+  }
+
+  submitHistory(): void {
+    if (this.historyForm.invalid) {
+      Swal.fire({ icon: 'warning', title: 'Invalid form', text: 'Please fill all required fields.' });
+      return;
+    }
+    if (this.historyForm.value.subCategory === 'refund-generation' && this.showRefundModal) {
+      // Await modal completion
+      Swal.fire({ icon: 'info', title: 'Refund details required', text: 'Please complete the refund form.' });
+      return;
+    }
+    const { callType, category, subCategory, orderId, date, notes } = this.historyForm.value;
+    // Prepare structured details for backend persistence (latest entries)
+    const lastOrder = this.orderDetailsList.length > 0 ? this.orderDetailsList[this.orderDetailsList.length - 1] : null;
+    const lastRefund = this.refundDetailsList.length > 0 ? this.refundDetailsList[this.refundDetailsList.length - 1] : null;
+    const payload = {
+      customerId: this.customerId,
+      callType,
+      category,
+      orderId: orderId || null,
+      date: new Date(date),
+      notes,
+      outcome: subCategory,
+      orderDetails: lastOrder ? {
+        customerName: lastOrder.customerName,
+        customerMobileNo: lastOrder.customerMobileNo,
+        mrp: lastOrder.mrp,
+        pay: lastOrder.pay,
+        orderId: lastOrder.orderId,
+        followupDate: lastOrder.followupDate,
+        alternate: lastOrder.alternate
+      } : undefined,
+      followUpDate: lastOrder && lastOrder.followupDate ? new Date(lastOrder.followupDate) : undefined,
+      refundDetails: lastRefund ? {
+        customerName: lastRefund.customerName,
+        customerNumber: lastRefund.customerNumber,
+        customerOrderId: lastRefund.customerOrderId,
+        medicineName: lastRefund.medicineName,
+        medicineQty: lastRefund.medicineQty,
+        returnReason: lastRefund.returnReason,
+        accountHolderName: lastRefund.accountHolderName,
+        accountNumber: lastRefund.accountNumber,
+        ifscCode: lastRefund.ifscCode,
+        imageName: lastRefund.imageName
+      } : undefined
+    };
+
+    this.callService.createCall(payload).subscribe({
+      next: (created) => {
+        // Upload refund image to customer attachments if provided
+        if (this.refundImageFile) {
+          this.customerService.uploadCustomerFiles(this.customerId, [this.refundImageFile], 'image').subscribe({
+            next: () => {},
+            error: (err) => console.error('Failed to upload refund image', err)
+          });
+          this.refundImageFile = null;
+        }
+        Swal.fire({ icon: 'success', title: 'Logged', text: 'Interaction logged successfully.' });
+        this.historyForm.reset();
+        this.loadHistory();
+      },
+      error: (err) => {
+        console.error('Failed to create call', err);
+        const msg = err?.error?.message || 'Failed to log interaction';
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+      }
+    });
+  }
+}

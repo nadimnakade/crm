@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CustomerService } from '../../../shared/services/customer';
@@ -9,7 +10,7 @@ import fa from '@angular/common/locales/fa';
 @Component({
   selector: 'app-customer-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule],
   templateUrl: './customer-detail.html',
   styleUrls: ['./customer-detail.scss']
 })
@@ -18,6 +19,9 @@ export class CustomerDetailComponent implements OnInit {
   customerForm!: FormGroup;
   isEditMode = false;
   isNewMode = false;
+  attachments: { filename: string; url: string }[] = [];
+  selectedFiles: File[] = [];
+  uploadType: string = 'document';
 
   constructor(
     private customerService: CustomerService,
@@ -36,6 +40,7 @@ export class CustomerDetailComponent implements OnInit {
       this.customer = {};
     } else if (id) {
       this.loadCustomer(+id);
+      this.loadAttachments(+id);
     }
   }
 
@@ -67,6 +72,50 @@ export class CustomerDetailComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading customer', error);
+      }
+    });
+  }
+
+  loadAttachments(id: number): void {
+    this.customerService.getCustomerFiles(id).subscribe({
+      next: resp => { this.attachments = resp.files || []; },
+      error: err => { console.error('Error loading attachments', err); }
+    });
+  }
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    this.selectedFiles = files;
+  }
+
+  uploadFiles(): void {
+    if (!this.customer?.id) return;
+    if (this.selectedFiles.length === 0) return;
+    this.customerService.uploadCustomerFiles(this.customer.id, this.selectedFiles, this.uploadType).subscribe({
+      next: resp => {
+        this.selectedFiles = [];
+        this.loadAttachments(this.customer.id);
+        Swal.fire({ icon: 'success', title: 'Files uploaded', timer: 1200, showConfirmButton: false });
+      },
+      error: err => {
+        console.error('Upload failed', err);
+        Swal.fire({ icon: 'error', title: 'Upload failed', text: 'Please try again.' });
+      }
+    });
+  }
+
+  deleteAttachment(file: { filename: string }): void {
+    if (!this.customer?.id) return;
+    if (!file?.filename) return;
+    this.customerService.deleteCustomerFile(this.customer.id, file.filename).subscribe({
+      next: () => {
+        this.loadAttachments(this.customer.id);
+        Swal.fire({ icon: 'success', title: 'File deleted', timer: 1000, showConfirmButton: false });
+      },
+      error: err => {
+        console.error('Delete failed', err);
+        Swal.fire({ icon: 'error', title: 'Delete failed', text: 'Please try again.' });
       }
     });
   }

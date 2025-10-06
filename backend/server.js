@@ -23,11 +23,20 @@ app.use((req, res, next) => {
 });
 
 // CORS whitelist via env (comma-separated origins)
-const allowedOrigins = (process.env.CORS_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean);
+// Always allow localhost dev origins when not in production, while preserving env configuration.
+const envOrigins = (process.env.CORS_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean);
+const devOrigins = ['http://localhost:4200','http://localhost:4201', 'http://127.0.0.1:4200'];
+const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+// If envOrigins is empty, allow all (legacy behavior). Otherwise allow env + dev (non-prod) origins.
+const mergedAllowedOrigins = envOrigins.length === 0 ? null : [...envOrigins, ...(isProd ? [] : devOrigins)];
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // allow same-origin/proxy
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (mergedAllowedOrigins === null) {
+      return callback(null, true); // no env config -> allow all
+    }
+    if (mergedAllowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
@@ -110,7 +119,7 @@ async function seedDefaults() {
 // Kick off seed after DB sync
 (async () => {
   try {
-    await seedDefaults();
+    //await seedDefaults();
   } catch {}
 })();
 

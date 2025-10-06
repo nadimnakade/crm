@@ -35,6 +35,10 @@ const User = sequelize.define('User', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  managerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   phone: {
     type: DataTypes.STRING,
     allowNull: true

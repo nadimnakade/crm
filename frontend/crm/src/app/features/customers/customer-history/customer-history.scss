@@ -1,0 +1,64 @@
+.customer-history-container {
+  padding: 16px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.customer-summary {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.no-data {
+  text-align: center;
+  color: #6b7280;
+}
+.log-form .invalid {
+  color: #dc2626;
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+:host-context(.dark-theme) {
+  .card {
+    background-color: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .card-header {
+    background-color: #1a202c;
+    border-color: #4a5568;
+  }
+  
+  .table {
+    color: #e2e8f0;
+    
+    th, td {
+      border-color: #4a5568;
+      color: #e2e8f0;
+    }
+    
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+  
+  .form-control {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+    
+    &:focus {
+      background-color: #2d3748;
+      color: #e2e8f0;
+    }
+  }
+}

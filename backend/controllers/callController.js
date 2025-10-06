@@ -11,6 +11,11 @@ exports.getCalls = async (req, res) => {
     const searchTerm = (req.query.searchTerm || '').toString().trim();
     const status = (req.query.status || '').toString().trim();
     const type = (req.query.type || '').toString().trim(); // maps to callType
+    const customerId = req.query.customerId ? parseInt(req.query.customerId, 10) : null;
+    const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
+    const orderId = (req.query.orderId || '').toString().trim();
+    const hasOrderDetails = ['true', '1'].includes((req.query.hasOrderDetails || '').toString().toLowerCase());
+    const hasRefundDetails = ['true', '1'].includes((req.query.hasRefundDetails || '').toString().toLowerCase());
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
     const sortBy = (req.query.sortBy || 'createdAt').toString();
@@ -19,11 +24,33 @@ exports.getCalls = async (req, res) => {
     const where = {};
     if (status) where.outcome = status; // map UI status to outcome
     if (type) where.callType = type;
+    if (customerId) where.customerId = customerId;
+    if (orderId) where.orderId = { [Op.like]: `%${orderId}%` };
+    if (hasOrderDetails) where.orderDetails = { [Op.ne]: null };
+    if (hasRefundDetails) where.refundDetails = { [Op.ne]: null };
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date[Op.gte] = startDate;
       if (endDate) where.date[Op.lte] = endDate;
     }
+
+    // Role-based visibility
+    const visibility = await getVisibility(req.user);
+    // if (visibility.scope === 'agent') {
+    //   // Agents can only see their own calls; ignore requestedAgentId
+    //   where.agentId = req.user.id;
+    // } else if (visibility.scope === 'manager') {
+    //   // Managers can filter by a specific agent within their team
+    //   if (requestedAgentId && visibility.allowedAgentIds.includes(requestedAgentId)) {
+    //     where.agentId = requestedAgentId;
+    //   } else {
+    //     where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    //   }
+    // } else if (visibility.scope === 'admin') {
+    //   if (requestedAgentId) {
+    //     where.agentId = requestedAgentId;
+    //   }
+    // }
 
     let customerWhere = undefined;
     const callSearchWhere = [];
@@ -31,7 +58,8 @@ exports.getCalls = async (req, res) => {
       // Search across call fields
       callSearchWhere.push(
         { notes: { [Op.like]: `%${searchTerm}%` } },
-        { outcome: { [Op.like]: `%${searchTerm}%` } }
+        { outcome: { [Op.like]: `%${searchTerm}%` } },
+        { orderId: { [Op.like]: `%${searchTerm}%` } }
       );
       // Search customer name
       customerWhere = {
@@ -95,10 +123,14 @@ exports.createCall = async (req, res) => {
       customerId,
       agentId,
       callType,
+      category,
       date,
       duration,
       notes,
       outcome,
+      orderId,
+      orderDetails,
+      refundDetails,
       followUpRequired,
       followUpDate
     } = req.body;
@@ -107,10 +139,14 @@ exports.createCall = async (req, res) => {
       customerId,
       agentId: agentId || (req.user ? req.user.id : null),
       callType,
+      category,
       date,
       duration,
       notes,
       outcome,
+      orderId,
+      orderDetails,
+      refundDetails,
       followUpRequired,
       followUpDate
     });
@@ -137,10 +173,14 @@ exports.updateCall = async (req, res) => {
       customerId,
       agentId,
       callType,
+      category,
       date,
       duration,
       notes,
       outcome,
+      orderId,
+      orderDetails,
+      refundDetails,
       followUpRequired,
       followUpDate
     } = req.body;
@@ -150,10 +190,14 @@ exports.updateCall = async (req, res) => {
     if (customerId) call.customerId = customerId;
     if (agentId) call.agentId = agentId;
     if (callType) call.callType = callType;
+    if (category !== undefined) call.category = category;
     if (date) call.date = date;
     if (duration !== undefined) call.duration = duration;
     if (notes !== undefined) call.notes = notes;
     if (outcome) call.outcome = outcome;
+    if (orderId !== undefined) call.orderId = orderId;
+    if (orderDetails !== undefined) call.orderDetails = orderDetails;
+    if (refundDetails !== undefined) call.refundDetails = refundDetails;
     if (followUpRequired !== undefined) call.followUpRequired = followUpRequired;
     if (followUpDate !== undefined) call.followUpDate = followUpDate;
 
@@ -199,16 +243,29 @@ exports.deleteCall = async (req, res) => {
   }
 };
 
-// Helper to determine if the requester has admin-level visibility
-const hasAdminVisibility = async (user) => {
-  try {
-    if (!user) return false;
-    const role = await Role.findByPk(user.roleId);
-    const adminNames = ['SuperAdmin', 'Super Admin', 'Admin', 'Manager'];
-    return !!role && adminNames.includes(role.name);
-  } catch {
-    return false;
+// Visibility helpers
+const getRoleName = async (user) => {
+  if (!user) return null;
+  const role = await Role.findByPk(user.roleId);
+  return role ? role.name : null;
+};
+
+const getManagedAgentIds = async (managerId) => {
+  const agents = await User.findAll({ where: { managerId }, attributes: ['id'] });
+  return agents.map(a => a.id);
+};
+
+const getVisibility = async (user) => {
+  const roleName = await getRoleName(user);
+  if (!roleName) return { scope: 'agent', allowedAgentIds: [user?.id].filter(Boolean) };
+  if (['SuperAdmin', 'Super Admin', 'Admin'].includes(roleName)) {
+    return { scope: 'admin' };
   }
+  if (roleName === 'Manager') {
+    const teamIds = await getManagedAgentIds(user.id);
+    return { scope: 'manager', allowedAgentIds: [...teamIds, user.id] };
+  }
+  return { scope: 'agent', allowedAgentIds: [user.id] };
 };
 
 // @desc    Get recent calls (role-based visibility)
@@ -217,8 +274,12 @@ const hasAdminVisibility = async (user) => {
 exports.getRecentCalls = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 10;
-    const isAdmin = await hasAdminVisibility(req.user);
-    const where = isAdmin ? {} : { agentId: req.user.id };
+    const visibility = await getVisibility(req.user);
+    const where = (visibility.scope === 'admin')
+      ? {}
+      : (visibility.scope === 'manager')
+        ? { agentId: { [Op.in]: visibility.allowedAgentIds } }
+        : { agentId: req.user.id };
 
     const calls = await Call.findAll({
       where,
@@ -249,11 +310,12 @@ exports.getTopCallersDaily = async (req, res) => {
     end.setHours(23, 59, 59, 999);
     const limit = parseInt(req.query.limit, 10) || 10;
 
-    const isAdmin = await hasAdminVisibility(req.user);
     const where = {
       date: { [Op.between]: [start, end] }
     };
-    if (!isAdmin) where.agentId = req.user.id;
+    const visibility = await getVisibility(req.user);
+    if (visibility.scope === 'agent') where.agentId = req.user.id;
+    if (visibility.scope === 'manager') where.agentId = { [Op.in]: visibility.allowedAgentIds };
 
     const rows = await Call.findAll({
       where,
@@ -289,11 +351,12 @@ exports.getTopCallersWeekly = async (req, res) => {
     end.setHours(23, 59, 59, 999);
     const limit = parseInt(req.query.limit, 10) || 10;
 
-    const isAdmin = await hasAdminVisibility(req.user);
     const where = {
       date: { [Op.between]: [start, end] }
     };
-    if (!isAdmin) where.agentId = req.user.id;
+    const visibility = await getVisibility(req.user);
+    if (visibility.scope === 'agent') where.agentId = req.user.id;
+    if (visibility.scope === 'manager') where.agentId = { [Op.in]: visibility.allowedAgentIds };
 
     const rows = await Call.findAll({
       where,

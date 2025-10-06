@@ -1,22 +1,52 @@
-<div class="customer-list-container">
-  <div class="header">
-    <h2>Customers</h2>
-    <button class="btn btn-primary" routerLink="/customers/new">Add Customer</button>
+<div class="card glass-card h-100 shadow-sm">
+
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Customer Details</h5><span _ngcontent-ng-c1507357036="" class="text-color small"><button
+        class="btn btn-primary" routerLink="/customers/new">Add Customer</button></span>
   </div>
 
-  <div class="search-bar">
-    <input type="text" placeholder="Search customers..." [(ngModel)]="searchTerm" (input)="filterCustomers()">
-  </div>
 
-  <div class="table-container">
-    <table class="table table-striped table-hover align-middle mb-0">
+
+
+
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Phone</th>
-          <th>Company</th>
-          <th>Actions</th>
+         
+          <td>
+             <label class="ms-2">Status:</label>
+              <select [(ngModel)]="statusFilter" (change)="onStatusChange()">
+                <option value="">All</option>
+                <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
+              </select>   
+            <label class="ms-2">Page size:</label>
+              <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+                <option [value]="10">10</option>
+                <option [value]="25">25</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+          </td>
+           <td colspan="4">
+            <div class="search-bar float-end">
+              <input type="text" placeholder="Search customers..." [(ngModel)]="searchTerm" (input)="filterCustomers()">
+                        
+            </div>
+          </td>
+        </tr>
+      </thead>
+      <thead>
+        <tr>
+          <th (click)="setSort('firstName')">Name <span *ngIf="sortBy==='firstName'">{{sortOrder==='ASC' ? '▲' :
+              '▼'}}</span></th>
+          <th (click)="setSort('email')">Email <span *ngIf="sortBy==='email'">{{sortOrder==='ASC' ? '▲' : '▼'}}</span>
+          </th>
+          <th (click)="setSort('phone')">Phone <span *ngIf="sortBy==='phone'">{{sortOrder==='ASC' ? '▲' : '▼'}}</span>
+          </th>
+          <th (click)="setSort('company')">Company <span *ngIf="sortBy==='company'">{{sortOrder==='ASC' ? '▲' :
+              '▼'}}</span></th>
+          <th style="width:20%">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -24,17 +54,34 @@
           <td colspan="5" class="no-data">No customers found</td>
         </tr>
         <tr *ngFor="let customer of filteredCustomers">
-          <td>{{ customer.firstName }} {{ customer.lastName }}</td>
-          <td>{{ customer.email }}</td>
-          <td>{{ customer.phone }}</td>
-          <td>{{ customer.company }}</td>
+          <td [innerHTML]="highlight((customer.firstName || '') + ' ' + (customer.lastName || ''))"></td>
+          <td [innerHTML]="highlight(customer.email)"></td>
+          <td [innerHTML]="highlight(customer.phone)"></td>
+          <td [innerHTML]="highlight(customer.company)"></td>
           <td class="actions">
-            <button class="btn-view" [routerLink]="['/customers', customer.id]">View</button>
-            <button class="btn-edit" [routerLink]="['/customers', customer.id, 'edit']">Edit</button>
-            <button class="btn-delete" (click)="deleteCustomer(customer.id)">Delete</button>
+            <a [routerLink]="['/customers', customer.id]" class="text-primary me-3" title="View">
+              <i class="fa-solid fa-eye"></i>
+            </a>
+            <a [routerLink]="['/customers', customer.id, 'edit']" class="text-success me-3" title="Edit">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </a>
+            <a [routerLink]="['/customers', customer.id, 'history']" class="text-info me-3" title="History">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </a>
+            <button class="btn btn-link text-danger p-0" (click)="deleteCustomer(customer.id)" title="Delete">
+              <i class="fa-solid fa-trash"></i>
+            </button>
           </td>
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="pagination-bar" *ngIf="total > pageSize">
+    <button class="btn btn-secondary" (click)="prevPage()" [disabled]="page <= 1">Prev</button>
+    <span class="mx-2">Page {{page}} of {{ Math.ceil(total / pageSize) }}</span>
+    <button class="btn btn-secondary" (click)="nextPage()"
+      [disabled]="page >= Math.ceil(total / pageSize)">Next</button>
+    <span class="mx-2">Showing {{ ((page-1)*pageSize)+1 }}–{{ Math.min(page*pageSize, total) }} of {{ total }}</span>
   </div>
 </div>

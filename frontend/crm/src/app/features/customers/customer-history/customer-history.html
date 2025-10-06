@@ -1,0 +1,350 @@
+<div class="card glass-card h-100 shadow-sm">
+
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Customer History</h5><span _ngcontent-ng-c1507357036="" class="text-color small"><a
+        class="btn btn-secondary" [routerLink]="['/customers']">Back to Customers</a></span>
+  </div>
+
+
+
+
+
+  <div class="card-body p-0">
+
+
+    <div class="customer-summary p-2" *ngIf="customer">
+      <h3>{{ customer.firstName }} {{ customer.lastName }}</h3>
+      <p><strong>Email:</strong> {{ customer.email }}</p>
+      <p><strong>Phone:</strong> {{ customer.phone }}</p>
+      <p><strong>Company:</strong> {{ customer.company || '—' }}</p>
+      <p><strong>Address:</strong> {{ customer.address || '—' }}</p>
+    </div>
+
+    <div class="history-section p-2">
+      <h3>Past Interactions</h3>
+      <div *ngIf="isLoading" class="loading">Loading history...</div>
+      <table class="table table-striped table-hover" *ngIf="!isLoading">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Call Type</th>
+            <th>Category</th>
+            <th>Sub Category</th>
+            <th>Order Id</th>
+            <th>Notes</th>
+            <th>Actions</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of calls">
+            <td>{{ c.date | date: 'short' }}</td>
+            <td>{{ c.callType }}</td>
+            <td>{{ c.category || '—' }}</td>
+            <td>{{ c.outcome || '—' }}</td>
+            <td>{{ c.orderId || '—' }}</td>
+            <td>{{ c.notes || '—' }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-primary" [routerLink]="['/calls', c.id]">View / Upload Files</a>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary" (click)="toggleDetails(c.id)">
+                {{ expandedId === c.id ? 'Hide' : 'View' }}
+              </button>
+            </td>
+          </tr>
+          <!-- Expanded details row -->
+          <tr *ngFor="let c of calls">
+            <td colspan="8" *ngIf="expandedId === c.id" class="bg-light">
+              <div class="row">
+                <div class="col-md-6" *ngIf="c.orderDetails">
+                  <h6>Order Details</h6>
+                  <table class="table table-sm mb-3">
+                    <tbody>
+                      <tr><th>Customer Name</th><td>{{ c.orderDetails.customerName }}</td></tr>
+                      <tr><th>Mobile No</th><td>{{ c.orderDetails.customerMobileNo }}</td></tr>
+                      <tr><th>MRP</th><td>{{ c.orderDetails.mrp }}</td></tr>
+                      <tr><th>Pay</th><td>{{ c.orderDetails.pay }}</td></tr>
+                      <tr><th>Order Id</th><td>{{ c.orderDetails.orderId }}</td></tr>
+                      <tr><th>Followup Date</th><td>{{ c.orderDetails.followupDate | date }}</td></tr>
+                      <tr><th>Alternate</th><td>{{ c.orderDetails.alternate }}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="col-md-6" *ngIf="c.refundDetails">
+                  <h6>Refund Details</h6>
+                  <table class="table table-sm mb-3">
+                    <tbody>
+                      <tr><th>Customer Name</th><td>{{ c.refundDetails.customerName }}</td></tr>
+                      <tr><th>Number</th><td>{{ c.refundDetails.customerNumber }}</td></tr>
+                      <tr><th>Order Id</th><td>{{ c.refundDetails.customerOrderId }}</td></tr>
+                      <tr><th>Medicine</th><td>{{ c.refundDetails.medicineName }}</td></tr>
+                      <tr><th>Qty</th><td>{{ c.refundDetails.medicineQty }}</td></tr>
+                      <tr><th>Reason</th><td>{{ c.refundDetails.returnReason }}</td></tr>
+                      <tr><th>Account Holder</th><td>{{ c.refundDetails.accountHolderName }}</td></tr>
+                      <tr><th>Account No</th><td>{{ c.refundDetails.accountNumber }}</td></tr>
+                      <tr><th>IFSC</th><td>{{ c.refundDetails.ifscCode }}</td></tr>
+                      <tr><th>Image</th><td>{{ c.refundDetails.imageName || '—' }}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div *ngIf="!c.orderDetails && !c.refundDetails" class="text-muted">No additional details.</div>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="calls.length === 0">
+            <td colspan="5" class="no-data">No interactions yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="log-section p-2">
+      <h3>Log New Interaction</h3>
+      <form [formGroup]="historyForm" (ngSubmit)="submitHistory()" class="log-form">
+        <div class="row">
+          <div class="col-md-3 mb-3">
+            <label class="form-label">Call Type</label>
+            <select class="form-select" formControlName="callType">
+              <option value="">Select call type</option>
+              <option *ngFor="let ct of callTypeOptions" [value]="ct.value">{{ ct.label }}</option>
+            </select>
+            <div class="invalid" *ngIf="historyForm.get('callType')?.invalid && historyForm.get('callType')?.touched">
+              Call type is required
+            </div>
+          </div>
+
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Category</label>
+            <select class="form-select" formControlName="category">
+              <option value="">Select category</option>
+              <option *ngFor="let c of currentCategories" [value]="c.value">{{ c.label }}</option>
+            </select>
+            <div class="invalid" *ngIf="historyForm.get('category')?.invalid && historyForm.get('category')?.touched">
+              Category is required
+            </div>
+          </div>
+
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Sub Category</label>
+            <select class="form-select" formControlName="subCategory">
+              <option value="">Select sub category</option>
+              <option *ngFor="let s of currentSubCategories" [value]="s.value">{{ s.label }}</option>
+            </select>
+            <div class="invalid" *ngIf="historyForm.get('subCategory')?.invalid && historyForm.get('subCategory')?.touched">
+              Sub Category is required
+            </div>
+          </div>
+
+          <div class="col-md-3 mb-3">
+            <label class="form-label">Order Id</label>
+            <div class="input-group">
+              <input class="form-control" formControlName="orderId" placeholder="Optional">
+              <button type="button" class="btn btn-outline-secondary" (click)="openOrderModal()">Add</button>
+            </div>
+          </div>
+
+          <div class="col-md-3 mb-3">
+            <label class="form-label">Date</label>
+            <input type="datetime-local" class="form-control" formControlName="date">
+            <div class="invalid" *ngIf="historyForm.get('date')?.invalid && historyForm.get('date')?.touched">
+              Date is required
+            </div>
+          </div>
+
+          <div class="col-md-12 mb-3">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="4" formControlName="notes" placeholder="Enter details..."></textarea>
+            <div class="invalid" *ngIf="historyForm.get('notes')?.invalid && historyForm.get('notes')?.touched">Notes
+              are required (min 5 characters)</div>
+          </div>
+        </div>
+
+        <div class="form-actions text-center">
+          <button class="btn text-center btn-primary" type="submit" [disabled]="historyForm.invalid">Log Interaction</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Refund Generation Modal -->
+    <div class="modal-backdrop" *ngIf="showRefundModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.35);"></div>
+    <div class="modal" *ngIf="showRefundModal" style="display:block; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 80%; max-width: 900px; background: #fff; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.2);">
+      <div class="modal-header p-3 border-bottom">
+        <h5 class="modal-title">Refund Generation Details</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="cancelRefundModal()"></button>
+      </div>
+      <div class="modal-body p-3">
+        <form [formGroup]="refundForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Customer Name</label>
+              <input class="form-control" formControlName="customerName" placeholder="Enter customer name">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Customer Number</label>
+              <input class="form-control" formControlName="customerNumber" placeholder="Enter 10-digit phone">
+              <div class="invalid" *ngIf="refundForm.get('customerNumber')?.invalid && refundForm.get('customerNumber')?.touched">Enter 10-digit number</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Customer Order Id</label>
+              <input class="form-control" formControlName="customerOrderId" placeholder="Order ID">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Medicine Name</label>
+              <input class="form-control" formControlName="medicineName" placeholder="Medicine name">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Medicine Qty</label>
+              <input class="form-control" formControlName="medicineQty" placeholder="Quantity">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Return Reason</label>
+              <input class="form-control" formControlName="returnReason" placeholder="Reason">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Account Holder Name</label>
+              <input class="form-control" formControlName="accountHolderName" placeholder="Account holder name">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Account Number</label>
+              <input class="form-control" formControlName="accountNumber" placeholder="Account number">
+              <div class="invalid" *ngIf="refundForm.get('accountNumber')?.invalid && refundForm.get('accountNumber')?.touched">Enter 9-18 digits</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">IFSC Code</label>
+              <input class="form-control" formControlName="ifscCode" placeholder="IFSC code">
+              <div class="invalid" *ngIf="refundForm.get('ifscCode')?.invalid && refundForm.get('ifscCode')?.touched">Format: XXXX0YYYYYY</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Upload Image</label>
+              <input type="file" class="form-control" (change)="onRefundImageSelected($event)" accept="image/*">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer p-3 border-top d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary" (click)="cancelRefundModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitRefundModal()">Save & Log</button>
+      </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div class="modal-backdrop" *ngIf="showOrderModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.35);"></div>
+    <div class="modal" *ngIf="showOrderModal" style="display:block; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 80%; max-width: 900px; background: #fff; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.2);">
+      <div class="modal-header p-3 border-bottom">
+        <h5 class="modal-title">Add Order Details</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="cancelOrderModal()"></button>
+      </div>
+      <div class="modal-body p-3">
+        <form [formGroup]="orderDetailsForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Customer Name</label>
+              <input class="form-control" formControlName="customerName">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Customer Mobile No</label>
+              <input class="form-control" formControlName="customerMobileNo" placeholder="Enter 10-digit phone">
+              <div class="invalid" *ngIf="orderDetailsForm.get('customerMobileNo')?.invalid && orderDetailsForm.get('customerMobileNo')?.touched">Enter 10-digit number</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">MRP</label>
+              <input class="form-control" formControlName="mrp" placeholder="e.g. 199.99">
+              <div class="invalid" *ngIf="orderDetailsForm.get('mrp')?.invalid && orderDetailsForm.get('mrp')?.touched">Enter a valid amount</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Pay</label>
+              <input class="form-control" formControlName="pay" placeholder="e.g. 149.00">
+              <div class="invalid" *ngIf="orderDetailsForm.get('pay')?.invalid && orderDetailsForm.get('pay')?.touched">Enter a valid amount</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Order Id</label>
+              <input class="form-control" formControlName="orderId">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Followup Date</label>
+              <input type="date" class="form-control" formControlName="followupDate">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Alternate</label>
+              <select class="form-select" formControlName="alternate">
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer p-3 border-top d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary" (click)="cancelOrderModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitOrderModal()">Save</button>
+      </div>
+    </div>
+
+    <!-- Listing Sections -->
+    <div class="p-3">
+      <h5>Refund Generation</h5>
+      <div *ngIf="refundDetailsList.length === 0" class="text-muted">No refund entries captured yet.</div>
+      <table class="table table-sm" *ngIf="refundDetailsList.length > 0">
+        <thead>
+          <tr>
+            <th>Customer Name</th>
+            <th>Number</th>
+            <th>Order Id</th>
+            <th>Medicine</th>
+            <th>Qty</th>
+            <th>Reason</th>
+            <th>Account Holder</th>
+            <th>Account No</th>
+            <th>IFSC</th>
+            <th>Image</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of refundDetailsList">
+            <td>{{ r.customerName }}</td>
+            <td>{{ r.customerNumber }}</td>
+            <td>{{ r.customerOrderId }}</td>
+            <td>{{ r.medicineName }}</td>
+            <td>{{ r.medicineQty }}</td>
+            <td>{{ r.returnReason }}</td>
+            <td>{{ r.accountHolderName }}</td>
+            <td>{{ r.accountNumber }}</td>
+            <td>{{ r.ifscCode }}</td>
+            <td>{{ r.imageName || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="p-3">
+      <h5>Order Details</h5>
+      <div *ngIf="orderDetailsList.length === 0" class="text-muted">No order details captured yet.</div>
+      <table class="table table-sm" *ngIf="orderDetailsList.length > 0">
+        <thead>
+          <tr>
+            <th>Customer Name</th>
+            <th>Mobile No</th>
+            <th>MRP</th>
+            <th>Pay</th>
+            <th>Order Id</th>
+            <th>Followup Date</th>
+            <th>Alternate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of orderDetailsList">
+            <td>{{ o.customerName }}</td>
+            <td>{{ o.customerMobileNo }}</td>
+            <td>{{ o.mrp }}</td>
+            <td>{{ o.pay }}</td>
+            <td>{{ o.orderId }}</td>
+            <td>{{ o.followupDate | date }}</td>
+            <td>{{ o.alternate }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>

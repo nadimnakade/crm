@@ -29,6 +29,11 @@ export class CallService {
     searchTerm?: string;
     status?: string;
     type?: string; // maps to callType
+    customerId?: number;
+    agentId?: number;
+    orderId?: string;
+    hasOrderDetails?: boolean;
+    hasRefundDetails?: boolean;
     startDate?: string;
     endDate?: string;
     sortBy?: string;
@@ -81,5 +86,20 @@ export class CallService {
       headers: this.getHeaders(),
       params
     });
+  }
+
+  // Upload a general document attachment for a call
+  uploadDocument(id: number | string, file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('document', file);
+    return this.http.post(`${this.apiUrl}/${id}/upload/document`, formData, {
+      // Authorization header is added by interceptor; do not set Content-Type for FormData
+      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
+    });
+  }
+
+  // List uploaded files for a call
+  getCallFiles(id: number | string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/${id}/files`, { headers: this.getHeaders() });
   }
 }

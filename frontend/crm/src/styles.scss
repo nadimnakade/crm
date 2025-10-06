@@ -9,6 +9,8 @@
   --bg-color: #f5f5f5;
   --card-bg: white;
   --text-color: #333;
+  --text-primary: #333;
+  --text-secondary: #555;
   --primary-color: #2c3e50;
   --primary-hover: #2980b9;
   --border-color: #ddd;
@@ -24,6 +26,8 @@ body.dark-theme {
   --bg-color: #121212;
   --card-bg: #1E1E1E;
   --text-color: #FFFFFF;
+  --text-primary: #eaeaea;
+  --text-secondary: #c7c7c7;
   --primary-color: #6F42C1;
   --primary-hover: #5a359a;
   --border-color: #2D2D2D;
@@ -39,4 +43,74 @@ body {
   background-color: var(--bg-color);
   color: var(--text-color);
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+
+/* Bootstrap card enhancement to mimic glassy Vision UI */
+.glass-card {
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(8px);
+}
+.glass-card .card-header {
+  background: linear-gradient(90deg, rgba(111,66,193,0.12) 0%, rgba(111,66,193,0.04) 100%);
+  border-bottom: 1px solid var(--border-color);
+  padding:10px;
+  margin-bottom: 10px;
+}
+.glass-card .list-group-item { 
+  background-color: transparent; 
+  border-color: var(--border-color); 
+  color: var(--text-primary);
+}
+.glass-card .table { 
+  --bs-table-bg: transparent; 
+  --bs-table-striped-color: var(--text-primary); 
+}
+.dark-theme .glass-card .table {
+  --bs-table-striped-bg: rgba(255,255,255,0.03);
+  --bs-table-hover-bg: rgba(111, 66, 193, 0.12);
+}
+.light-theme .glass-card .table {
+  --bs-table-striped-bg: rgba(0,0,0,0.03);
+  --bs-table-hover-bg: rgba(99, 102, 241, 0.10);
+}
+.glass-card .table thead th { color: var(--text-secondary); font-weight: 600; border-bottom-color: var(--border-color); }
+
+
+:host-context(.dark-theme) {
+  .card {
+    background-color: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .card-header {
+    background-color: #1a202c;
+    border-color: #4a5568;
+  }
+  
+  .table {
+    color: #e2e8f0;
+    
+    th, td {
+      border-color: #4a5568;
+      color: #e2e8f0;
+    }
+    
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+  
+  .form-control {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+    
+    &:focus {
+      background-color: #2d3748;
+      color: #e2e8f0;
+    }
+  }
 }

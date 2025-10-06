@@ -42,7 +42,7 @@ exports.getUserById = async (req, res) => {
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName, roleId, phone, isActive } = req.body;
+    const { username, email, password, firstName, lastName, roleId, phone, isActive, managerId } = req.body;
 
     const userExists = await User.findOne({ where: { email } });
     if (userExists) {
@@ -56,6 +56,7 @@ exports.createUser = async (req, res) => {
       firstName,
       lastName,
       roleId,
+      managerId,
       phone,
       isActive
     });
@@ -88,7 +89,7 @@ exports.updateUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { username, email, firstName, lastName, roleId, phone, isActive } = req.body;
+    const { username, email, firstName, lastName, roleId, phone, isActive, managerId } = req.body;
 
     // Update user fields
     if (username) user.username = username;
@@ -96,6 +97,7 @@ exports.updateUser = async (req, res) => {
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     if (roleId) user.roleId = roleId;
+    if (managerId !== undefined) user.managerId = managerId;
     if (phone !== undefined) user.phone = phone;
     if (isActive !== undefined) user.isActive = isActive;
 

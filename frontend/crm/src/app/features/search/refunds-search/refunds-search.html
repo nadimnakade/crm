@@ -1,0 +1,161 @@
+<div class="card glass-card h-100 shadow-sm">
+
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Refund Details</h5>
+  </div>
+
+  <div class="card-body p-2">
+
+
+    <form [formGroup]="form" (ngSubmit)="search()" class="search-form">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label>Refund Status</label>
+          <select class="form-control" formControlName="status">
+            <option *ngFor="let s of statuses" [value]="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label>Start Date</label>
+          <input class="form-control" type="date" formControlName="startDate" />
+        </div>
+        <div class="col-md-4">
+          <label>End Date</label>
+          <input class="form-control" type="date" formControlName="endDate" />
+        </div>
+        <div class="col-md-4">
+          <label>Agent</label>
+          <select class="form-control" formControlName="agentId">
+            <option value="">All</option>
+            <option *ngFor="let u of users" [value]="u.id">{{ u.firstName }} {{ u.lastName }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label>Page size</label>
+          <select class="form-control" [value]="pageSize" (change)="changePageSize($any($event.target).value)">
+            <option [value]="10">10</option>
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </div>
+      </div>
+      <div class="row mt-4">
+         <div class="form-actions text-center">
+          <button class="btn btn-primary text-center w-25" type="submit">Search</button>
+        </div>
+      </div>
+
+    </form>
+
+
+    <div class="table-responsive mt-4" *ngIf="!isLoading">
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>OrderId</th>
+            <th>CustomerName, Address</th>
+            <th>MobileNo</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of results">
+            <td>{{ r.orderId || (r.refundDetails?.customerOrderId) || '-' }}</td>
+            <td>{{ customerName(r) }}<span *ngIf="customerAddress(r)">, {{ customerAddress(r) }}</span></td>
+            <td>{{ customerPhone(r) }}</td>
+            <td><button class="btn btn-sm btn-outline-primary" (click)="view(r)">View</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="no-results" *ngIf="results.length === 0">No matching refunds found.</div>
+      <div class="pagination" *ngIf="total > pageSize">
+        <button class="btn btn-secondary" (click)="setPage(currentPage - 1)"
+          [disabled]="currentPage === 1">Prev</button>
+        <span>Page {{ currentPage }} of {{ totalPages() }}</span>
+        <button class="btn btn-secondary" (click)="setPage(currentPage + 1)"
+          [disabled]="currentPage === totalPages()">Next</button>
+      </div>
+    </div>
+
+    <div class="loading" *ngIf="isLoading">Loading…</div>
+
+    <!-- Details Modal -->
+    <div class="modal-backdrop" *ngIf="selectedCall" (click)="closeModal()"
+         style="position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1040;"></div>
+    <div class="modal" *ngIf="selectedCall"
+         style="display:block; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 80%; max-width: 900px; background: #fff; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.2); z-index: 1050;">
+      <div class="modal-header">
+        <h3>Refund Details</h3>
+        <button class="close btn btn-sm btn-light" (click)="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <table class="details-table" *ngIf="selectedCall?.refundDetails as d">
+          <tr>
+            <th>Order ID</th>
+            <td>{{ d?.customerOrderId || selectedCall.orderId || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Customer Name</th>
+            <td>{{ d?.customerName || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Address</th>
+            <td>{{ customerAddress(selectedCall) }}</td>
+          </tr>
+          <tr>
+            <th>Mobile No</th>
+            <td>{{ d?.customerNumber || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Medicine Name</th>
+            <td>{{ d?.medicineName || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Qty</th>
+            <td>{{ d?.medicineQty || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Return Reason</th>
+            <td>{{ d?.returnReason || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Account Holder</th>
+            <td>{{ d?.accountHolderName || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Account Number</th>
+            <td>{{ d?.accountNumber || '-' }}</td>
+          </tr>
+          <tr>
+            <th>IFSC</th>
+            <td>{{ d?.ifscCode || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Image</th>
+            <td>{{ d?.imageName || '—' }}</td>
+          </tr>
+        </table>
+        <div *ngIf="!selectedCall?.refundDetails">No structured refund details available.</div>
+
+        <!-- Upload refund document -->
+        <div class="mt-3">
+          <label class="form-label">Attach Document</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="file" class="form-control" (change)="onRefundDocSelected($event)" accept="image/*,.pdf" style="max-width: 400px;" />
+            <button class="btn btn-primary" (click)="uploadRefundDoc()" [disabled]="!selectedUploadFile || uploadInProgress">
+              {{ uploadInProgress ? 'Uploading…' : 'Upload' }}
+            </button>
+          </div>
+          <div class="mt-2 text-muted" *ngIf="uploadMessage">{{ uploadMessage }}</div>
+          <div class="mt-2" *ngIf="uploadedDocumentUrl">
+            <a [href]="uploadedDocumentUrl" target="_blank" rel="noopener">View uploaded document</a>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

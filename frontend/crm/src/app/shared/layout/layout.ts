@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../auth/auth';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-layout',
@@ -14,8 +15,10 @@ export class LayoutComponent implements OnInit {
   isDarkTheme = true;
   userName = '';
   isSidebarCollapsed = false;
+  userRole: string | null = null;
+  canManageUsersAndRoles: boolean = false;
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private router: Router) {}
 
   ngOnInit(): void {
     const savedTheme = localStorage.getItem('theme');
@@ -31,6 +34,11 @@ export class LayoutComponent implements OnInit {
     const user = this.authService.getUser();
     const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
     this.userName = fullName || user?.email || 'User';
+
+    // Determine role-based visibility for admin/superadmin
+    this.userRole = user?.role || null;
+    const role = (this.userRole || '').toLowerCase();
+    this.canManageUsersAndRoles = role === 'admin' || role === 'superadmin';
   }
 
   toggleTheme(): void {
@@ -42,5 +50,10 @@ export class LayoutComponent implements OnInit {
 
   toggleSidebar(): void {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

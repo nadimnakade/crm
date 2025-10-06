@@ -12,7 +12,7 @@ const Customer = sequelize.define('Customer', {
   },
   email: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     unique: true,
     validate: {
       isEmail: true
@@ -20,8 +20,7 @@ const Customer = sequelize.define('Customer', {
   },
   phone: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
+    allowNull: true
   },
   company: {
     type: DataTypes.STRING,
@@ -44,11 +43,7 @@ const Customer = sequelize.define('Customer', {
     allowNull: true
   }
 }, {
-  timestamps: true,
-  indexes: [
-    { unique: true, fields: ['email'] },
-    { unique: true, fields: ['phone'] }
-  ]
+  timestamps: true
 });
 
 module.exports = Customer;

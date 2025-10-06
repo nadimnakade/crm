@@ -10,6 +10,10 @@ const Call = sequelize.define('Call', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  orderId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   date: {
     type: DataTypes.DATE,
     allowNull: false
@@ -26,8 +30,20 @@ const Call = sequelize.define('Call', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   outcome: {
     type: DataTypes.STRING,
+    allowNull: true
+  },
+  orderDetails: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  refundDetails: {
+    type: DataTypes.JSON,
     allowNull: true
   },
   followUpRequired: {

@@ -125,7 +125,7 @@
 .avatar { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid var(--primary-color); }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-.content-slot { min-height: calc(100vh - 100px); }
+.content-slot { min-height: calc(100vh - 100px); padding: 10px; }
 
 /* Dark theme: nav icons have white background */
 .dark-theme .sidebar .nav-icon { color: #ffffff; }

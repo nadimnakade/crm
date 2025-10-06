@@ -27,6 +27,20 @@ export class CustomerService {
     return this.http.get<any[]>(this.apiUrl, { headers: this.getHeaders() });
   }
 
+  searchCustomers(
+    q: string,
+    page = 1,
+    pageSize = 10,
+    status: string = '',
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC'
+  ): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(this.apiUrl, {
+      headers: this.getHeaders(),
+      params: { q, page, pageSize, status, sortBy, sortOrder }
+    });
+  }
+
   getCustomer(id: number): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/${id}`, { headers: this.getHeaders() });
   }
@@ -41,5 +55,28 @@ export class CustomerService {
 
   deleteCustomer(id: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${id}`, { headers: this.getHeaders() });
+  }
+
+  // Attachments APIs
+  uploadCustomerFiles(id: number, files: File[], fileType?: string): Observable<{ files: any[] }> {
+    const token = this.authService.getToken();
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    if (fileType) form.append('fileType', fileType);
+    return this.http.post<{ files: any[] }>(`${this.apiUrl}/${id}/files`, form, {
+      headers: new HttpHeaders({ 'Authorization': `Bearer ${token}` })
+    });
+  }
+
+  getCustomerFiles(id: number): Observable<{ files: { filename: string; url: string }[] }> {
+    return this.http.get<{ files: { filename: string; url: string }[] }>(`${this.apiUrl}/${id}/files`, {
+      headers: this.getHeaders()
+    });
+  }
+
+  deleteCustomerFile(id: number, filename: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/${id}/files/${encodeURIComponent(filename)}`, {
+      headers: this.getHeaders()
+    });
   }
 }

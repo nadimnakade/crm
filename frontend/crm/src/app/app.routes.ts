@@ -8,7 +8,6 @@ export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-  { path: 'dashboard', component: DashboardComponent },
   // Authenticated app routes under shared layout
   {
     path: '',
@@ -16,13 +15,18 @@ export const routes: Routes = [
     canActivate: [AuthGuard],
     children: [
       { path: '', redirectTo: '/customers', pathMatch: 'full' },
+      { path: 'dashboard', component: DashboardComponent },
       // Customers (standalone components)
       { path: 'customers', loadComponent: () => import('./features/customers/customer-list/customer-list').then(m => m.CustomerListComponent) },
       { path: 'customers/new', loadComponent: () => import('./features/customers/customer-detail/customer-detail').then(m => m.CustomerDetailComponent) },
       { path: 'customers/:id', loadComponent: () => import('./features/customers/customer-detail/customer-detail').then(m => m.CustomerDetailComponent) },
+      { path: 'customers/:id/history', loadComponent: () => import('./features/customers/customer-history/customer-history').then(m => m.CustomerHistoryComponent) },
       // Calls (standalone components)
       { path: 'calls', loadComponent: () => import('./features/calls/call-list/call-list').then(m => m.CallListComponent) },
       { path: 'calls/:id', loadComponent: () => import('./features/calls/call-detail/call-detail').then(m => m.CallDetailComponent) },
+      // Search pages
+      { path: 'search/orders', loadComponent: () => import('./features/search/orders-search/orders-search').then(m => m.OrdersSearchComponent) },
+      { path: 'search/refunds', loadComponent: () => import('./features/search/refunds-search/refunds-search').then(m => m.RefundsSearchComponent) },
       // Placeholder routes
       { path: 'messages', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },
       { path: 'settings', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },
