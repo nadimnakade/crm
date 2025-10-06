@@ -1,0 +1,71 @@
+<div class="call-detail-container">
+  <div class="header">
+    <h2>{{ isEditMode ? 'Edit Call' : (isNewMode ? 'Log New Call' : 'Call Details') }}</h2>
+    <div class="actions" *ngIf="!isEditMode && !isNewMode">
+      <button class="btn-edit" (click)="toggleEditMode()">Edit</button>
+      <button class="btn-back" routerLink="/calls">Back to List</button>
+    </div>
+  </div>
+
+  <form *ngIf="call" [formGroup]="callForm" (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="customer">Customer</label>
+      <select id="customer" formControlName="customerId" [disabled]="!isEditMode && !isNewMode">
+        <option value="">Select a customer</option>
+        <option *ngFor="let customer of customers" [value]="customer.id">{{ customer.firstName }} {{ customer.lastName }}</option>
+      </select>
+      <div *ngIf="callForm.get('customerId')?.invalid && callForm.get('customerId')?.touched" class="error-message">
+        Customer is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="type">Call Type</label>
+      <select id="type" formControlName="type" [disabled]="!isEditMode && !isNewMode">
+        <option value="Inquiry">Inquiry</option>
+        <option value="Support">Support</option>
+        <option value="Complaint">Complaint</option>
+        <option value="Sales">Sales</option>
+        <option value="Follow-up">Follow-up</option>
+      </select>
+      <div *ngIf="callForm.get('type')?.invalid && callForm.get('type')?.touched" class="error-message">
+        Call type is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="status">Status</label>
+      <select id="status" formControlName="status" [disabled]="!isEditMode && !isNewMode">
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Resolved">Resolved</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <div *ngIf="callForm.get('status')?.invalid && callForm.get('status')?.touched" class="error-message">
+        Status is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="date">Date & Time</label>
+      <input type="datetime-local" id="date" formControlName="date" [readonly]="!isEditMode && !isNewMode">
+      <div *ngIf="callForm.get('date')?.invalid && callForm.get('date')?.touched" class="error-message">
+        Date is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea id="notes" formControlName="notes" [readonly]="!isEditMode && !isNewMode"></textarea>
+    </div>
+
+    <div class="form-actions" *ngIf="isEditMode || isNewMode">
+      <button type="submit" class="btn-save" [disabled]="callForm.invalid">Save</button>
+      <button type="button" class="btn-cancel" (click)="cancel()">Cancel</button>
+    </div>
+  </form>
+
+  <div *ngIf="!call && !isNewMode" class="loading">
+    Loading call details...
+  </div>
+</div>

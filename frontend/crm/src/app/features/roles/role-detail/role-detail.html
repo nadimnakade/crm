@@ -1,0 +1,56 @@
+<div class="role-detail-container">
+  <div class="header">
+    <h2>{{ isNewMode ? 'Create New Role' : (isEditMode ? 'Edit Role' : 'Role Details') }}</h2>
+    <div class="actions" *ngIf="!isNewMode && !isEditMode">
+      <button class="btn-edit" (click)="toggleEditMode()">Edit</button>
+      <button class="btn-back" routerLink="/roles">Back to Roles</button>
+    </div>
+    <div class="actions" *ngIf="isNewMode || isEditMode">
+      <button class="btn-cancel" (click)="cancel()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="!isNewMode && !roleForm && !isEditMode">
+    Loading role details...
+  </div>
+
+  <form *ngIf="roleForm" [formGroup]="roleForm" (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="name">Role Name</label>
+      <input type="text" id="name" formControlName="name" [readonly]="!isNewMode && !isEditMode">
+      <div class="error" *ngIf="roleForm.get('name')?.invalid && roleForm.get('name')?.touched">
+        Role name is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" formControlName="description" rows="3" [readonly]="!isNewMode && !isEditMode"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Permissions</label>
+      <div class="permissions-list">
+        <div *ngFor="let permission of permissions" class="permission-item">
+          <input 
+            type="checkbox" 
+            [id]="'permission-' + permission.id" 
+            [value]="permission.id" 
+            [checked]="isPermissionSelected(permission.id)"
+            (change)="togglePermission(permission.id)"
+            [disabled]="!isNewMode && !isEditMode">
+          <label [for]="'permission-' + permission.id">{{ permission.name }}</label>
+        </div>
+        <div *ngIf="permissions.length === 0" class="no-permissions">
+          No permissions available
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions" *ngIf="isNewMode || isEditMode">
+      <button type="submit" class="btn-submit" [disabled]="roleForm.invalid">
+        {{ isNewMode ? 'Create Role' : 'Update Role' }}
+      </button>
+    </div>
+  </form>
+</div>

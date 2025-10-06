@@ -1,0 +1,102 @@
+<div class="call-list-container">
+  <div class="header">
+    <h2>Status Update</h2>
+    <button class="btn-add" routerLink="/calls/new">Log New Call</button>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" placeholder="Search calls..." [(ngModel)]="searchTerm" (input)="onSearchInput($event.target.value)">
+  </div>
+
+  <div class="filters">
+    <div class="filter-item">
+      <label>Status</label>
+      <select [(ngModel)]="selectedStatus" (change)="filterCalls()">
+        <option value="">All</option>
+        <option value="new">New</option>
+        <option value="in-progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="missed">Missed</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="resolved">Resolved</option>
+        <option value="positive">Positive</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>Type</label>
+      <select [(ngModel)]="selectedType" (change)="filterCalls()">
+        <option value="">All</option>
+        <option value="inbound">Inbound</option>
+        <option value="outbound">Outbound</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>From</label>
+      <input type="date" [(ngModel)]="startDate" (change)="filterCalls()" />
+    </div>
+    <div class="filter-item">
+      <label>To</label>
+      <input type="date" [(ngModel)]="endDate" (change)="filterCalls()" />
+    </div>
+    <div class="filter-item">
+      <label>Page Size</label>
+      <select [(ngModel)]="pageSize" (change)="onPageSizeChange(pageSize)">
+        <option [ngValue]="5">5</option>
+        <option [ngValue]="10">10</option>
+        <option [ngValue]="20">20</option>
+        <option [ngValue]="50">50</option>
+      </select>
+    </div>
+    <div class="filters-actions">
+      <button class="btn-clear" type="button" (click)="clearFilters()">Clear Filters</button>
+    </div>
+  </div>
+
+  <table class="calls-table" *ngIf="filteredCalls.length > 0">
+    <thead>
+      <tr>
+        <th>Customer</th>
+        <th class="sortable" (click)="setSort('startTime')">Date
+          <span class="sort-indicator">{{ sortBy==='startTime' ? (sortOrder==='ASC' ? '▲' : '▼') : '' }}</span>
+        </th>
+        <th class="sortable" (click)="setSort('callType')">Type
+          <span class="sort-indicator">{{ sortBy==='callType' ? (sortOrder==='ASC' ? '▲' : '▼') : '' }}</span>
+        </th>
+        <th class="sortable" (click)="setSort('status')">Status
+          <span class="sort-indicator">{{ sortBy==='status' ? (sortOrder==='ASC' ? '▲' : '▼') : '' }}</span>
+        </th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let call of pagedCalls()">
+        <td>{{ call.customerName || (call.Customer?.firstName + ' ' + call.Customer?.lastName) }}</td>
+        <td>{{ call.startTime | date:'medium' }}</td>
+        <td>{{ call.callType }}</td>
+        <td>
+          <span class="status-chip" [ngClass]="getStatusClass(call.status)">{{ call.status }}</span>
+        </td>
+        <td class="actions">
+          <button class="btn-view" [routerLink]="['/calls', call.id]">View</button>
+          <button class="btn-edit" [routerLink]="['/calls', call.id, 'edit']">Edit</button>
+          <button class="btn-delete" (click)="deleteCall(call.id)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="no-calls" *ngIf="filteredCalls.length === 0">
+    No calls found. Try adjusting your search or add a new call.
+  </div>
+
+  <div class="results-info" *ngIf="filteredCalls.length > 0">
+    Showing {{ resultsStartIndex() }}–{{ resultsEndIndex() }} of {{ totalResults() }} results
+  </div>
+
+  <div class="pagination" *ngIf="filteredCalls.length > 0">
+    <button class="page-btn" (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
+    <span class="page-info">Page {{ currentPage }} of {{ totalPages() }}</span>
+    <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages()">Next</button>
+  </div>
+</div>

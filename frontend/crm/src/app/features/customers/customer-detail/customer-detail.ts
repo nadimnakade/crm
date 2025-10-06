@@ -1,0 +1,188 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { CustomerService } from '../../../shared/services/customer';
+import Swal from 'sweetalert2';
+import fa from '@angular/common/locales/fa';
+
+@Component({
+  selector: 'app-customer-detail',
+  standalone: true,
+  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+  templateUrl: './customer-detail.html',
+  styleUrls: ['./customer-detail.scss']
+})
+export class CustomerDetailComponent implements OnInit {
+  customer: any;
+  customerForm!: FormGroup;
+  isEditMode = false;
+  isNewMode = false;
+
+  constructor(
+    private customerService: CustomerService,
+    private route: ActivatedRoute,
+    private router: Router,
+    private fb: FormBuilder
+  ) { }
+
+  ngOnInit(): void {
+    this.initForm();
+    debugger
+    const id = this.route.snapshot.paramMap.get('id');
+    this.isNewMode = id == null ? true :false ;
+    
+    if (this.isNewMode) {
+      this.customer = {};
+    } else if (id) {
+      this.loadCustomer(+id);
+    }
+  }
+
+  initForm(): void {
+    this.customerForm = this.fb.group({
+      name: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      phone: ['', [Validators.required, Validators.pattern(/^[+()\-\s\d]{7,20}$/)]],
+      company: [''],
+      address: [''] 
+    });
+
+    if (this.isNewMode) {
+      this.isEditMode = true;
+    }
+  }
+
+  loadCustomer(id: number): void {
+    this.customerService.getCustomer(id).subscribe({
+      next: (data) => {
+        this.customer = data;
+        this.customerForm.patchValue({
+          name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+          email: data.email,
+          phone: data.phone || '',
+          company: data.company || '',
+          address: data.address || ''
+        });
+      },
+      error: (error) => {
+        console.error('Error loading customer', error);
+      }
+    });
+  }
+
+  toggleEditMode(): void {
+    this.isEditMode = !this.isEditMode;
+  }
+
+  onSubmit(): void {
+    if (this.customerForm.invalid) {
+      this.customerForm.markAllAsTouched();
+      Swal.fire({ icon: 'warning', title: 'Invalid form', text: 'Please fix the highlighted fields.' });
+      return;
+    }
+
+    const formValue = this.customerForm.value;
+    const trimmedName = (formValue.name || '').trim();
+    const parts = trimmedName.split(' ');
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+
+    const normalizePhone = (p: string) => (p || '').replace(/[\s\-()]/g, '');
+    const customerData = {
+      ...this.customer,
+      email: formValue.email,
+      phone: formValue.phone,
+      company: formValue.company,
+      address: formValue.address,
+      firstName,
+      lastName
+    };
+    // Uniqueness check for email and phone against existing customers
+    this.customerService.getCustomers().subscribe({
+      next: (customers) => {
+        const emailLower = (customerData.email || '').toLowerCase();
+        const phoneNorm = normalizePhone(customerData.phone || '');
+        const conflict = customers.some((c: any) => {
+          const sameEmail = (c.email || '').toLowerCase() === emailLower;
+          const samePhone = normalizePhone(c.phone || '') === phoneNorm;
+          const sameId = this.customer && c.id === this.customer.id;
+          return !sameId && (sameEmail || samePhone);
+        });
+
+        if (conflict) {
+          Swal.fire({ icon: 'error', title: 'Duplicate found', text: 'Email or phone already exists for another customer.' });
+          return;
+        }
+
+        if (this.isNewMode) {
+          this.customerService.createCustomer(customerData).subscribe({
+            next: () => {
+              Swal.fire({ icon: 'success', title: 'Customer created', timer: 1500, showConfirmButton: false })
+                .then(() => this.router.navigate(['/customers']));
+            },
+            error: (error) => {
+              console.error('Error creating customer', error);
+              Swal.fire({ icon: 'error', title: 'Create failed', text: 'Unable to create customer. Please try again.' });
+            }
+          });
+        } else {
+          this.customerService.updateCustomer(this.customer.id, customerData).subscribe({
+            next: () => {
+              this.isEditMode = false;
+              this.customer = customerData;
+              Swal.fire({ icon: 'success', title: 'Customer updated', timer: 1500, showConfirmButton: false });
+            },
+            error: (error) => {
+              console.error('Error updating customer', error);
+              Swal.fire({ icon: 'error', title: 'Update failed', text: 'Unable to update customer. Please try again.' });
+            }
+          });
+        }
+      },
+      error: (error) => {
+        console.error('Error validating uniqueness', error);
+        // Fallback: proceed with submit and rely on backend validation if present
+        if (this.isNewMode) {
+          this.customerService.createCustomer(customerData).subscribe({
+            next: () => {
+              Swal.fire({ icon: 'success', title: 'Customer created', timer: 1500, showConfirmButton: false })
+                .then(() => this.router.navigate(['/customers']));
+            },
+            error: (err) => {
+              console.error('Error creating customer', err);
+              Swal.fire({ icon: 'error', title: 'Create failed', text: 'Unable to create customer. Please try again.' });
+            }
+          });
+        } else {
+          this.customerService.updateCustomer(this.customer.id, customerData).subscribe({
+            next: () => {
+              this.isEditMode = false;
+              this.customer = customerData;
+              Swal.fire({ icon: 'success', title: 'Customer updated', timer: 1500, showConfirmButton: false });
+            },
+            error: (err) => {
+              console.error('Error updating customer', err);
+              Swal.fire({ icon: 'error', title: 'Update failed', text: 'Unable to update customer. Please try again.' });
+            }
+          });
+        }
+      }
+    });
+  }
+
+  cancel(): void {
+    if (this.isNewMode) {
+      this.router.navigate(['/customers']);
+    } else {
+      this.isEditMode = false;
+      this.customerForm.patchValue({
+        name: `${this.customer.firstName || ''} ${this.customer.lastName || ''}`.trim(),
+        email: this.customer.email,
+        phone: this.customer.phone || '',
+        company: this.customer.company || '',
+        address: this.customer.address || ''
+      });
+    }
+  }
+}

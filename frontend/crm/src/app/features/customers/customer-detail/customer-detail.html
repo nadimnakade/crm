@@ -1,0 +1,56 @@
+<div class="customer-detail-container">
+  <div class="header">
+    <h2>{{ isEditMode ? 'Edit Customer' : (isNewMode ? 'Add Customer' : 'Customer Details') }}</h2>
+    <div class="actions" *ngIf="!isEditMode && !isNewMode">
+      <button class="btn-edit" (click)="toggleEditMode()">Edit</button>
+      <button class="btn-back" routerLink="/customers">Back to List</button>
+    </div>
+  </div>
+
+  <form *ngIf="customer" [formGroup]="customerForm" (ngSubmit)="onSubmit()">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" formControlName="name" [readonly]="!isEditMode && !isNewMode">
+        <div *ngIf="customerForm.get('name')?.invalid && customerForm.get('name')?.touched" class="error-message">
+          Name is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" formControlName="email" [readonly]="!isEditMode && !isNewMode">
+        <div *ngIf="customerForm.get('email')?.invalid && customerForm.get('email')?.touched" class="error-message">
+          Please enter a valid email address
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Phone</label>
+        <input type="text" id="phone" formControlName="phone" [readonly]="!isEditMode && !isNewMode">
+        <div *ngIf="customerForm.get('phone')?.invalid && customerForm.get('phone')?.touched" class="error-message">
+          Phone is required and must be valid
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="company">Company</label>
+        <input type="text" id="company" formControlName="company" [readonly]="!isEditMode && !isNewMode">
+      </div>
+
+      <div class="form-group full-width">
+        <label for="address">Address</label>
+        <textarea id="address" formControlName="address" [readonly]="!isEditMode && !isNewMode"></textarea>
+      </div>
+    </div>
+
+    <div class="form-actions" *ngIf="isEditMode || isNewMode">
+      <button type="submit" class="btn btn-save" [disabled]="customerForm.invalid">Save</button>
+      <button type="button" class="btn btn-cancel" (click)="cancel()">Cancel</button>
+    </div>
+  </form>
+
+  <div *ngIf="!customer && !isNewMode" class="loading">
+    Loading customer details...
+  </div>
+</div>

@@ -1,0 +1,195 @@
+.call-list-container {
+  padding: 20px;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    h2 { margin: 0; color: var(--text-primary); }
+
+    .btn-add {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all .3s ease;
+      &:hover { opacity: .9; }
+    }
+  }
+
+  .search-bar {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 12px;
+    
+    input {
+      width: 100%;
+      padding: 6px 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 14px;
+      &:focus { outline: none; }
+    }
+  }
+
+  .filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px 12px;
+      color: var(--text-secondary);
+
+      label { font-size: 12px; }
+      select, input[type="date"] {
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        outline: none;
+        font-size: 14px;
+      }
+    }
+
+    .filters-actions {
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all .2s ease;
+      &:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+      }
+    }
+  }
+
+  .calls-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+    
+    th {
+      background-color: rgba(255,255,255,0.02);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    
+    tr:hover { background-color: rgba(111,66,193,0.06); }
+    
+    .actions {
+      display: flex;
+      gap: 8px;
+      
+      button {
+        border: none;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all .3s ease;
+        
+        &.btn-view {
+          background-color: var(--chart-blue);
+          color: #fff;
+          &:hover { opacity: .9; }
+        }
+        
+        &.btn-edit {
+          background-color: var(--warning-color);
+          color: #222;
+          &:hover { filter: brightness(0.95); }
+        }
+        
+        &.btn-delete {
+          background-color: var(--danger-color);
+          color: #fff;
+          &:hover { opacity: .9; }
+        }
+      }
+    }
+  }
+
+  .no-calls {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+  }
+
+  .status-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .chip { background-color: var(--border-color); }
+  .chip-primary { background-color: var(--primary-color); }
+  .chip-success { background-color: var(--success-color); }
+  .chip-warning { background-color: var(--warning-color); color: #222; }
+  .chip-danger { background-color: var(--danger-color); }
+  .chip-secondary { background-color: #6c757d; }
+  .chip-info { background-color: var(--info-color); }
+  .chip-default { background-color: var(--border-color); }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+
+    .page-btn {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all .3s ease;
+      &:disabled { opacity: .5; cursor: not-allowed; }
+      &:hover { opacity: .9; }
+    }
+
+    .page-info { color: var(--text-secondary); }
+  }
+
+  .results-info {
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+}

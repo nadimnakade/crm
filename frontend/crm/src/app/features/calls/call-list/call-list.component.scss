@@ -1,0 +1,107 @@
+.card {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: none;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #eee;
+  padding: 1rem 1.5rem;
+}
+
+.table {
+  margin-bottom: 0;
+  
+  th {
+    font-weight: 600;
+    border-top: none;
+  }
+  
+  td {
+    vertical-align: middle;
+  }
+}
+
+.btn-group {
+  .btn {
+    margin-right: 0.25rem;
+    
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+}
+
+// Status badges
+.badge {
+  padding: 0.5em 0.75em;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.badge-new {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.badge-in-progress {
+  background-color: #007bff;
+  color: white;
+}
+
+.badge-completed {
+  background-color: #28a745;
+  color: white;
+}
+
+.badge-scheduled {
+  background-color: #6f42c1;
+  color: white;
+}
+
+.badge-missed {
+  background-color: #dc3545;
+  color: white;
+}
+
+.badge-cancelled {
+  background-color: #6c757d;
+  color: white;
+}
+
+// Dark theme support
+:host-context(.dark-theme) {
+  .card {
+    background-color: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .card-header {
+    background-color: #1a202c;
+    border-color: #4a5568;
+  }
+  
+  .table {
+    color: #e2e8f0;
+    
+    th, td {
+      border-color: #4a5568;
+    }
+    
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+  
+  .form-control {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+    
+    &:focus {
+      background-color: #2d3748;
+      color: #e2e8f0;
+    }
+  }
+}

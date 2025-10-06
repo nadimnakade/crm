@@ -1,0 +1,90 @@
+const express = require('express');
+const router = express.Router();
+const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly } = require('../controllers/callController');
+const { getCallFiles, getCallHistory, getCallFilesSource, getCallHistorySource } = require('../controllers/callController');
+const { protect } = require('../middleware/auth');
+const upload = require('../utils/fileUpload');
+const { CallAttachment } = require('../models');
+
+// Call routes
+router.route('/')
+  .get(protect, getCalls)
+  .post(protect, createCall);
+
+// Analytics routes for dashboard
+router.get('/recent', protect, getRecentCalls);
+router.get('/top-callers/daily', protect, getTopCallersDaily);
+router.get('/top-callers/weekly', protect, getTopCallersWeekly);
+
+router.route('/:id')
+  .get(protect, getCallById)
+  .put(protect, updateCall)
+  .delete(protect, deleteCall);
+
+// Files and status history
+router.get('/:id/files', protect, getCallFiles);
+router.get('/:id/history', protect, getCallHistory);
+// Diagnostics (admin-only, enforced in controller)
+router.get('/:id/files/source', protect, getCallFilesSource);
+router.get('/:id/history/source', protect, getCallHistorySource);
+
+// File upload routes
+router.post('/:id/upload/medicine', protect, upload.single('medicineList'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const filePath = `/api/uploads/call-${req.params.id}/${req.file.filename}`;
+    // Insert attachment row
+    CallAttachment.create({
+      CallId: parseInt(req.params.id, 10),
+      Type: 'medicine',
+      FileName: req.file.originalname,
+      FilePath: filePath,
+      UploadedBy: req.user ? req.user.id : null
+    }).catch(err => console.error('Failed to insert attachment:', err));
+    res.status(200).json({ message: 'Medicine list uploaded successfully', filePath });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading file', error: error.message });
+  }
+});
+
+router.post('/:id/upload/prescription', protect, upload.single('prescription'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const filePath = `/api/uploads/call-${req.params.id}/${req.file.filename}`;
+    CallAttachment.create({
+      CallId: parseInt(req.params.id, 10),
+      Type: 'prescription',
+      FileName: req.file.originalname,
+      FilePath: filePath,
+      UploadedBy: req.user ? req.user.id : null
+    }).catch(err => console.error('Failed to insert attachment:', err));
+    res.status(200).json({ message: 'Prescription uploaded successfully', filePath });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading file', error: error.message });
+  }
+});
+
+router.post('/:id/upload/document', protect, upload.single('document'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const filePath = `/api/uploads/call-${req.params.id}/${req.file.filename}`;
+    CallAttachment.create({
+      CallId: parseInt(req.params.id, 10),
+      Type: 'document',
+      FileName: req.file.originalname,
+      FilePath: filePath,
+      UploadedBy: req.user ? req.user.id : null
+    }).catch(err => console.error('Failed to insert attachment:', err));
+    res.status(200).json({ message: 'Document uploaded successfully', filePath });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading file', error: error.message });
+  }
+});
+
+module.exports = router;

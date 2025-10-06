@@ -1,0 +1,194 @@
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header">
+      <h2>{{ isNewCall ? 'New Call' : 'Edit Call' }}</h2>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="callForm" (ngSubmit)="onSubmit()">
+        <div class="row">
+          <!-- Customer Selection -->
+          <div class="col-md-6 mb-3">
+            <label for="customerId" class="form-label">Customer</label>
+            <select id="customerId" formControlName="customerId" class="form-select">
+              <option value="">Select Customer</option>
+              <option *ngFor="let customer of customers" [value]="customer.id">
+                {{ customer.firstName }} {{ customer.lastName }}
+              </option>
+            </select>
+            <div *ngIf="callForm.get('customerId')?.invalid && callForm.get('customerId')?.touched" class="text-danger">
+              Customer is required
+            </div>
+          </div>
+
+          <!-- Order ID -->
+          <div class="col-md-6 mb-3">
+            <label for="orderId" class="form-label">Order ID</label>
+            <input type="text" id="orderId" formControlName="orderId" class="form-control">
+          </div>
+
+          <!-- Mobile Number -->
+          <div class="col-md-6 mb-3">
+            <label for="mobileNo" class="form-label">Mobile Number</label>
+            <input type="text" id="mobileNo" formControlName="mobileNo" class="form-control">
+          </div>
+
+          <!-- Address -->
+          <div class="col-md-6 mb-3">
+            <label for="address" class="form-label">Address</label>
+            <textarea id="address" formControlName="address" class="form-control" rows="2"></textarea>
+          </div>
+
+          <!-- Call Type -->
+          <div class="col-md-6 mb-3">
+            <label for="callType" class="form-label">Call Type</label>
+            <select id="callType" formControlName="callType" class="form-select">
+              <option value="inbound">Inbound</option>
+              <option value="outbound">Outbound</option>
+            </select>
+          </div>
+
+          <!-- Status -->
+          <div class="col-md-6 mb-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" formControlName="status" class="form-select">
+              <option value="new">New</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="missed">Missed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <!-- Start Time -->
+          <div class="col-md-6 mb-3">
+            <label for="startTime" class="form-label">Start Time</label>
+            <input type="datetime-local" id="startTime" formControlName="startTime" class="form-control">
+          </div>
+
+          <!-- End Time -->
+          <div class="col-md-6 mb-3">
+            <label for="endTime" class="form-label">End Time</label>
+            <input type="datetime-local" id="endTime" formControlName="endTime" class="form-control">
+          </div>
+
+          <!-- Notes -->
+          <div class="col-12 mb-3">
+            <label for="notes" class="form-label">Notes</label>
+            <textarea id="notes" formControlName="notes" class="form-control" rows="3"></textarea>
+          </div>
+
+          <!-- Follow Up Required -->
+          <div class="col-md-6 mb-3">
+            <div class="form-check">
+              <input type="checkbox" id="followUpRequired" formControlName="followUpRequired" class="form-check-input">
+              <label for="followUpRequired" class="form-check-label">Follow Up Required</label>
+            </div>
+          </div>
+
+          <!-- Follow Up Date -->
+          <div class="col-md-6 mb-3" *ngIf="callForm.get('followUpRequired')?.value">
+            <label for="followUpDate" class="form-label">Follow Up Date</label>
+            <input type="date" id="followUpDate" formControlName="followUpDate" class="form-control">
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary" [disabled]="callForm.invalid">
+            {{ isNewCall ? 'Create Call' : 'Update Call' }}
+          </button>
+        </div>
+      </form>
+
+      <!-- File Upload Section - Only visible for existing calls -->
+      <div *ngIf="!isNewCall" class="mt-4" id="attachments">
+        <h3>Attachments</h3>
+        <div class="mb-3">
+          <h5>Uploaded Files</h5>
+          <div *ngIf="attachments.length === 0" class="text-muted">
+            No files uploaded yet. Use upload cards below.
+          </div>
+          <ul class="list-group" *ngIf="attachments.length > 0">
+            <li class="list-group-item" *ngFor="let file of attachments">
+              <a [href]="file.url" target="_blank">{{ file.type | titlecase }}: {{ file.name }}</a>
+            </li>
+          </ul>
+        </div>
+        <div class="row">
+          <!-- Medicine List Upload -->
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">Medicine List</div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <input type="file" class="form-control" (change)="onMedicineListSelected($event)">
+                </div>
+                <button class="btn btn-outline-primary" [disabled]="!medicineListFile" (click)="uploadMedicineList()">
+                  Upload Medicine List
+                </button>
+                <div *ngIf="uploadMessages.medicineList" class="mt-2" 
+                     [ngClass]="{'text-success': uploadSuccess.medicineList, 'text-danger': !uploadSuccess.medicineList}">
+                  {{ uploadMessages.medicineList }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prescription Upload -->
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">Prescription</div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <input type="file" class="form-control" (change)="onPrescriptionSelected($event)">
+                </div>
+                <button class="btn btn-outline-primary" [disabled]="!prescriptionFile" (click)="uploadPrescription()">
+                  Upload Prescription
+                </button>
+                <div *ngIf="uploadMessages.prescription" class="mt-2"
+                     [ngClass]="{'text-success': uploadSuccess.prescription, 'text-danger': !uploadSuccess.prescription}">
+                  {{ uploadMessages.prescription }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Additional Document Upload -->
+          <div class="col-md-4 mb-3">
+            <div class="card">
+              <div class="card-header">Additional Document</div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <input type="file" class="form-control" (change)="onAdditionalFileSelected($event)">
+                </div>
+                <button class="btn btn-outline-primary" [disabled]="!additionalFile" (click)="uploadAdditionalFile()">
+                  Upload Document
+                </button>
+                <div *ngIf="uploadMessages.additional" class="mt-2"
+                     [ngClass]="{'text-success': uploadSuccess.additional, 'text-danger': !uploadSuccess.additional}">
+                  {{ uploadMessages.additional }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status History Section -->
+      <div *ngIf="!isNewCall" class="mt-4" id="history">
+        <h3>Status History</h3>
+        <div *ngIf="statusHistory.length === 0" class="text-muted">No status changes recorded yet.</div>
+        <ul class="list-group" *ngIf="statusHistory.length > 0">
+          <li class="list-group-item" *ngFor="let h of statusHistory">
+            <span>{{ h.changedAt | date:'short' }}: </span>
+            <strong>{{ h.previousStatus || 'N/A' }}</strong>
+            <span> → </span>
+            <strong>{{ h.newStatus }}</strong>
+            <span *ngIf="h.changedBy"> (by User #{{ h.changedBy }})</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

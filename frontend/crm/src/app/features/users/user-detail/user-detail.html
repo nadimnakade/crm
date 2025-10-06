@@ -1,0 +1,77 @@
+<div class="user-detail-container">
+  <div class="header">
+    <h2>{{ isNewMode ? 'Create New User' : (isEditMode ? 'Edit User' : 'User Details') }}</h2>
+    <div class="actions" *ngIf="!isNewMode && !isEditMode">
+      <button class="btn-edit" (click)="toggleEditMode()">Edit</button>
+      <button class="btn-back" routerLink="/users">Back to Users</button>
+    </div>
+    <div class="actions" *ngIf="isNewMode || isEditMode">
+      <button class="btn-cancel" (click)="cancel()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="!isNewMode && !userForm && !isEditMode">
+    Loading user details...
+  </div>
+
+  <form *ngIf="userForm" [formGroup]="userForm" (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="firstName">First Name</label>
+      <input type="text" id="firstName" formControlName="firstName" [readonly]="!isNewMode && !isEditMode">
+      <div class="error" *ngIf="userForm.get('firstName')?.invalid && userForm.get('firstName')?.touched">
+        First name is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="lastName">Last Name</label>
+      <input type="text" id="lastName" formControlName="lastName" [readonly]="!isNewMode && !isEditMode">
+      <div class="error" *ngIf="userForm.get('lastName')?.invalid && userForm.get('lastName')?.touched">
+        Last name is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" formControlName="email" [readonly]="!isNewMode && !isEditMode">
+      <div class="error" *ngIf="userForm.get('email')?.invalid && userForm.get('email')?.touched">
+        <span *ngIf="userForm.get('email')?.errors?.['required']">Email is required</span>
+        <span *ngIf="userForm.get('email')?.errors?.['email']">Please enter a valid email</span>
+      </div>
+    </div>
+
+    <div class="form-group" *ngIf="isNewMode || isEditMode">
+      <label for="password">Password</label>
+      <input type="password" id="password" formControlName="password">
+      <div class="error" *ngIf="userForm.get('password')?.invalid && userForm.get('password')?.touched">
+        <span *ngIf="userForm.get('password')?.errors?.['required']">Password is required</span>
+        <span *ngIf="userForm.get('password')?.errors?.['minlength']">Password must be at least 6 characters</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="role">Role</label>
+      <select id="role" formControlName="role" [disabled]="!isNewMode && !isEditMode">
+        <option value="">Select a role</option>
+        <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
+      </select>
+      <div class="error" *ngIf="userForm.get('role')?.invalid && userForm.get('role')?.touched">
+        Role is required
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="active">Status</label>
+      <div class="toggle-container">
+        <input type="checkbox" id="active" formControlName="active" [disabled]="!isNewMode && !isEditMode">
+        <label for="active" class="toggle-label">{{ userForm.get('active')?.value ? 'Active' : 'Inactive' }}</label>
+      </div>
+    </div>
+
+    <div class="form-actions" *ngIf="isNewMode || isEditMode">
+      <button type="submit" class="btn-submit" [disabled]="userForm.invalid">
+        {{ isNewMode ? 'Create User' : 'Update User' }}
+      </button>
+    </div>
+  </form>
+</div>

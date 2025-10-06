@@ -1,0 +1,40 @@
+<div class="customer-list-container">
+  <div class="header">
+    <h2>Customers</h2>
+    <button class="btn btn-primary" routerLink="/customers/new">Add Customer</button>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" placeholder="Search customers..." [(ngModel)]="searchTerm" (input)="filterCustomers()">
+  </div>
+
+  <div class="table-container">
+    <table class="table table-striped table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Company</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="filteredCustomers.length === 0">
+          <td colspan="5" class="no-data">No customers found</td>
+        </tr>
+        <tr *ngFor="let customer of filteredCustomers">
+          <td>{{ customer.firstName }} {{ customer.lastName }}</td>
+          <td>{{ customer.email }}</td>
+          <td>{{ customer.phone }}</td>
+          <td>{{ customer.company }}</td>
+          <td class="actions">
+            <button class="btn-view" [routerLink]="['/customers', customer.id]">View</button>
+            <button class="btn-edit" [routerLink]="['/customers', customer.id, 'edit']">Edit</button>
+            <button class="btn-delete" (click)="deleteCustomer(customer.id)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

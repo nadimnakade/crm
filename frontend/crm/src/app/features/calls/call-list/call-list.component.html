@@ -1,0 +1,63 @@
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2>Status Update</h2>
+      <div class="d-flex">
+        <input type="text" class="form-control me-2" placeholder="Search..." [(ngModel)]="searchTerm">
+        <button class="btn btn-primary" [routerLink]="['/calls', 'new']">New Call</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div *ngIf="isLoading" class="text-center">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped table-hover" *ngIf="!isLoading">
+          <thead>
+            <tr>
+              <th>Customer Name</th>
+              <th>Mobile No</th>
+              <th>Address</th>
+              <th>Status</th>
+              <th>Created On</th>
+              <th>Last Updated</th>
+              <th>Actions (View History)/View Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let call of filterCalls()">
+              <td>{{ getCustomerName(call.customerId) }}</td>
+              <td>{{ call.mobileNo || 'N/A' }}</td>
+              <td>{{ call.address || 'N/A' }}</td>
+              <td><span [ngClass]="getStatusClass(call.status)">{{ call.status }}</span></td>
+              <td>{{ formatDate(call.createdAt) }}</td>
+              <td>{{ formatDate(call.updatedAt) }}</td>
+              <td>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewCallDetails(call.id)" title="View Details">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-info" (click)="viewOrderDetails(call.id)" title="View Order">
+                    <i class="bi bi-box"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="viewHistory(call.id)" title="View History">
+                    <i class="bi bi-clock-history"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-success" (click)="viewFiles(call.id)" title="View Files">
+                    <i class="bi bi-paperclip"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="filterCalls().length === 0">
+              <td colspan="8" class="text-center">No calls found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
