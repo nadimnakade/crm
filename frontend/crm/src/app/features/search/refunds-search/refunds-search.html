@@ -61,7 +61,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let r of results">
-            <td>{{ r.orderId || (r.refundDetails?.customerOrderId) || '-' }}</td>
+            <td>{{ r.orderId || r.orderDetails?.orderId || (r.refundDetails?.customerOrderId) || '-' }}</td>
             <td>{{ customerName(r) }}<span *ngIf="customerAddress(r)">, {{ customerAddress(r) }}</span></td>
             <td>{{ customerPhone(r) }}</td>
             <td><button class="btn btn-sm btn-outline-primary" (click)="view(r)">View</button></td>
@@ -137,6 +137,16 @@
           </tr>
         </table>
         <div *ngIf="!selectedCall?.refundDetails">No structured refund details available.</div>
+
+        <!-- Order Details Section -->
+        <h5 class="mt-4">Order Details</h5>
+        <table class="details-table" *ngIf="selectedCall?.orderDetails as o">
+          <tr *ngFor="let kv of o | keyvalue">
+            <th>{{ kv.key }}</th>
+            <td>{{ formatValue(kv.value) }}</td>
+          </tr>
+        </table>
+        <div *ngIf="!selectedCall?.orderDetails">No order details provided.</div>
 
         <!-- Upload refund document -->
         <div class="mt-3">

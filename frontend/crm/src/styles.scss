@@ -19,6 +19,7 @@
   --error-bg: #fadbd8;
   --disabled-color: #95a5a6;
   --link-color: #3498db;
+  --thead-color: antiquewhite;
 }
 
 /* Dark theme variables */
@@ -36,6 +37,7 @@ body.dark-theme {
   --error-bg: #2d1b1b;
   --disabled-color: #4a5568;
   --link-color: #6F42C1;
+  --thead-color: #2d1b1b;
 }
 
 /* Apply theme to body */
@@ -113,4 +115,9 @@ body {
       color: #e2e8f0;
     }
   }
+}
+
+ .table > thead {
+    background: var(--thead-color) !important;
+    vertical-align: bottom;
 }

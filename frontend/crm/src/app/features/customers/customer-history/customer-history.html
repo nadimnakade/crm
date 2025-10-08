@@ -31,7 +31,7 @@
             <th>Category</th>
             <th>Sub Category</th>
             <th>Order Id</th>
-            <th>Notes</th>
+            <!-- <th>Notes</th> -->
             <th>Actions</th>
             <th>Details</th>
           </tr>
@@ -42,8 +42,8 @@
             <td>{{ c.callType }}</td>
             <td>{{ c.category || '—' }}</td>
             <td>{{ c.outcome || '—' }}</td>
-            <td>{{ c.orderId || '—' }}</td>
-            <td>{{ c.notes || '—' }}</td>
+            <td>{{ c.orderId || c.orderDetails?.orderId || '—' }}</td>
+            <!-- <td>{{ c.notes || '—' }}</td> -->
             <td>
               <a class="btn btn-sm btn-outline-primary" [routerLink]="['/calls', c.id]">View / Upload Files</a>
             </td>

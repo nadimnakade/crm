@@ -177,4 +177,13 @@ export class RefundsSearchComponent implements OnInit {
       return undefined;
     }
   }
+
+  formatValue(value: any): string {
+    if (value === null || value === undefined) return '—';
+    if (Array.isArray(value)) return value.map(v => this.formatValue(v)).join(', ');
+    if (typeof value === 'object') {
+      try { return JSON.stringify(value); } catch { return String(value); }
+    }
+    return String(value);
+  }
 }

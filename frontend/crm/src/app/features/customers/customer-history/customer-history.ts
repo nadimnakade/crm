@@ -249,7 +249,26 @@ export class CustomerHistoryComponent implements OnInit {
     this.isLoading = true;
     this.callService.getCalls({ customerId: this.customerId, pageSize: 100, sortBy: 'date', sortOrder: 'DESC' }).subscribe({
       next: (resp) => {
-        this.calls = resp.data || [];
+        const data = Array.isArray(resp.data) ? resp.data : [];
+        // Normalize NVARCHAR JSON fields for order/refund details
+        const normalized = data.map((c: any) => ({
+          ...c,
+          orderDetails: typeof c.orderDetails === 'string' ? this.parseJSON(c.orderDetails) : c.orderDetails,
+          refundDetails: typeof c.refundDetails === 'string' ? this.parseJSON(c.refundDetails) : c.refundDetails
+        }));
+        this.calls = normalized;
+        // Populate the bottom Order Details section from persisted history
+        this.orderDetailsList = normalized
+          .filter((c: any) => !!c.orderDetails)
+          .map((c: any) => ({
+            customerName: c.orderDetails.customerName || '',
+            customerMobileNo: c.orderDetails.customerMobileNo || '',
+            mrp: c.orderDetails.mrp || '',
+            pay: c.orderDetails.pay || '',
+            orderId: c.orderDetails.orderId || '',
+            followupDate: c.orderDetails.followupDate || '',
+            alternate: c.orderDetails.alternate || 'No'
+          }));
         this.isLoading = false;
       },
       error: (err) => {
@@ -257,6 +276,17 @@ export class CustomerHistoryComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  private parseJSON(value: any): any {
+    if (!value) return undefined;
+    if (typeof value !== 'string') return value;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   submitHistory(): void {

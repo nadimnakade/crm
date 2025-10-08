@@ -61,7 +61,12 @@ export class OrdersSearchComponent implements OnInit {
       sortOrder: 'DESC'
     }).subscribe({
       next: (res) => {
-        this.results = res.data || [];
+        const data = Array.isArray(res.data) ? res.data : [];
+        // Normalize NVARCHAR JSON fields coming from MSSQL
+        this.results = data.map((r: any) => ({
+          ...r,
+          orderDetails: typeof r.orderDetails === 'string' ? this.parseJSON(r.orderDetails) : r.orderDetails
+        }));
         this.total = res.total || 0;
         this.isLoading = false;
       },
@@ -106,5 +111,16 @@ export class OrdersSearchComponent implements OnInit {
   customerPhone(call: any): string {
     const c = call?.Customer || call?.customer;
     return c?.phone || '';
+  }
+
+  private parseJSON(value: any): any {
+    if (!value) return undefined;
+    if (typeof value !== 'string') return value;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
