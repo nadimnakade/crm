@@ -71,6 +71,8 @@ app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/calls', require('./routes/callRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
+app.use('/api/portfolio', require('./routes/portfolioRoutes'));
+app.use('/api/customer-medicine-details', require('./routes/customerMedicineDetailRoutes'));
 
 // Serve frontend static files after API routes
 const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm');

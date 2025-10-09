@@ -20,6 +20,10 @@
         <i class="fa-solid fa-users nav-icon"></i>
         <span class="nav-label">Customers</span>
       </a>
+      <a routerLink="/portfolio" routerLinkActive="active" class="nav-item">
+        <i class="fa-solid fa-folder-open nav-icon"></i>
+        <span class="nav-label">Portfolio</span>
+      </a>
       <a routerLink="/search/orders" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-magnifying-glass nav-icon"></i>
         <span class="nav-label">Orders</span>
@@ -27,6 +31,10 @@
       <a routerLink="/search/refunds" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-magnifying-glass-dollar nav-icon"></i>
         <span class="nav-label">Refunds</span>
+      </a>
+      <a routerLink="/customer-medicine-detail" routerLinkActive="active" class="nav-item">
+        <i class="fa-solid fa-pills nav-icon"></i>
+        <span class="nav-label">Customer Medicine Detail</span>
       </a>
       <a *ngIf="canManageUsersAndRoles" routerLink="/users" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-table-list nav-icon"></i>

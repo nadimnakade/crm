@@ -1,0 +1,16 @@
+.card-body .form-label { font-weight: 600; }
+.list-group-item { background-color: transparent; }
+.portfolio-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 2050;
+}
+.portfolio-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2060;
+}

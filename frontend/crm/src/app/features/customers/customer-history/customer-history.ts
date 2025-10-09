@@ -71,6 +71,12 @@ export class CustomerHistoryComponent implements OnInit {
   // Expanded interaction details row state
   expandedId: number | null = null;
 
+  // Attachments per call (loaded on demand)
+  attachmentsByCall: Record<number, Array<{ name: string; url: string; type: string }>> = {};
+
+  // Order modal mode: add new vs view existing
+  orderModalMode: 'add' | 'view' = 'add';
+
   constructor(
     private route: ActivatedRoute,
     private customerService: CustomerService,
@@ -161,6 +167,9 @@ export class CustomerHistoryComponent implements OnInit {
 
   toggleDetails(id: number): void {
     this.expandedId = this.expandedId === id ? null : id;
+    if (this.expandedId) {
+      this.loadAttachments(this.expandedId);
+    }
   }
 
   onRefundImageSelected(event: Event): void {
@@ -176,6 +185,7 @@ export class CustomerHistoryComponent implements OnInit {
 
   submitRefundModal(): void {
     if (this.refundForm.invalid) {
+      this.refundForm.markAllAsTouched();
       Swal.fire({ icon: 'warning', title: 'Incomplete details', text: 'Please fill all required fields.' });
       return;
     }
@@ -208,16 +218,25 @@ export class CustomerHistoryComponent implements OnInit {
   }
 
   openOrderModal(): void {
+    this.orderModalMode = 'add';
     this.showOrderModal = true;
   }
 
   cancelOrderModal(): void {
     this.showOrderModal = false;
+    this.orderModalMode = 'add';
   }
 
   submitOrderModal(): void {
     if (this.orderDetailsForm.invalid) {
+      this.orderDetailsForm.markAllAsTouched();
       Swal.fire({ icon: 'warning', title: 'Incomplete details', text: 'Please fill all required fields.' });
+      return;
+    }
+    if (this.orderModalMode === 'view') {
+      // View-only mode: no submission, just close
+      this.showOrderModal = false;
+      this.orderModalMode = 'add';
       return;
     }
     const v = this.orderDetailsForm.value;
@@ -234,6 +253,40 @@ export class CustomerHistoryComponent implements OnInit {
       alternate: v.alternate
     });
     this.showOrderModal = false;
+  }
+
+  // Open order details modal for an existing call (view-only)
+  openOrderModalForCall(call: any): void {
+    const od = typeof call.orderDetails === 'string' ? this.parseJSON(call.orderDetails) : call.orderDetails;
+    if (!od) {
+      Swal.fire({ icon: 'info', title: 'No order details', text: 'This interaction has no order details.' });
+      return;
+    }
+    this.orderDetailsForm.patchValue({
+      customerName: od.customerName || '',
+      customerMobileNo: od.customerMobileNo || '',
+      mrp: od.mrp || '',
+      pay: od.pay || '',
+      orderId: od.orderId || '',
+      followupDate: od.followupDate || '',
+      alternate: od.alternate || 'No'
+    });
+    this.orderModalMode = 'view';
+    this.showOrderModal = true;
+  }
+
+  // Load attachments for a specific call
+  loadAttachments(callId: number): void {
+    if (!callId) return;
+    this.callService.getCallFiles(callId).subscribe({
+      next: (files) => {
+        this.attachmentsByCall[callId] = Array.isArray(files) ? files : [];
+      },
+      error: (err) => {
+        console.error('Failed to load attachments', err);
+        this.attachmentsByCall[callId] = [];
+      }
+    });
   }
 
   loadCustomer(): void {

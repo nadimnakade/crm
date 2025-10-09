@@ -1,8 +1,11 @@
 import { Component, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../shared/auth/auth';
 import { CallService } from '../../shared/services/call';
+import { PortfolioService } from '../../shared/services/portfolio';
+import { CustomerMedicineDetailService } from '../../shared/services/customer-medicine-detail';
 import { Chart, registerables } from 'chart.js';
 
 // Register all Chart.js components
@@ -11,11 +14,12 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss']
 })
 export class DashboardComponent implements OnInit, AfterViewInit {
+  Math = Math;
   @ViewChild('callsByAgentChart') callsByAgentChart!: ElementRef;
   @ViewChild('callTypeChart') callTypeChart!: ElementRef;
   
@@ -30,13 +34,37 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   recentCalls: any[] = [];
   topCallersDaily: any[] = [];
   topCallersWeekly: any[] = [];
+  // Customer Medicine Details recent list
+  cmdItems: any[] = [];
+  cmdSearch: string = '';
+  cmdPage: number = 1;
+  cmdPageSize: number = 10;
+  cmdTotal: number = 0;
+  cmdLoading: boolean = false;
+  // Detail modal state
+  showCmdDetail: boolean = false;
+  cmdDetailMobile: string = '';
+  cmdDetailItems: any[] = [];
+  cmdDetailPage: number = 1;
+  cmdDetailPageSize: number = 10;
+  cmdDetailTotal: number = 0;
+  cmdDetailLoading: boolean = false;
+  // Portfolio search state
+  portfolioMobile: string = '';
+  portfolioItems: any[] = [];
+  portfolioTotal: number = 0;
   
   // Chart objects
   agentChart!: Chart;
   typeChart!: Chart;
   weeklySalesChart!: Chart;
 
-  constructor(private authService: AuthService, private callService: CallService) { }
+  constructor(
+    private authService: AuthService,
+    private callService: CallService,
+    private portfolioService: PortfolioService,
+    private cmdService: CustomerMedicineDetailService
+  ) { }
 
   ngOnInit(): void {
     // Check for saved theme preference
@@ -136,6 +164,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       next: (rows) => this.topCallersWeekly = rows || [],
       error: () => this.topCallersWeekly = []
     });
+
+    // Default portfolio list (unique by mobile)
+    this.portfolioService.list({ unique: true, page: 1, pageSize: 10 }).subscribe({
+      next: (res) => {
+        this.portfolioItems = res.items || [];
+        this.portfolioTotal = res.total || this.portfolioItems.length;
+      },
+      error: () => {
+        this.portfolioItems = [];
+        this.portfolioTotal = 0;
+      }
+    });
+
+    // Customer Medicine Details unique list (by mobile)
+    this.loadCmdUnique();
   }
   
   initCallsByAgentChart(): void {
@@ -302,6 +345,103 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
   }
 
+  // --- Customer Medicine Detail unique list (dashboard) ---
+  loadCmdUnique(): void {
+    this.cmdLoading = true;
+    this.cmdService.list({
+      page: this.cmdPage,
+      pageSize: this.cmdPageSize,
+      sortBy: 'uploadedAt',
+      sortOrder: 'desc',
+      q: this.cmdSearch,
+      unique: true
+    }).subscribe({
+      next: (res) => {
+        this.cmdItems = res?.items || [];
+        this.cmdTotal = res?.total || (this.cmdItems?.length || 0);
+        this.cmdLoading = false;
+      },
+      error: () => {
+        this.cmdItems = [];
+        this.cmdTotal = 0;
+        this.cmdLoading = false;
+      }
+    });
+  }
+
+  searchCmd(): void {
+    this.cmdPage = 1;
+    this.loadCmdUnique();
+  }
+
+  prevCmdPage(): void {
+    if (this.cmdPage > 1) {
+      this.cmdPage--;
+      this.loadCmdUnique();
+    }
+  }
+
+  nextCmdPage(): void {
+    const maxPage = Math.ceil((this.cmdTotal || 0) / this.cmdPageSize);
+    if (this.cmdPage < maxPage) {
+      this.cmdPage++;
+      this.loadCmdUnique();
+    }
+  }
+
+  openCmdDetail(mobile: string): void {
+    this.cmdDetailMobile = (mobile || '').replace(/[^0-9]/g, '');
+    if (!this.cmdDetailMobile) return;
+    this.cmdDetailPage = 1;
+    this.showCmdDetail = true;
+    this.loadCmdDetail();
+  }
+
+  closeCmdDetail(): void {
+    this.showCmdDetail = false;
+    this.cmdDetailMobile = '';
+    this.cmdDetailItems = [];
+    this.cmdDetailTotal = 0;
+  }
+
+  loadCmdDetail(): void {
+    if (!this.cmdDetailMobile) return;
+    this.cmdDetailLoading = true;
+    this.cmdService.list({
+      page: this.cmdDetailPage,
+      pageSize: this.cmdDetailPageSize,
+      sortBy: 'uploadedAt',
+      sortOrder: 'desc',
+      mobile: this.cmdDetailMobile
+    }).subscribe({
+      next: (res) => {
+        this.cmdDetailItems = res?.items || [];
+        this.cmdDetailTotal = res?.total || (this.cmdDetailItems?.length || 0);
+        this.cmdDetailLoading = false;
+      },
+      error: () => {
+        this.cmdDetailItems = [];
+        this.cmdDetailTotal = 0;
+        this.cmdDetailLoading = false;
+      }
+    });
+  }
+
+  prevCmdDetailPage(): void {
+    if (this.cmdDetailPage > 1) {
+      this.cmdDetailPage--;
+      this.loadCmdDetail();
+    }
+  }
+
+  nextCmdDetailPage(): void {
+    const maxPage = Math.ceil((this.cmdDetailTotal || 0) / this.cmdDetailPageSize);
+    if (this.cmdDetailPage < maxPage) {
+      this.cmdDetailPage++;
+      this.loadCmdDetail();
+    }
+  }
+
   toggleTheme(): void {
     this.isDarkTheme = !this.isDarkTheme;
     localStorage.setItem('theme', this.isDarkTheme ? 'dark' : 'light');
@@ -331,5 +471,20 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   logout(): void {
     this.authService.logout();
     window.location.href = '/login';
+  }
+
+  // Portfolio search by mobile/name/address
+  searchPortfolio(): void {
+    const input = (this.portfolioMobile || '').trim();
+    const mobileDigits = input.replace(/[^0-9]/g, '');
+    const isFullMobile = /^[0-9]{10}$/.test(mobileDigits);
+    const params = isFullMobile ? { mobile: mobileDigits } : { q: input };
+    this.portfolioService.list(params as any).subscribe({
+      next: (res) => this.portfolioItems = res.items || [],
+      error: (err) => {
+        console.error('Failed to fetch portfolio', err);
+        this.portfolioItems = [];
+      }
+    });
   }
 }

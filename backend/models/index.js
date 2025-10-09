@@ -3,6 +3,7 @@ const Role = require('./Role');
 const Customer = require('./Customer');
 const Call = require('./Call');
 const CallAttachment = require('./CallAttachment');
+const CustomerPortfolio = require('./CustomerPortfolio');
 const CallStatusHistory = require('./CallStatusHistory');
 const { sequelize } = require('../config/db');
 
@@ -104,6 +105,7 @@ module.exports = {
   Call,
   CallAttachment,
   CallStatusHistory,
+  CustomerPortfolio,
   sequelize,
   syncDatabase
 };

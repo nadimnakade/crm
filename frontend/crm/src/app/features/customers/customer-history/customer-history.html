@@ -9,7 +9,7 @@
 
 
 
-  <div class="card-body p-0">
+  <div class="card-body p-4">
 
 
     <div class="customer-summary p-2" *ngIf="customer">
@@ -46,6 +46,7 @@
             <!-- <td>{{ c.notes || '—' }}</td> -->
             <td>
               <a class="btn btn-sm btn-outline-primary" [routerLink]="['/calls', c.id]">View / Upload Files</a>
+              <button class="btn btn-sm btn-outline-info ms-2" (click)="openOrderModalForCall(c)" [disabled]="!c.orderDetails">Order Details</button>
             </td>
             <td>
               <button class="btn btn-sm btn-outline-secondary" (click)="toggleDetails(c.id)">
@@ -87,6 +88,17 @@
                       <tr><th>Image</th><td>{{ c.refundDetails.imageName || '—' }}</td></tr>
                     </tbody>
                   </table>
+                </div>
+                <div class="col-12 mt-2">
+                  <h6>Attachments</h6>
+                  <div *ngIf="!attachmentsByCall[c.id]" class="text-muted">Loading attachments...</div>
+                  <div *ngIf="attachmentsByCall[c.id] && attachmentsByCall[c.id].length === 0" class="text-muted">No attachments</div>
+                  <ul *ngIf="attachmentsByCall[c.id] && attachmentsByCall[c.id].length > 0" class="mb-0">
+                    <li *ngFor="let f of attachmentsByCall[c.id]">
+                      <a [href]="f.url" target="_blank">{{ f.name }}</a>
+                      <span class="badge bg-secondary ms-2">{{ f.type }}</span>
+                    </li>
+                  </ul>
                 </div>
                 <div *ngIf="!c.orderDetails && !c.refundDetails" class="text-muted">No additional details.</div>
               </div>
@@ -182,7 +194,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Customer Number</label>
-              <input class="form-control" formControlName="customerNumber" placeholder="Enter 10-digit phone">
+              <input class="form-control" type="tel" inputmode="numeric" maxlength="10" pattern="\\d{10}" formControlName="customerNumber" placeholder="Enter 10-digit phone">
               <div class="invalid" *ngIf="refundForm.get('customerNumber')?.invalid && refundForm.get('customerNumber')?.touched">Enter 10-digit number</div>
             </div>
             <div class="col-md-6 mb-3">
@@ -195,7 +207,8 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Medicine Qty</label>
-              <input class="form-control" formControlName="medicineQty" placeholder="Quantity">
+              <input class="form-control" type="number" min="1" step="1" formControlName="medicineQty" placeholder="Quantity">
+              <div class="invalid" *ngIf="refundForm.get('medicineQty')?.invalid && refundForm.get('medicineQty')?.touched">Enter a valid quantity</div>
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Return Reason</label>
@@ -207,7 +220,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Account Number</label>
-              <input class="form-control" formControlName="accountNumber" placeholder="Account number">
+              <input class="form-control" inputmode="numeric" minlength="9" maxlength="18" pattern="\\d{9,18}" formControlName="accountNumber" placeholder="Account number">
               <div class="invalid" *ngIf="refundForm.get('accountNumber')?.invalid && refundForm.get('accountNumber')?.touched">Enter 9-18 digits</div>
             </div>
             <div class="col-md-6 mb-3">
@@ -224,7 +237,7 @@
       </div>
       <div class="modal-footer p-3 border-top d-flex justify-content-end gap-2">
         <button class="btn btn-outline-secondary" (click)="cancelRefundModal()">Cancel</button>
-        <button class="btn btn-primary" (click)="submitRefundModal()">Save & Log</button>
+        <button class="btn btn-primary" (click)="submitRefundModal()" [disabled]="refundForm.invalid">Save & Log</button>
       </div>
     </div>
 
@@ -244,17 +257,17 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Customer Mobile No</label>
-              <input class="form-control" formControlName="customerMobileNo" placeholder="Enter 10-digit phone">
+              <input class="form-control" type="tel" inputmode="numeric" maxlength="10" pattern="\\d{10}" formControlName="customerMobileNo" placeholder="Enter 10-digit phone">
               <div class="invalid" *ngIf="orderDetailsForm.get('customerMobileNo')?.invalid && orderDetailsForm.get('customerMobileNo')?.touched">Enter 10-digit number</div>
             </div>
             <div class="col-md-4 mb-3">
               <label class="form-label">MRP</label>
-              <input class="form-control" formControlName="mrp" placeholder="e.g. 199.99">
+              <input class="form-control" type="number" min="0" step="0.01" formControlName="mrp" placeholder="e.g. 199.99">
               <div class="invalid" *ngIf="orderDetailsForm.get('mrp')?.invalid && orderDetailsForm.get('mrp')?.touched">Enter a valid amount</div>
             </div>
             <div class="col-md-4 mb-3">
               <label class="form-label">Pay</label>
-              <input class="form-control" formControlName="pay" placeholder="e.g. 149.00">
+              <input class="form-control" type="number" min="0" step="0.01" formControlName="pay" placeholder="e.g. 149.00">
               <div class="invalid" *ngIf="orderDetailsForm.get('pay')?.invalid && orderDetailsForm.get('pay')?.touched">Enter a valid amount</div>
             </div>
             <div class="col-md-4 mb-3">
@@ -276,8 +289,8 @@
         </form>
       </div>
       <div class="modal-footer p-3 border-top d-flex justify-content-end gap-2">
-        <button class="btn btn-outline-secondary" (click)="cancelOrderModal()">Cancel</button>
-        <button class="btn btn-primary" (click)="submitOrderModal()">Save</button>
+        <button class="btn btn-outline-secondary" (click)="cancelOrderModal()">Close</button>
+        <button class="btn btn-primary" (click)="submitOrderModal()" *ngIf="orderModalMode === 'add'" [disabled]="orderDetailsForm.invalid">Save</button>
       </div>
     </div>
 
