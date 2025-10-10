@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly } = require('../controllers/callController');
 const { getCallFiles, getCallHistory, getCallFilesSource, getCallHistorySource } = require('../controllers/callController');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const upload = require('../utils/fileUpload');
 const { CallAttachment } = require('../models');
 
@@ -18,8 +18,8 @@ router.get('/top-callers/weekly', protect, getTopCallersWeekly);
 
 router.route('/:id')
   .get(protect, getCallById)
-  .put(protect, updateCall)
-  .delete(protect, deleteCall);
+  .put(protect, authorize('Admin', 'Super Admin', 'admin'), updateCall)
+  .delete(protect, authorize('Admin', 'Super Admin', 'admin'), deleteCall);
 
 // Files and status history
 router.get('/:id/files', protect, getCallFiles);

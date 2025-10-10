@@ -20,7 +20,7 @@
         <i class="fa-solid fa-users nav-icon"></i>
         <span class="nav-label">Customers</span>
       </a>
-      <a routerLink="/portfolio" routerLinkActive="active" class="nav-item">
+      <a routerLink="/portfolio" routerLinkActive="active d-none" class="nav-item">
         <i class="fa-solid fa-folder-open nav-icon"></i>
         <span class="nav-label">Portfolio</span>
       </a>
@@ -40,7 +40,7 @@
         <i class="fa-solid fa-table-list nav-icon"></i>
         <span class="nav-label">Users</span>
       </a>
-      <a *ngIf="canManageUsersAndRoles" routerLink="/roles" routerLinkActive="active" class="nav-item">
+      <a *ngIf="canManageUsersAndRoles" routerLink="/roles" routerLinkActive="active" class="d-none nav-item">
         <i class="fa-solid fa-gear nav-icon"></i>
         <span class="nav-label">Roles</span>
       </a>

@@ -144,9 +144,59 @@ exports.listPortfolio = async (req, res) => {
       baseFilters.UploadedAt = range;
     }
 
-    // Search mode: query across mobile/name/address
+    // Search mode
+    // - If the query contains mobile digits (>=6), return UNIQUE-by-mobile results
+    //   This ensures searching by mobile shows a single representative record per mobile
+    // - Otherwise, perform general search across name/address (and partial mobile) returning raw rows
     if (q) {
       const digits = q.replace(/[^0-9]/g, '');
+
+      // Mobile-focused search -> unique per mobile
+      if (digits && digits.length >= 6) {
+        const where = { [Op.and]: [ baseFilters, { Mobile: { [Op.like]: `%${digits}%` } } ] };
+
+        // Count distinct mobiles matching the search
+        const totalDistinct = await CustomerPortfolio.count({ distinct: true, col: 'Mobile', where });
+
+        // Group by mobile to get latest timestamp and count
+        const groups = await CustomerPortfolio.findAll({
+          attributes: [
+            'Mobile',
+            [sequelize.fn('COUNT', sequelize.col('Id')), 'count'],
+            [sequelize.fn('MAX', sequelize.col('UploadedAt')), 'LatestAt']
+          ],
+          group: ['Mobile'],
+          order: [[sequelize.literal('LatestAt'), 'DESC']],
+          offset,
+          limit: pageSize,
+          where
+        });
+
+        const items = await Promise.all(groups.map(async (g) => {
+          const m = g.get('Mobile');
+          const latest = await CustomerPortfolio.findOne({
+            where: { ...baseFilters, Mobile: m },
+            order: [['UploadedAt', 'DESC']]
+          });
+          return {
+            Mobile: m,
+            Count: parseInt(g.get('count'), 10) || 0,
+            LatestAt: g.get('LatestAt'),
+            GroupId: latest?.GroupId || null,
+            Name: latest?.Name || null,
+            Address: latest?.Address || null,
+            PinCode: latest?.PinCode || null,
+            SkuName: latest?.SkuName || null,
+            FileName: latest?.FileName || null,
+            FilePath: latest?.FilePath || null,
+            UploadedAt: latest?.UploadedAt || g.get('LatestAt')
+          };
+        }));
+
+        return res.json({ items, total: totalDistinct, page, pageSize, mode: 'search-unique' });
+      }
+
+      // General text search (name/address and partial mobile) -> raw rows
       const orClauses = [
         { Name: { [Op.like]: `%${q}%` } },
         { Address: { [Op.like]: `%${q}%` } }
