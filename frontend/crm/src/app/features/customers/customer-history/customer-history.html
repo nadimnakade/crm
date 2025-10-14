@@ -41,7 +41,7 @@
             <td>{{ c.date | date: 'short' }}</td>
             <td>{{ c.callType }}</td>
             <td>{{ c.category || '—' }}</td>
-            <td>{{ c.outcome || '—' }}</td>
+            <td>{{ displaySubCategory(c) }}</td>
             <td>{{ c.orderId || c.orderDetails?.orderId || '—' }}</td>
             <!-- <td>{{ c.notes || '—' }}</td> -->
             <td>

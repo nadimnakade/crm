@@ -34,7 +34,8 @@ export class CustomerHistoryComponent implements OnInit {
       ]},
       { value: 'new-order-related', label: 'New Order Related', subs: [
         { value: 'discount-query', label: 'Discount Query' },
-        { value: 'follow-up-scheduled', label: 'Follow-up Scheduled' }
+        { value: 'follow-up-scheduled', label: 'Follow-up Scheduled' },
+        { value: 'lead', label: 'Lead' }
       ]},
       { value: 'return-related', label: 'Return Related', subs: [
         { value: 'for-return', label: 'For Return' }
@@ -42,8 +43,8 @@ export class CustomerHistoryComponent implements OnInit {
     ],
     outbound: [
       { value: 'sales-call', label: 'Sales Call', subs: [
-        { value: 'positive', label: 'Yes' },
-        { value: 'negative', label: 'No' }
+        { value: 'Yes', label: 'Lead' },
+        { value: 'No', label: 'FollowUp' }
       ]},
       { value: 'previous-order-history', label: 'Previous Order History', subs: [
         { value: 'order-entry', label: 'Order Entry' },
@@ -137,6 +138,20 @@ export class CustomerHistoryComponent implements OnInit {
     const defs = this.categoryMap[callType] || [];
     const match = defs.find(d => d.value === category);
     this.currentSubCategories = (match?.subs || []).map(s => ({ value: s.value, label: s.label }));
+  }
+
+  // Display mapping for Sub Category in table
+  displaySubCategory(call: any): string {
+    const outcome = (call?.outcome || '').toString();
+    const callType = (call?.callType || '').toString().toLowerCase();
+    const category = (call?.category || '').toString().toLowerCase();
+    const isSalesOutbound = callType === 'outbound' && (category === 'sales' || category === 'sales-call');
+    if (!outcome) return '—';
+    if (isSalesOutbound) {
+      if (outcome.toLowerCase() === 'yes' || outcome.toLowerCase() === 'positive') return 'Lead';
+      if (outcome.toLowerCase() === 'no' || outcome.toLowerCase() === 'negative') return 'FollowUp';
+    }
+    return outcome;
   }
 
   initRefundForm(): void {

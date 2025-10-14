@@ -47,9 +47,9 @@ export class CustomerDetailComponent implements OnInit {
   initForm(): void {
     this.customerForm = this.fb.group({
       name: ['', Validators.required],
-      email: ['', [Validators.required, Validators.email]],
+      email: ['NA'],
       phone: ['', [Validators.required, Validators.pattern(/^[+()\-\s\d]{7,20}$/)]],
-      company: [''],
+      company: ['NA'],
       address: [''] 
     });
 
@@ -64,9 +64,9 @@ export class CustomerDetailComponent implements OnInit {
         this.customer = data;
         this.customerForm.patchValue({
           name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-          email: data.email,
+          email: data.email || 'NA',
           phone: data.phone || '',
-          company: data.company || '',
+          company: data.company || 'NA',
           address: data.address || ''
         });
       },
@@ -147,77 +147,37 @@ export class CustomerDetailComponent implements OnInit {
       firstName,
       lastName
     };
-    // Uniqueness check for email and phone against existing customers
-    this.customerService.getCustomers().subscribe({
-      next: (customers) => {
-        const emailLower = (customerData.email || '').toLowerCase();
-        const phoneNorm = normalizePhone(customerData.phone || '');
-        const conflict = customers.some((c: any) => {
-          const sameEmail = (c.email || '').toLowerCase() === emailLower;
-          const samePhone = normalizePhone(c.phone || '') === phoneNorm;
-          const sameId = this.customer && c.id === this.customer.id;
-          return !sameId && (sameEmail || samePhone);
-        });
-
-        if (conflict) {
-          Swal.fire({ icon: 'error', title: 'Duplicate found', text: 'Email or phone already exists for another customer.' });
-          return;
+    // Submit directly; rely on backend for uniqueness validation (409)
+    if (this.isNewMode) {
+      this.customerService.createCustomer(customerData).subscribe({
+        next: () => {
+          Swal.fire({ icon: 'success', title: 'Customer created', timer: 1500, showConfirmButton: false })
+            .then(() => this.router.navigate(['/customers']));
+        },
+        error: (error) => {
+          const msg = (error?.status === 409)
+            ? 'Email or phone already exists.'
+            : 'Unable to create customer. Please try again.';
+          console.error('Error creating customer', error);
+          Swal.fire({ icon: 'error', title: 'Create failed', text: msg });
         }
-
-        if (this.isNewMode) {
-          this.customerService.createCustomer(customerData).subscribe({
-            next: () => {
-              Swal.fire({ icon: 'success', title: 'Customer created', timer: 1500, showConfirmButton: false })
-                .then(() => this.router.navigate(['/customers']));
-            },
-            error: (error) => {
-              console.error('Error creating customer', error);
-              Swal.fire({ icon: 'error', title: 'Create failed', text: 'Unable to create customer. Please try again.' });
-            }
-          });
-        } else {
-          this.customerService.updateCustomer(this.customer.id, customerData).subscribe({
-            next: () => {
-              this.isEditMode = false;
-              this.customer = customerData;
-              Swal.fire({ icon: 'success', title: 'Customer updated', timer: 1500, showConfirmButton: false });
-            },
-            error: (error) => {
-              console.error('Error updating customer', error);
-              Swal.fire({ icon: 'error', title: 'Update failed', text: 'Unable to update customer. Please try again.' });
-            }
-          });
+      });
+    } else {
+      this.customerService.updateCustomer(this.customer.id, customerData).subscribe({
+        next: () => {
+          this.isEditMode = false;
+          this.customer = customerData;
+          Swal.fire({ icon: 'success', title: 'Customer updated', timer: 1500, showConfirmButton: false });
+        },
+        error: (error) => {
+          const msg = (error?.status === 409)
+            ? 'Email or phone already exists.'
+            : 'Unable to update customer. Please try again.';
+          console.error('Error updating customer', error);
+          Swal.fire({ icon: 'error', title: 'Update failed', text: msg });
         }
-      },
-      error: (error) => {
-        console.error('Error validating uniqueness', error);
-        // Fallback: proceed with submit and rely on backend validation if present
-        if (this.isNewMode) {
-          this.customerService.createCustomer(customerData).subscribe({
-            next: () => {
-              Swal.fire({ icon: 'success', title: 'Customer created', timer: 1500, showConfirmButton: false })
-                .then(() => this.router.navigate(['/customers']));
-            },
-            error: (err) => {
-              console.error('Error creating customer', err);
-              Swal.fire({ icon: 'error', title: 'Create failed', text: 'Unable to create customer. Please try again.' });
-            }
-          });
-        } else {
-          this.customerService.updateCustomer(this.customer.id, customerData).subscribe({
-            next: () => {
-              this.isEditMode = false;
-              this.customer = customerData;
-              Swal.fire({ icon: 'success', title: 'Customer updated', timer: 1500, showConfirmButton: false });
-            },
-            error: (err) => {
-              console.error('Error updating customer', err);
-              Swal.fire({ icon: 'error', title: 'Update failed', text: 'Unable to update customer. Please try again.' });
-            }
-          });
-        }
-      }
-    });
+      });
+    }
   }
 
   cancel(): void {
