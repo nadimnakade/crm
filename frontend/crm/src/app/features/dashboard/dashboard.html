@@ -64,8 +64,8 @@
               </div>
               <div class="card-body p-0">
                 <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                  <input type="text" class="form-control" [(ngModel)]="cmdSearch" placeholder="Search mobile/name/address">
-                  <button class="btn btn-primary" (click)="searchCmd()" [disabled]="cmdLoading">Search</button>
+                  <input type="text" class="form-control w-50" [(ngModel)]="cmdSearch" placeholder="Search mobile/name/address">
+                  <button class="btn btn-primary" (click)="searchCmd()">Search</button>
                 </div>
                 <div class="table-responsive" *ngIf="cmdItems?.length; else noCmd">
                   <table class="table table-striped table-hover align-middle mb-0" [ngClass]="{'table-dark': isDarkTheme}">
@@ -107,7 +107,16 @@
               </div>
             </div>
             <ng-template #noCmd>
-              <div class="p-3 text-secondary">No customer medicine details yet.</div>
+              <div class="p-3 text-center text-secondary">
+                <div *ngIf="!cmdSearch || cmdSearch.trim() === ''; else noResults">
+                  <i class="fas fa-search fa-2x mb-2 opacity-50"></i>
+                  <p class="mb-0">Enter search terms to find customer medicine details</p>
+                </div>
+                <ng-template #noResults>
+                  <i class="fas fa-exclamation-circle fa-2x mb-2 opacity-50"></i>
+                  <p class="mb-0">No customer medicine details found for your search</p>
+                </ng-template>
+              </div>
             </ng-template>
           </div>
         </div>

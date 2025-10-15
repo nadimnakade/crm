@@ -17,25 +17,12 @@
         </div>
       </div>
 
-      <div class="form-group d-none">
-        <label for="email">Email</label>
-        <input type="email" id="email" formControlName="email" [readonly]="!isEditMode && !isNewMode">
-        <div *ngIf="customerForm.get('email')?.invalid && customerForm.get('email')?.touched" class="error-message">
-          Please enter a valid email address
-        </div>
-      </div>
-
       <div class="form-group">
         <label for="phone">Phone</label>
         <input type="text" id="phone" formControlName="phone" [readonly]="!isEditMode && !isNewMode">
         <div *ngIf="customerForm.get('phone')?.invalid && customerForm.get('phone')?.touched" class="error-message">
           Phone is required and must be valid
         </div>
-      </div>
-
-      <div class="form-group d-none">
-        <label for="company">Company</label>
-        <input type="text" id="company" formControlName="company" [readonly]="!isEditMode && !isNewMode">
       </div>
 
       <div class="form-group full-width">

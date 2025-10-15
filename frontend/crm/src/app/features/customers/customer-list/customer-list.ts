@@ -68,9 +68,7 @@ export class CustomerListComponent implements OnInit {
           const fullName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim().toLowerCase();
           return (
             fullName.includes(lower) ||
-            (customer.email || '').toLowerCase().includes(lower) ||
-            (customer.phone || '').toLowerCase().includes(lower) ||
-            (customer.company || '').toLowerCase().includes(lower)
+            (customer.phone || '').toLowerCase().includes(lower)
           );
         });
         this.total = this.filteredCustomers.length;

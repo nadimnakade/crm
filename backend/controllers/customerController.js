@@ -49,16 +49,14 @@ exports.getCustomers = async (req, res) => {
       where[Op.or] = [
         { firstName: like },
         { lastName: like },
-        { email: like },
-        { phone: like },
-        { company: like }
+        { phone: like }
       ];
     }
     if (status) {
       where.status = status;
     }
 
-    const allowedSort = ['createdAt', 'firstName', 'lastName', 'email', 'phone', 'company', 'status'];
+    const allowedSort = ['createdAt', 'firstName', 'lastName', 'phone', 'status'];
     const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['createdAt', 'DESC']];
 
     // Restrict visibility per role
@@ -112,7 +110,7 @@ exports.getCustomerById = async (req, res) => {
 // @access  Private
 exports.createCustomer = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, company, address, assignedAgentId, status, notes, name } = req.body;
+    const { firstName, lastName, phone, address, assignedAgentId, status, notes, name } = req.body;
 
     // Backward compatibility: if a single 'name' is provided, split into first/last
     let fName = firstName;
@@ -123,18 +121,13 @@ exports.createCustomer = async (req, res) => {
       lName = parts.slice(1).join(' ') || '';
     }
 
-    // Uniqueness check for email and phone
-    if (email || phone) {
+    // Uniqueness check for phone
+    if (phone) {
       const existing = await Customer.findOne({
-        where: {
-          [Op.or]: [
-            email ? { email } : null,
-            phone ? { phone } : null
-          ].filter(Boolean)
-        }
+        where: { phone }
       });
       if (existing) {
-        return res.status(409).json({ message: 'Email or phone already exists' });
+        return res.status(409).json({ message: 'Phone already exists' });
       }
     }
 
@@ -153,9 +146,7 @@ exports.createCustomer = async (req, res) => {
     const customer = await Customer.create({
       firstName: fName,
       lastName: lName,
-      email,
       phone,
-      company,
       address,
       assignedAgentId: finalAssignedAgentId,
       status,
@@ -166,7 +157,7 @@ exports.createCustomer = async (req, res) => {
   } catch (error) {
     console.error(error);
     if (error && (error.name === 'SequelizeUniqueConstraintError' || error.original?.code === 'EREQUEST')) {
-      return res.status(409).json({ message: 'Email or phone already exists' });
+      return res.status(409).json({ message: 'Phone already exists' });
     }
     res.status(500).json({ message: 'Server error' });
   }
@@ -183,7 +174,7 @@ exports.updateCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    const { firstName, lastName, name, email, phone, company, address, assignedAgentId, status, notes } = req.body;
+    const { firstName, lastName, name, phone, address, assignedAgentId, status, notes } = req.body;
     const visibility = await getVisibility(req.user);
     if (visibility.scope === 'agent' && customer.assignedAgentId !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized to update this customer' });
@@ -201,28 +192,23 @@ exports.updateCustomer = async (req, res) => {
       lName = parts.slice(1).join(' ') || '';
     }
 
-    // Uniqueness check for email and phone excluding current record
-    if (email || phone) {
+    // Uniqueness check for phone excluding current record
+    if (phone) {
       const conflict = await Customer.findOne({
         where: {
           id: { [Op.ne]: req.params.id },
-          [Op.or]: [
-            email ? { email } : null,
-            phone ? { phone } : null
-          ].filter(Boolean)
+          phone
         }
       });
       if (conflict) {
-        return res.status(409).json({ message: 'Email or phone already exists' });
+        return res.status(409).json({ message: 'Phone already exists' });
       }
     }
 
     // Update customer fields
     if (fName !== undefined) customer.firstName = fName;
     if (lName !== undefined) customer.lastName = lName;
-    if (email) customer.email = email;
     if (phone !== undefined) customer.phone = phone;
-    if (company !== undefined) customer.company = company;
     if (address !== undefined) customer.address = address;
     // Reassignment: Admins can reassign freely; Managers only within team; Agents cannot
     if (assignedAgentId !== undefined) {
@@ -244,7 +230,7 @@ exports.updateCustomer = async (req, res) => {
   } catch (error) {
     console.error(error);
     if (error && (error.name === 'SequelizeUniqueConstraintError' || error.original?.code === 'EREQUEST')) {
-      return res.status(409).json({ message: 'Email or phone already exists' });
+      return res.status(409).json({ message: 'Phone already exists' });
     }
     res.status(500).json({ message: 'Server error' });
   }

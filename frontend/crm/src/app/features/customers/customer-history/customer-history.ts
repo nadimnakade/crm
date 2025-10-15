@@ -28,7 +28,10 @@ export class CustomerHistoryComponent implements OnInit {
   categoryMap: Record<string, Array<{ value: string; label: string; subs: Array<{ value: string; label: string }> }>> = {
     inbound: [
       { value: 'existing-order', label: 'Existing Order', subs: [
-        { value: 'agent-comment', label: 'Agent Comment' },
+        // { value: 'agent-comment', label: 'Agent Comment' },
+        { value: 'refund-call-transfer', label: 'Call Transfer' },
+        { value: 'refund-complaint', label: 'Call Complaint' },
+        { value: 'refund-order-status', label: 'Order Status' },
         { value: 'refund-status', label: 'Refund Status' },
         { value: 'refund-generation', label: 'Refund Generation' }
       ]},
@@ -36,6 +39,11 @@ export class CustomerHistoryComponent implements OnInit {
         { value: 'discount-query', label: 'Discount Query' },
         { value: 'follow-up-scheduled', label: 'Follow-up Scheduled' },
         { value: 'lead', label: 'Lead' }
+      ]},
+       { value: 'lab-option', label: 'Lab', subs: [
+        { value: 'lab-statusy', label: 'Status' },
+        { value: 'lab-report', label: 'Report' },
+        { value: 'lab-enquiry', label: 'Enquiry' }
       ]},
       { value: 'return-related', label: 'Return Related', subs: [
         { value: 'for-return', label: 'For Return' }

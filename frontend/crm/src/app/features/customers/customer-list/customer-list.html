@@ -28,7 +28,7 @@
                 <option [value]="100">100</option>
               </select>
           </td>
-           <td colspan="4">
+           <td colspan="2">
             <div class="search-bar float-end">
               <input type="text" placeholder="Search customers..." [(ngModel)]="searchTerm" (input)="filterCustomers()">
                         
@@ -40,24 +40,18 @@
         <tr>
           <th (click)="setSort('firstName')">Name <span *ngIf="sortBy==='firstName'">{{sortOrder==='ASC' ? '▲' :
               '▼'}}</span></th>
-          <th (click)="setSort('email')">Email <span *ngIf="sortBy==='email'">{{sortOrder==='ASC' ? '▲' : '▼'}}</span>
-          </th>
           <th (click)="setSort('phone')">Phone <span *ngIf="sortBy==='phone'">{{sortOrder==='ASC' ? '▲' : '▼'}}</span>
           </th>
-          <th (click)="setSort('company')">Company <span *ngIf="sortBy==='company'">{{sortOrder==='ASC' ? '▲' :
-              '▼'}}</span></th>
           <th style="width:20%">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngIf="filteredCustomers.length === 0">
-          <td colspan="5" class="no-data">No customers found</td>
+          <td colspan="3" class="no-data">No customers found</td>
         </tr>
         <tr *ngFor="let customer of filteredCustomers">
           <td [innerHTML]="highlight((customer.firstName || '') + ' ' + (customer.lastName || ''))"></td>
-          <td [innerHTML]="highlight(customer.email)"></td>
           <td [innerHTML]="highlight(customer.phone)"></td>
-          <td [innerHTML]="highlight(customer.company)"></td>
           <td class="actions">
             <a [routerLink]="['/customers', customer.id]" class="text-primary me-3" title="View">
               <i class="fa-solid fa-eye"></i>

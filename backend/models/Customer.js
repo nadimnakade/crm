@@ -10,19 +10,7 @@ const Customer = sequelize.define('Customer', {
     type: DataTypes.STRING,
     allowNull: false
   },
-  email: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    unique: true,
-    validate: {
-      isEmail: true
-    }
-  },
   phone: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  company: {
     type: DataTypes.STRING,
     allowNull: true
   },

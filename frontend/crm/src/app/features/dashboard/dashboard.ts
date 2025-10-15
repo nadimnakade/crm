@@ -132,53 +132,53 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
   
   ngAfterViewInit(): void {
-    setTimeout(() => {
-      this.initCallsByAgentChart();
-      this.initCallTypeChart();
-      this.initWeeklySalesChart();
-    }, 100);
+    // setTimeout(() => {
+    //   this.initCallsByAgentChart();
+    //   this.initCallTypeChart();
+    //   this.initWeeklySalesChart();
+    // }, 100);
   }
 
   private loadDashboardData(): void {
     // Recent calls (role-based on backend)
-    this.callService.getRecentCalls(10).subscribe({
-      next: (calls) => this.recentCalls = calls || [],
-      error: () => this.recentCalls = []
-    });
+    // this.callService.getRecentCalls(10).subscribe({
+    //   next: (calls) => this.recentCalls = calls || [],
+    //   error: () => this.recentCalls = []
+    // });
 
     // Daily top callers
-    const today = new Date();
-    const dateStr = today.toISOString();
-    this.callService.getTopCallersDaily(dateStr, 10).subscribe({
-      next: (rows) => this.topCallersDaily = rows || [],
-      error: () => this.topCallersDaily = []
-    });
+    // const today = new Date();
+    // const dateStr = today.toISOString();
+    // this.callService.getTopCallersDaily(dateStr, 10).subscribe({
+    //   next: (rows) => this.topCallersDaily = rows || [],
+    //   error: () => this.topCallersDaily = []
+    // });
 
     // Weekly top callers (last 7 days)
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(end.getDate() - 6);
-    const startStr = start.toISOString();
-    const endStr = end.toISOString();
-    this.callService.getTopCallersWeekly(startStr, endStr, 10).subscribe({
-      next: (rows) => this.topCallersWeekly = rows || [],
-      error: () => this.topCallersWeekly = []
-    });
+    // const end = new Date();
+    // const start = new Date(end);
+    // start.setDate(end.getDate() - 6);
+    // const startStr = start.toISOString();
+    // const endStr = end.toISOString();
+    // this.callService.getTopCallersWeekly(startStr, endStr, 10).subscribe({
+    //   next: (rows) => this.topCallersWeekly = rows || [],
+    //   error: () => this.topCallersWeekly = []
+    // });
 
     // Default portfolio list (unique by mobile)
-    this.portfolioService.list({ unique: true, page: 1, pageSize: 10 }).subscribe({
-      next: (res) => {
-        this.portfolioItems = res.items || [];
-        this.portfolioTotal = res.total || this.portfolioItems.length;
-      },
-      error: () => {
-        this.portfolioItems = [];
-        this.portfolioTotal = 0;
-      }
-    });
+    // this.portfolioService.list({ unique: true, page: 1, pageSize: 10 }).subscribe({
+    //   next: (res) => {
+    //     this.portfolioItems = res.items || [];
+    //     this.portfolioTotal = res.total || this.portfolioItems.length;
+    //   },
+    //   error: () => {
+    //     this.portfolioItems = [];
+    //     this.portfolioTotal = 0;
+    //   }
+    // });
 
-    // Customer Medicine Details unique list (by mobile)
-    this.loadCmdUnique();
+    // Customer Medicine Details - don't load by default, only on search
+    // this.loadCmdUnique();
   }
   
   initCallsByAgentChart(): void {
@@ -347,13 +347,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // --- Customer Medicine Detail unique list (dashboard) ---
   loadCmdUnique(): void {
+    // Only search if there's a search term
+    if (!this.cmdSearch || this.cmdSearch.trim() === '') {
+      this.cmdItems = [];
+      this.cmdTotal = 0;
+      this.cmdLoading = false;
+      return;
+    }
+
     this.cmdLoading = true;
     this.cmdService.list({
       page: this.cmdPage,
       pageSize: this.cmdPageSize,
       sortBy: 'uploadedAt',
       sortOrder: 'desc',
-      q: this.cmdSearch,
+      q: this.cmdSearch.trim(),
       unique: true
     }).subscribe({
       next: (res) => {

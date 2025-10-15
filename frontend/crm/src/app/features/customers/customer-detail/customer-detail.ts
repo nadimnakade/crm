@@ -47,9 +47,7 @@ export class CustomerDetailComponent implements OnInit {
   initForm(): void {
     this.customerForm = this.fb.group({
       name: ['', Validators.required],
-      email: ['NA'],
       phone: ['', [Validators.required, Validators.pattern(/^[+()\-\s\d]{7,20}$/)]],
-      company: ['NA'],
       address: [''] 
     });
 
@@ -64,9 +62,7 @@ export class CustomerDetailComponent implements OnInit {
         this.customer = data;
         this.customerForm.patchValue({
           name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-          email: data.email || 'NA',
           phone: data.phone || '',
-          company: data.company || 'NA',
           address: data.address || ''
         });
       },
@@ -140,9 +136,7 @@ export class CustomerDetailComponent implements OnInit {
     const normalizePhone = (p: string) => (p || '').replace(/[\s\-()]/g, '');
     const customerData = {
       ...this.customer,
-      email: formValue.email,
       phone: formValue.phone,
-      company: formValue.company,
       address: formValue.address,
       firstName,
       lastName
@@ -156,7 +150,7 @@ export class CustomerDetailComponent implements OnInit {
         },
         error: (error) => {
           const msg = (error?.status === 409)
-            ? 'Email or phone already exists.'
+            ? 'Phone already exists.'
             : 'Unable to create customer. Please try again.';
           console.error('Error creating customer', error);
           Swal.fire({ icon: 'error', title: 'Create failed', text: msg });
@@ -171,7 +165,7 @@ export class CustomerDetailComponent implements OnInit {
         },
         error: (error) => {
           const msg = (error?.status === 409)
-            ? 'Email or phone already exists.'
+            ? 'Phone already exists.'
             : 'Unable to update customer. Please try again.';
           console.error('Error updating customer', error);
           Swal.fire({ icon: 'error', title: 'Update failed', text: msg });
@@ -187,9 +181,7 @@ export class CustomerDetailComponent implements OnInit {
       this.isEditMode = false;
       this.customerForm.patchValue({
         name: `${this.customer.firstName || ''} ${this.customer.lastName || ''}`.trim(),
-        email: this.customer.email,
         phone: this.customer.phone || '',
-        company: this.customer.company || '',
         address: this.customer.address || ''
       });
     }
