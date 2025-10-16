@@ -1,5 +1,5 @@
-const { Customer, User, Role } = require('../models');
-const { Op } = require('sequelize');
+const { Customer, User, Role, sequelize } = require('../models');
+const { Op, QueryTypes } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
 
@@ -30,78 +30,231 @@ const getVisibility = async (user) => {
   return { scope: 'agent', allowedAgentIds: [user.id] };
 };
 
-// @desc    Get all customers
-// @route   GET /api/customers
-// @access  Private
+
 exports.getCustomers = async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim();
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 10;
-    const offset = (page - 1) * pageSize;
     const status = (req.query.status || '').toString().trim();
-    const sortBy = (req.query.sortBy || 'createdAt').toString();
-    const sortOrder = ((req.query.sortOrder || 'DESC').toString().toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+    const cursorIdRaw = req.query.cursorId;
+    let cursorId = cursorIdRaw ? parseInt(cursorIdRaw, 10) : null;
+    if (Number.isNaN(cursorId)) cursorId = null;
 
-    const like = q ? { [Op.like]: `%${q}%` } : null;
-    const where = {};
+    const clauses = [];
+    const replacements = {};
+    let digits = '';
+
     if (q) {
-      where[Op.or] = [
-        { firstName: like },
-        { lastName: like },
-        { phone: like }
-      ];
+      digits = q.replace(/\D/g, '');
+      if (digits.length > 0) {
+        replacements.phoneExact = digits;
+        replacements.phonePrefix = `${digits}%`;
+        clauses.push('(PhoneDigits = :phoneExact OR PhoneDigits LIKE :phonePrefix)');
+      } else {
+        // Non-digit query: avoid slow scans until FTS is available
+        clauses.push('1 = 0');
+      }
     }
+
     if (status) {
-      where.status = status;
+      clauses.push('status = :status');
+      replacements.status = status;
     }
 
-    const allowedSort = ['createdAt', 'firstName', 'lastName', 'phone', 'status'];
-    const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['createdAt', 'DESC']];
+    if (cursorId && cursorId > 0) {
+      clauses.push('id < :cursorId');
+      replacements.cursorId = cursorId;
+    }
 
-    // Restrict visibility per role
-    const visibility = await getVisibility(req.user);
-    // Agents can see all customers; do not restrict by assignedAgentId
-    // if (visibility.scope === 'manager') {
-    //   where.assignedAgentId = { [Op.in]: visibility.allowedAgentIds };
-    // }
+    const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-    const { rows, count } = await Customer.findAndCountAll({
-      where,
-      include: [{ model: User, as: 'assignedAgent', attributes: ['id', 'firstName', 'lastName'] }],
-      limit: pageSize,
-      offset,
-      order
+    // Total count: fast metadata when no filters; indexed count when digit filter
+    let total = 0;
+    if (clauses.length === 0) {
+      const fastCountRows = await sequelize.query(
+        `SELECT SUM(rows) AS count
+         FROM sys.partitions
+         WHERE object_id = OBJECT_ID('dbo.Customers') AND index_id IN (0,1)`,
+        { type: QueryTypes.SELECT }
+      );
+      total = Number(fastCountRows?.[0]?.count || 0);
+    } else if (digits.length > 0) {
+      const countRows = await sequelize.query(
+        `SELECT COUNT_BIG(*) AS count FROM dbo.Customers WITH (NOLOCK)
+         ${whereSql} OPTION (RECOMPILE)`,
+        { replacements, type: QueryTypes.SELECT }
+      );
+      total = Number(countRows?.[0]?.count || 0);
+    }
+
+    // Keyset pagination: fetch pageSize+1 ordered by id DESC, optional cursor
+    const fetchLimit = pageSize + 1;
+    const dataSql = `
+      SELECT TOP (:fetchLimit) id, firstName, lastName, phone, address, status, createdAt, updatedAt
+      FROM dbo.Customers WITH (NOLOCK)
+      ${whereSql}
+      ORDER BY id DESC OPTION (RECOMPILE)
+    `;
+    const rows = await sequelize.query(dataSql, {
+      replacements: { ...replacements, fetchLimit },
+      type: QueryTypes.SELECT
     });
-    res.json({ data: rows, total: count, page, pageSize });
+
+    let hasMore = false;
+    let resultRows = rows;
+    if (rows.length > pageSize) {
+      hasMore = true;
+      resultRows = rows.slice(0, pageSize);
+    }
+    const nextCursor = resultRows.length ? resultRows[resultRows.length - 1].id : cursorId;
+
+    res.json({ data: resultRows, total, page, pageSize, hasMore, nextCursor });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error fetching customers:', error);
+    const statusCode = error.status || 500;
+    res.status(statusCode).json({ message: 'An error occurred while fetching customers.', details: error?.message });
   }
 };
+// @desc    Get all customers
+// @route   GET /api/customers
+// @access  Private
+// exports.getCustomers = async (req, res) => {
+//   try {
+//     const q = (req.query.q || '').toString().trim();
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const pageSize = parseInt(req.query.pageSize, 10) || 10;
+//     const offset = (page - 1) * pageSize;
+//     const status = (req.query.status || '').toString().trim();
+//     const cursorIdRaw = req.query.cursorId;
+//     let cursorId = cursorIdRaw ? parseInt(cursorIdRaw, 10) : null;
+//     if (Number.isNaN(cursorId)) cursorId = null;
+//     // Sorting removed per requirements; always order by id DESC for performance
+
+//     const like = q ? { [Op.like]: `%${q}%` } : null;
+//     const where = {};
+//     if (q) {
+//       where[Op.or] = [        
+//         { phone: like }
+//       ];
+//     }
+//     if (status) {
+//       where.status = status;
+//     }
+
+//     // Always order by id DESC (clustered PK), avoids expensive sorts on large tables
+
+//     // Restrict visibility per role
+//     const visibility = await getVisibility(req.user);
+//     // Agents can see all customers; do not restrict by assignedAgentId
+//     // if (visibility.scope === 'manager') {
+//     //   where.assignedAgentId = { [Op.in]: visibility.allowedAgentIds };
+//     // }
+
+//     // Use raw count with NOLOCK to avoid long-running count(*) timeouts on large tables
+//     const clauses = [];
+//     const replacements = {};
+//     let digits = '';
+//     if (q) {
+//       digits = q.replace(/\D/g, '');
+//       if (digits.length > 0) {
+//         replacements.phoneExact = digits;
+//         replacements.phonePrefix = `${digits}%`;
+//         clauses.push('(PhoneDigits = :phoneExact OR PhoneDigits LIKE :phonePrefix)');
+//       } else {
+//         // Non-digit query: return no rows quickly
+//         clauses.push('1 = 0');
+//       }
+//     }
+//     if (status) {
+//       clauses.push('status = :status');
+//       replacements.status = status;
+//     }
+//     if (cursorId && cursorId > 0) {
+//       clauses.push('id < :cursorId');
+//       replacements.cursorId = cursorId;
+//     }
+//     const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+//     let total = 0;
+//     if (clauses.length > 0) {
+//       const countHint = digits.length > 0 ? 'NOLOCK, INDEX(IX_Customers_PhoneDigits)' : 'NOLOCK';
+//       const countRows = await sequelize.query(
+//         `SELECT COUNT_BIG(*) AS count FROM dbo.Customers WITH (${countHint}) ${whereSql} OPTION (RECOMPILE)`,
+//         { replacements, type: QueryTypes.SELECT }
+//       );
+//       total = Number(countRows?.[0]?.count || 0);
+//     } else {
+//       // Fast metadata count for full-table listing without filters
+//       const fastCountRows = await sequelize.query(
+//         `SELECT SUM(rows) AS count
+//          FROM sys.partitions
+//          WHERE object_id = OBJECT_ID('dbo.Customers') AND index_id IN (0,1)`,
+//         { type: QueryTypes.SELECT }
+//       );
+//       total = Number(fastCountRows?.[0]?.count || 0);
+//     }
+
+//     // Keyset pagination: use TOP (pageSize+1) with id DESC and optional cursor
+//     const dataHint = digits.length > 0 ? 'NOLOCK, INDEX(IX_Customers_PhoneDigits)' : 'NOLOCK';
+//     const fetchLimit = pageSize + 1; // fetch one extra row to detect 'hasMore'
+//     const dataSql = `
+//       SELECT TOP (:fetchLimit) id, firstName, lastName, phone, address, status, createdAt, updatedAt
+//       FROM dbo.Customers WITH (${dataHint})
+//       ${whereSql}
+//       ORDER BY id DESC OPTION (RECOMPILE)
+//     `;
+//     const rows = await sequelize.query(dataSql, {
+//       replacements: { ...replacements, fetchLimit },
+//       type: QueryTypes.SELECT
+//     });
+
+//     let hasMore = false;
+//     let resultRows = rows;
+//     if (rows.length > pageSize) {
+//       hasMore = true;
+//       resultRows = rows.slice(0, pageSize);
+//     }
+//     const nextCursor = resultRows.length ? resultRows[resultRows.length - 1].id : cursorId;
+
+//     res.json({ data: resultRows, total, page, pageSize, hasMore, nextCursor });
+//   } catch (error) {
+//     console.error(error);
+//     const status = error.status || 500;
+//     const payload = {
+//       message: (error && error.message) ? error.message : 'Server error',
+//       name: error && error.name ? error.name : undefined,
+//       details: error && (error.errors || (error.original && error.original.message))
+//     };
+//     res.status(status).json(payload);
+//   }
+// };
 
 // @desc    Get customer by ID
 // @route   GET /api/customers/:id
 // @access  Private
 exports.getCustomerById = async (req, res) => {
   try {
-    const customer = await Customer.findByPk(req.params.id, {
-      include: [{ model: User, as: 'assignedAgent', attributes: ['id', 'firstName', 'lastName'] }]
-    });
+    const customer = await Customer.findByPk(req.params.id);
 
-    if (customer) {
-      const visibility = await getVisibility(req.user);
-      // Agents can view any customer; managers are restricted to their team
-      if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-        return res.status(403).json({ message: 'Not authorized to view this customer' });
-      }
+    if (customer) {      
       res.json(customer);
     } else {
       res.status(404).json({ message: 'Customer not found' });
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    const payload = {
+      message: (error && error.message) ? error.message : 'Server error'
+    };
+    if (error && error.name) payload.name = error.name;
+    if (error && error.code) payload.code = error.code;
+    if (error && error.sql) payload.sql = error.sql;
+    if (error && error.errors) payload.errors = error.errors;
+    if (error && error.original) {
+      if (error.original.code) payload.dbCode = error.original.code;
+      if (error.original.message) payload.dbMessage = error.original.message;
+    }
+    res.status(500).json(payload);
   }
 };
 
@@ -110,7 +263,7 @@ exports.getCustomerById = async (req, res) => {
 // @access  Private
 exports.createCustomer = async (req, res) => {
   try {
-    const { firstName, lastName, phone, address, assignedAgentId, status, notes, name } = req.body;
+    const { firstName, lastName, phone, address, status, name } = req.body;
 
     // Backward compatibility: if a single 'name' is provided, split into first/last
     let fName = firstName;
@@ -131,26 +284,15 @@ exports.createCustomer = async (req, res) => {
       }
     }
 
-    const visibility = await getVisibility(req.user);
-
-    // For non-admins, restrict assignment to allowed agents
-    let finalAssignedAgentId = assignedAgentId;
-    if (visibility.scope === 'agent') {
-      finalAssignedAgentId = req.user.id;
-    } else if (visibility.scope === 'manager') {
-      finalAssignedAgentId = visibility.allowedAgentIds.includes(assignedAgentId)
-        ? assignedAgentId
-        : req.user.id;
-    }
+    // Visibility no longer used for assignment; agents/managers can create customers
 
     const customer = await Customer.create({
       firstName: fName,
       lastName: lName,
       phone,
       address,
-      assignedAgentId: finalAssignedAgentId,
       status,
-      notes
+      
     });
 
     res.status(201).json(customer);
@@ -174,14 +316,8 @@ exports.updateCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    const { firstName, lastName, name, phone, address, assignedAgentId, status, notes } = req.body;
-    const visibility = await getVisibility(req.user);
-    if (visibility.scope === 'agent' && customer.assignedAgentId !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to update this customer' });
-    }
-    if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-      return res.status(403).json({ message: 'Not authorized to update this customer' });
-    }
+    const { firstName, lastName, name, phone, address, status } = req.body;
+    // No assigned agent restrictions; proceed with update
 
     // Map single 'name' to first/last if provided
     let fName = firstName;
@@ -210,20 +346,7 @@ exports.updateCustomer = async (req, res) => {
     if (lName !== undefined) customer.lastName = lName;
     if (phone !== undefined) customer.phone = phone;
     if (address !== undefined) customer.address = address;
-    // Reassignment: Admins can reassign freely; Managers only within team; Agents cannot
-    if (assignedAgentId !== undefined) {
-      if (visibility.scope === 'admin') {
-        customer.assignedAgentId = assignedAgentId;
-      } else if (visibility.scope === 'manager') {
-        customer.assignedAgentId = visibility.allowedAgentIds.includes(assignedAgentId)
-          ? assignedAgentId
-          : customer.assignedAgentId;
-      } else {
-        customer.assignedAgentId = req.user.id;
-      }
-    }
     if (status) customer.status = status;
-    if (notes !== undefined) customer.notes = notes;
 
     await customer.save();
     res.json(customer);
@@ -247,13 +370,7 @@ exports.deleteCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    const visibility = await getVisibility(req.user);
-    if (visibility.scope === 'agent' && customer.assignedAgentId !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to delete this customer' });
-    }
-    if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-      return res.status(403).json({ message: 'Not authorized to delete this customer' });
-    }
+    // No assigned-agent restrictions; proceed with delete
 
     await customer.destroy();
     res.json({ message: 'Customer removed' });
@@ -269,17 +386,11 @@ exports.deleteCustomer = async (req, res) => {
 exports.uploadCustomerFiles = async (req, res) => {
   try {
     const customerId = req.params.id;
-    const visibility = await getVisibility(req.user);
     const customer = await Customer.findByPk(customerId);
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
-    if (visibility.scope === 'agent' && customer.assignedAgentId !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to upload files for this customer' });
-    }
-    if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-      return res.status(403).json({ message: 'Not authorized to upload files for this customer' });
-    }
+    // No assigned-agent restrictions; proceed
     const files = req.files || [];
     if (!files.length) {
       return res.status(400).json({ message: 'No files uploaded' });
@@ -306,15 +417,11 @@ exports.uploadCustomerFiles = async (req, res) => {
 exports.getCustomerFiles = async (req, res) => {
   try {
     const customerId = req.params.id;
-    const visibility = await getVisibility(req.user);
     const customer = await Customer.findByPk(customerId);
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
-    // Agents can view files for any customer; managers restricted to their team
-    if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-      return res.status(403).json({ message: 'Not authorized to view files for this customer' });
-    }
+    // No assigned-agent restrictions; proceed
     const dir = path.join(__dirname, '../uploads', `customer-${customerId}`);
     if (!fs.existsSync(dir)) {
       return res.json({ files: [] });
@@ -335,17 +442,11 @@ exports.getCustomerFiles = async (req, res) => {
 exports.deleteCustomerFile = async (req, res) => {
   try {
     const customerId = req.params.id;
-    const visibility = await getVisibility(req.user);
     const customer = await Customer.findByPk(customerId);
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
-    if (visibility.scope === 'agent' && customer.assignedAgentId !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to delete files for this customer' });
-    }
-    if (visibility.scope === 'manager' && !visibility.allowedAgentIds.includes(customer.assignedAgentId)) {
-      return res.status(403).json({ message: 'Not authorized to delete files for this customer' });
-    }
+    // No assigned-agent restrictions; proceed
     const filename = req.params.filename;
     const filePath = path.join(__dirname, '../uploads', `customer-${customerId}`, filename);
     if (!fs.existsSync(filePath)) {

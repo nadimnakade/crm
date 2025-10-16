@@ -64,7 +64,7 @@
               </div>
               <div class="card-body p-0">
                 <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                  <input type="text" class="form-control w-50" [(ngModel)]="cmdSearch" placeholder="Search mobile/name/address">
+                  <input type="text" class="form-control w-50" [(ngModel)]="cmdSearch" inputmode="numeric" placeholder="Search mobile number (min 5 digits)">
                   <button class="btn btn-primary" (click)="searchCmd()">Search</button>
                 </div>
                 <div class="table-responsive" *ngIf="cmdItems?.length; else noCmd">
@@ -74,7 +74,7 @@
                         <th scope="col">Mobile</th>
                         <th scope="col">Name</th>
                         <th scope="col">Address</th>
-                        <th scope="col">Pin</th>
+                        <!-- <th scope="col">Pin</th> -->
                         <th scope="col">Latest Upload</th>
                         <th scope="col">Count</th>
                         <th scope="col">Action</th>
@@ -84,8 +84,8 @@
                       <tr *ngFor="let it of cmdItems">
                         <td>{{it.Mobile}}</td>
                         <td>{{it.Name || '—'}}</td>
-                        <td>{{it.Address || '—'}}</td>
-                        <td>{{it.PinCode || '—'}}</td>
+                        <td class="w-50">{{it.Address || '—'}}</td>
+                        <!-- <td>{{it.PinCode || '—'}}</td> --> 
                         <td>{{it.UploadedAt | date:'short'}}</td>
                         <td>{{it.Count || 1}}</td>
                         <td>
@@ -95,13 +95,13 @@
                     </tbody>
                   </table>
                 </div>
-                <div class="p-3 d-flex justify-content-between align-items-center" *ngIf="cmdTotal > 0">
+                <div class="p-3 d-flex justify-content-between align-items-center" *ngIf="cmdItems?.length">
                   <div class="small text-muted">
-                    Showing {{ (cmdPage - 1) * cmdPageSize + 1 }}–{{ Math.min(cmdPage * cmdPageSize, cmdTotal) }} of {{ cmdTotal }}
+                    Showing {{ (cmdBackStack.length * cmdPageSize) + 1 }}–{{ (cmdBackStack.length * cmdPageSize) + (cmdItems?.length || 0) }}
                   </div>
                   <div class="btn-group">
-                    <button class="btn btn-outline-secondary" (click)="prevCmdPage()" [disabled]="cmdLoading || cmdPage === 1">Prev</button>
-                    <button class="btn btn-outline-secondary" (click)="nextCmdPage()" [disabled]="cmdLoading || (cmdPage * cmdPageSize) >= cmdTotal">Next</button>
+                    <button class="btn btn-outline-secondary" (click)="prevCmdPage()" [disabled]="cmdLoading || cmdBackStack.length === 0">Prev</button>
+                    <button class="btn btn-outline-secondary" (click)="nextCmdPage()" [disabled]="cmdLoading || !cmdHasMore">Next</button>
                   </div>
                 </div>
               </div>
@@ -110,7 +110,7 @@
               <div class="p-3 text-center text-secondary">
                 <div *ngIf="!cmdSearch || cmdSearch.trim() === ''; else noResults">
                   <i class="fas fa-search fa-2x mb-2 opacity-50"></i>
-                  <p class="mb-0">Enter search terms to find customer medicine details</p>
+                  <p class="mb-0">Enter at least 5 digits to search</p>
                 </div>
                 <ng-template #noResults>
                   <i class="fas fa-exclamation-circle fa-2x mb-2 opacity-50"></i>
@@ -138,8 +138,8 @@
                     <tr>
                       <th scope="col">Mobile</th>
                       <th scope="col">Name</th>
-                      <th scope="col">Address</th>
-                      <th scope="col">Pin</th>
+                      <th scope="col" class="w-50">Address</th>
+                      <!-- <th scope="col">Pin</th> -->
                       <th scope="col">Medicine Details</th>
                       <th scope="col">Uploaded</th>
                     </tr>
@@ -156,13 +156,13 @@
                   </tbody>
                 </table>
               </div>
-              <div class="p-3 d-flex justify-content-between align-items-center" *ngIf="cmdDetailTotal > 0">
+              <div class="p-3 d-flex justify-content-between align-items-center" *ngIf="cmdDetailItems?.length">
                 <div class="small text-muted">
-                  Showing {{ (cmdDetailPage - 1) * cmdDetailPageSize + 1 }}–{{ Math.min(cmdDetailPage * cmdDetailPageSize, cmdDetailTotal) }} of {{ cmdDetailTotal }}
+                  Showing {{ (cmdDetailBackStack.length * cmdDetailPageSize) + 1 }}–{{ (cmdDetailBackStack.length * cmdDetailPageSize) + (cmdDetailItems?.length || 0) }}
                 </div>
                 <div class="btn-group">
-                  <button class="btn btn-outline-secondary" (click)="prevCmdDetailPage()" [disabled]="cmdDetailLoading || cmdDetailPage === 1">Prev</button>
-                  <button class="btn btn-outline-secondary" (click)="nextCmdDetailPage()" [disabled]="cmdDetailLoading || (cmdDetailPage * cmdDetailPageSize) >= cmdDetailTotal">Next</button>
+                  <button class="btn btn-outline-secondary" (click)="prevCmdDetailPage()" [disabled]="cmdDetailLoading || cmdDetailBackStack.length === 0">Prev</button>
+                  <button class="btn btn-outline-secondary" (click)="nextCmdDetailPage()" [disabled]="cmdDetailLoading || !cmdDetailHasMore">Next</button>
                 </div>
               </div>
             </div>

@@ -15,8 +15,7 @@ Role.hasMany(User, { foreignKey: 'roleId' });
 User.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
 User.hasMany(User, { foreignKey: 'managerId', as: 'teamMembers' });
 
-Customer.belongsTo(User, { foreignKey: 'assignedAgentId', as: 'assignedAgent' });
-User.hasMany(Customer, { foreignKey: 'assignedAgentId', as: 'customers' });
+// Removed assignedAgentId relationship due to column removal from Customers table
 
 Call.belongsTo(Customer, { foreignKey: 'customerId' });
 Customer.hasMany(Call, { foreignKey: 'customerId' });
@@ -87,10 +86,53 @@ END
   }
 };
 
+// Create helpful indexes for Customers to speed up search and counts
+const ensureCustomerIndexes = async () => {
+  const sql = `
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_Phone' AND object_id = OBJECT_ID('dbo.Customers')
+)
+BEGIN
+  CREATE INDEX IX_Customers_Phone ON dbo.Customers (phone);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_Status' AND object_id = OBJECT_ID('dbo.Customers')
+)
+BEGIN
+  CREATE INDEX IX_Customers_Status ON dbo.Customers (status);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.columns WHERE Name = N'PhoneDigits' AND Object_ID = Object_ID(N'dbo.Customers')
+)
+BEGIN
+  ALTER TABLE dbo.Customers
+  ADD PhoneDigits AS (
+    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', '')
+  ) PERSISTED;
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_PhoneDigits' AND object_id = OBJECT_ID('dbo.Customers')
+)
+BEGIN
+  CREATE INDEX IX_Customers_PhoneDigits ON dbo.Customers (PhoneDigits);
+END
+`;
+  try {
+    await sequelize.query(sql);
+    console.log('Ensured Customers indexes exist');
+  } catch (e) {
+    console.error('Failed ensuring Customers indexes:', e);
+  }
+};
+
 const syncDatabase = async () => {
   try {
     await ensureCallColumns();
     await ensureSeedRoles();
+    await ensureCustomerIndexes();
     await sequelize.sync();
     console.log('Model sync complete (schema aligned)');
   } catch (error) {

@@ -32,9 +32,13 @@ export class CustomerDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.initForm();
-    debugger
     const id = this.route.snapshot.paramMap.get('id');
     this.isNewMode = id == null ? true :false ;
+    // Enable edit mode when routed via /customers/:id/edit (route data)
+    const editModeFromRoute = this.route.snapshot.data && this.route.snapshot.data['editMode'] === true;
+    if (editModeFromRoute) {
+      this.isEditMode = true;
+    }
     
     if (this.isNewMode) {
       this.customer = {};

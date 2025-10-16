@@ -37,17 +37,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   // Customer Medicine Details recent list
   cmdItems: any[] = [];
   cmdSearch: string = '';
-  cmdPage: number = 1;
   cmdPageSize: number = 10;
-  cmdTotal: number = 0;
+  cmdCursor: number | null = null;
+  cmdNextCursor: number | null = null;
+  cmdBackStack: Array<number | null> = [];
+  cmdHasMore: boolean = false;
   cmdLoading: boolean = false;
   // Detail modal state
   showCmdDetail: boolean = false;
   cmdDetailMobile: string = '';
   cmdDetailItems: any[] = [];
-  cmdDetailPage: number = 1;
   cmdDetailPageSize: number = 10;
-  cmdDetailTotal: number = 0;
+  cmdDetailCursor: number | null = null;
+  cmdDetailNextCursor: number | null = null;
+  cmdDetailBackStack: Array<number | null> = [];
+  cmdDetailHasMore: boolean = false;
   cmdDetailLoading: boolean = false;
   // Portfolio search state
   portfolioMobile: string = '';
@@ -350,57 +354,72 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     // Only search if there's a search term
     if (!this.cmdSearch || this.cmdSearch.trim() === '') {
       this.cmdItems = [];
-      this.cmdTotal = 0;
+      this.cmdCursor = null;
+      this.cmdNextCursor = null;
+      this.cmdBackStack = [];
+      this.cmdHasMore = false;
       this.cmdLoading = false;
       return;
     }
 
     this.cmdLoading = true;
+    const digits = this.cmdSearch.replace(/[^0-9]/g, '');
+    if (!digits || digits.length < 5) {
+      // Require at least 5 digits for CMD search
+      this.cmdItems = [];
+      this.cmdHasMore = false;
+      this.cmdNextCursor = null;
+      this.cmdLoading = false;
+      return;
+    }
+
     this.cmdService.list({
-      page: this.cmdPage,
       pageSize: this.cmdPageSize,
-      sortBy: 'uploadedAt',
-      sortOrder: 'desc',
-      q: this.cmdSearch.trim(),
-      unique: true
+      unique: true,
+      q: digits,
+      cursorId: this.cmdCursor
     }).subscribe({
       next: (res) => {
         this.cmdItems = res?.items || [];
-        this.cmdTotal = res?.total || (this.cmdItems?.length || 0);
+        this.cmdHasMore = !!res?.hasMore;
+        this.cmdNextCursor = res?.nextCursor ?? null;
         this.cmdLoading = false;
       },
       error: () => {
         this.cmdItems = [];
-        this.cmdTotal = 0;
+        this.cmdHasMore = false;
+        this.cmdNextCursor = null;
         this.cmdLoading = false;
       }
     });
   }
 
   searchCmd(): void {
-    this.cmdPage = 1;
+    this.cmdCursor = null;
+    this.cmdBackStack = [];
     this.loadCmdUnique();
   }
 
   prevCmdPage(): void {
-    if (this.cmdPage > 1) {
-      this.cmdPage--;
-      this.loadCmdUnique();
-    }
+    if (this.cmdBackStack.length === 0) return;
+    const prev = this.cmdBackStack.pop() ?? null;
+    this.cmdCursor = prev;
+    this.loadCmdUnique();
   }
 
   nextCmdPage(): void {
-    const maxPage = Math.ceil((this.cmdTotal || 0) / this.cmdPageSize);
-    if (this.cmdPage < maxPage) {
-      this.cmdPage++;
-      this.loadCmdUnique();
-    }
+    if (!this.cmdHasMore) return;
+    // push current cursor for back navigation
+    this.cmdBackStack.push(this.cmdCursor);
+    this.cmdCursor = this.cmdNextCursor ?? null;
+    this.loadCmdUnique();
   }
 
   openCmdDetail(mobile: string): void {
     this.cmdDetailMobile = (mobile || '').replace(/[^0-9]/g, '');
     if (!this.cmdDetailMobile) return;
-    this.cmdDetailPage = 1;
+    this.cmdDetailCursor = null;
+    this.cmdDetailBackStack = [];
     this.showCmdDetail = true;
     this.loadCmdDetail();
   }
@@ -409,45 +428,47 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.showCmdDetail = false;
     this.cmdDetailMobile = '';
     this.cmdDetailItems = [];
-    this.cmdDetailTotal = 0;
+    this.cmdDetailHasMore = false;
+    this.cmdDetailNextCursor = null;
+    this.cmdDetailCursor = null;
+    this.cmdDetailBackStack = [];
   }
 
   loadCmdDetail(): void {
     if (!this.cmdDetailMobile) return;
     this.cmdDetailLoading = true;
     this.cmdService.list({
-      page: this.cmdDetailPage,
       pageSize: this.cmdDetailPageSize,
-      sortBy: 'uploadedAt',
-      sortOrder: 'desc',
-      mobile: this.cmdDetailMobile
+      mobile: this.cmdDetailMobile,
+      cursorId: this.cmdDetailCursor
     }).subscribe({
       next: (res) => {
         this.cmdDetailItems = res?.items || [];
-        this.cmdDetailTotal = res?.total || (this.cmdDetailItems?.length || 0);
+        this.cmdDetailHasMore = !!res?.hasMore;
+        this.cmdDetailNextCursor = res?.nextCursor ?? null;
         this.cmdDetailLoading = false;
       },
       error: () => {
         this.cmdDetailItems = [];
-        this.cmdDetailTotal = 0;
+        this.cmdDetailHasMore = false;
+        this.cmdDetailNextCursor = null;
         this.cmdDetailLoading = false;
       }
     });
   }
 
   prevCmdDetailPage(): void {
-    if (this.cmdDetailPage > 1) {
-      this.cmdDetailPage--;
-      this.loadCmdDetail();
-    }
+    if (this.cmdDetailBackStack.length === 0) return;
+    const prev = this.cmdDetailBackStack.pop() ?? null;
+    this.cmdDetailCursor = prev;
+    this.loadCmdDetail();
   }
 
   nextCmdDetailPage(): void {
-    const maxPage = Math.ceil((this.cmdDetailTotal || 0) / this.cmdDetailPageSize);
-    if (this.cmdDetailPage < maxPage) {
-      this.cmdDetailPage++;
-      this.loadCmdDetail();
-    }
+    if (!this.cmdDetailHasMore) return;
+    this.cmdDetailBackStack.push(this.cmdDetailCursor);
+    this.cmdDetailCursor = this.cmdDetailNextCursor ?? null;
+    this.loadCmdDetail();
   }
 
   toggleTheme(): void {

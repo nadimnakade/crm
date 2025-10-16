@@ -14,9 +14,11 @@ export class CustomerMedicineDetailComponent {
   Math = Math;
   // List state
   items: Array<{ name: string; mobile: string; address: string }> = [];
-  page = 1;
   pageSize = 10;
-  total = 0;
+  cursor: number | null = null;
+  nextCursor: number | null = null;
+  backStack: Array<number | null> = [];
+  hasMore: boolean = false;
   sortBy: 'name' | 'mobile' | 'address' = 'name';
   sortOrder: 'asc' | 'desc' = 'asc';
   searchText = '';
@@ -31,24 +33,29 @@ export class CustomerMedicineDetailComponent {
   showDetail = false;
   detailMobile: string = '';
   detailItems: any[] = [];
-  detailPage = 1;
   detailPageSize = 10;
-  detailTotal = 0;
+  detailCursor: number | null = null;
+  detailNextCursor: number | null = null;
+  detailBackStack: Array<number | null> = [];
+  detailHasMore: boolean = false;
 
   constructor(private svc: CustomerMedicineDetailService) {
-    this.loadList(1);
+    this.loadList();
   }
 
-  loadList(page = 1): void {
-    this.page = Math.max(1, page);
+  loadList(): void {
+    const digits = (this.searchText || '').replace(/[^0-9]/g, '');
+    const params: any = {
+      pageSize: this.pageSize,
+      cursorId: this.cursor,
+      unique: true
+    };
+    if (digits && digits.length >= 5) {
+      params.q = digits;
+    }
+
     this.svc
-      .list({
-        page: this.page,
-        pageSize: this.pageSize,
-        sortBy: this.sortBy,
-        sortOrder: this.sortOrder,
-        q: (this.searchText || '').trim() || undefined
-      })
+      .list(params)
       .subscribe({
         next: (res: any) => {
           this.items = (res?.items || []).map((r: any) => ({
@@ -56,12 +63,14 @@ export class CustomerMedicineDetailComponent {
             mobile: r.Mobile || r.mobile || '',
             address: r.Address || r.address || ''
           }));
-          this.total = Number(res?.total || 0);
+          this.hasMore = !!res?.hasMore;
+          this.nextCursor = res?.nextCursor ?? null;
         },
         error: () => {
           // Keep it silent but reset items
           this.items = [];
-          this.total = 0;
+          this.hasMore = false;
+          this.nextCursor = null;
         }
       });
   }
@@ -73,18 +82,23 @@ export class CustomerMedicineDetailComponent {
       this.sortBy = col;
       this.sortOrder = 'asc';
     }
-    this.loadList(1);
+    // Reset cursor stack on sort change
+    this.cursor = null;
+    this.backStack = [];
+    this.loadList();
   }
 
   search(): void {
-    this.page = 1;
-    this.loadList(1);
+    this.cursor = null;
+    this.backStack = [];
+    this.loadList();
   }
 
   changePageSize(size: number): void {
     this.pageSize = Number(size) || 10;
-    this.page = 1;
-    this.loadList(1);
+    this.cursor = null;
+    this.backStack = [];
+    this.loadList();
   }
 
   openUpload(): void {
@@ -132,7 +146,10 @@ export class CustomerMedicineDetailComponent {
         const skipped = Number(res?.skipped || 0);
         this.uploadMessage = `Upload complete. Inserted: ${inserted}, Skipped: ${skipped}.`;
         this.uploading = false;
-        this.loadList(1);
+        // Refresh list from the beginning after successful upload
+        this.cursor = null;
+        this.backStack = [];
+        this.loadList();
         // Close after short delay to show message
         setTimeout(() => this.closeUpload(), 800);
       },
@@ -155,25 +172,26 @@ export class CustomerMedicineDetailComponent {
     if (!mobile) return;
     this.detailMobile = mobile;
     this.showDetail = true;
-    this.loadDetail(mobile, 1);
+    this.detailCursor = null;
+    this.detailBackStack = [];
+    this.loadDetail(mobile);
   }
 
   closeDetail(): void {
     this.showDetail = false;
     this.detailItems = [];
-    this.detailTotal = 0;
-    this.detailPage = 1;
+    this.detailHasMore = false;
+    this.detailNextCursor = null;
+    this.detailCursor = null;
+    this.detailBackStack = [];
   }
 
-  loadDetail(mobile: string, page = 1): void {
-    this.detailPage = Math.max(1, page);
+  loadDetail(mobile: string): void {
     this.svc
       .list({
-        page: this.detailPage,
         pageSize: this.detailPageSize,
-        sortBy: 'uploadedAt',
-        sortOrder: 'desc',
-        mobile
+        mobile,
+        cursorId: this.detailCursor
       })
       .subscribe({
         next: (res: any) => {
@@ -188,12 +206,42 @@ export class CustomerMedicineDetailComponent {
             FilePath: r.FilePath,
             UploadedAt: r.UploadedAt
           }));
-          this.detailTotal = Number(res?.total || this.detailItems.length || 0);
+          this.detailHasMore = !!res?.hasMore;
+          this.detailNextCursor = res?.nextCursor ?? null;
         },
         error: () => {
           this.detailItems = [];
-          this.detailTotal = 0;
+          this.detailHasMore = false;
+          this.detailNextCursor = null;
         }
       });
+  }
+
+  prevPage(): void {
+    if (this.backStack.length === 0) return;
+    const prev = this.backStack.pop() ?? null;
+    this.cursor = prev;
+    this.loadList();
+  }
+
+  nextPage(): void {
+    if (!this.hasMore) return;
+    this.backStack.push(this.cursor);
+    this.cursor = this.nextCursor ?? null;
+    this.loadList();
+  }
+
+  prevDetailPage(): void {
+    if (this.detailBackStack.length === 0) return;
+    const prev = this.detailBackStack.pop() ?? null;
+    this.detailCursor = prev;
+    this.loadDetail(this.detailMobile);
+  }
+
+  nextDetailPage(): void {
+    if (!this.detailHasMore) return;
+    this.detailBackStack.push(this.detailCursor);
+    this.detailCursor = this.detailNextCursor ?? null;
+    this.loadDetail(this.detailMobile);
   }
 }

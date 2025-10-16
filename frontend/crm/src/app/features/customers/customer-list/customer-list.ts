@@ -19,8 +19,12 @@ export class CustomerListComponent implements OnInit {
   page: number = 1;
   pageSize: number = 10;
   total: number = 0;
-  sortBy: string = 'createdAt';
-  sortOrder: 'ASC' | 'DESC' = 'DESC';
+  // Keyset pagination state
+  cursorId: number | null = null;
+  nextCursor: number | null = null;
+  hasMore: boolean = false;
+  cursorStack: (number | null)[] = [];
+  // Sorting removed; backend enforces id DESC for performance
   statusFilter: string = '';
   statusOptions: string[] = [];
   // Expose Math for template usage (e.g., Math.min)
@@ -34,13 +38,15 @@ export class CustomerListComponent implements OnInit {
 
   loadCustomers(): void {
     // Load initial page without filter
-    this.customerService.searchCustomers('', this.page, this.pageSize, this.statusFilter, this.sortBy, this.sortOrder).subscribe({
+    this.customerService.searchCustomers('', this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: (resp) => {
         this.customers = resp.data;
         this.filteredCustomers = resp.data;
         this.total = resp.total;
-        this.page = resp.page;
+        this.page = 1;
         this.pageSize = resp.pageSize;
+        this.hasMore = !!resp.hasMore;
+        this.nextCursor = (resp.nextCursor ?? null);
         this.computeStatusOptions(resp.data);
       },
       error: (error) => {
@@ -49,16 +55,21 @@ export class CustomerListComponent implements OnInit {
     });
   }
 
-  filterCustomers(): void {
+  filterCustomers(resetPage: boolean = false): void {
     const term = (this.searchTerm || '').trim();
-    // Reset to first page on new search input
-    this.page = 1;
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, this.sortBy, this.sortOrder).subscribe({
+    if (resetPage) {
+      this.page = 1;
+      this.cursorId = null;
+      this.cursorStack = [];
+    }
+    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
-        this.page = resp.page;
+        this.page = (this.cursorStack.length + 1);
         this.pageSize = resp.pageSize;
+        this.hasMore = !!resp.hasMore;
+        this.nextCursor = (resp.nextCursor ?? null);
         this.computeStatusOptions(resp.data);
       },
       error: err => {
@@ -78,15 +89,18 @@ export class CustomerListComponent implements OnInit {
 
   nextPage(): void {
     const term = (this.searchTerm || '').trim();
-    const maxPage = Math.ceil(this.total / this.pageSize) || 1;
-    if (this.page >= maxPage) return;
-    this.page += 1;
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, this.sortBy, this.sortOrder).subscribe({
+    if (!this.hasMore) return;
+    // push current cursor to stack for back navigation
+    this.cursorStack.push(this.cursorId);
+    this.cursorId = this.nextCursor || null;
+    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
-        this.page = resp.page;
+        this.page = (this.cursorStack.length + 1);
         this.pageSize = resp.pageSize;
+        this.hasMore = !!resp.hasMore;
+        this.nextCursor = (resp.nextCursor ?? null);
       },
       error: err => console.error('Pagination next failed', err)
     });
@@ -94,39 +108,40 @@ export class CustomerListComponent implements OnInit {
 
   prevPage(): void {
     const term = (this.searchTerm || '').trim();
-    if (this.page <= 1) return;
-    this.page -= 1;
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, this.sortBy, this.sortOrder).subscribe({
+    if (this.cursorStack.length === 0) return;
+    // pop previous cursor and fetch
+    this.cursorId = this.cursorStack.pop() ?? null;
+    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
-        this.page = resp.page;
+        this.page = (this.cursorStack.length + 1);
         this.pageSize = resp.pageSize;
+        this.hasMore = !!resp.hasMore;
+        this.nextCursor = (resp.nextCursor ?? null);
       },
       error: err => console.error('Pagination prev failed', err)
     });
   }
 
   onPageSizeChange(): void {
-    this.page = 1;
-    this.filterCustomers();
+    this.filterCustomers(true);
   }
 
   onStatusChange(): void {
-    this.page = 1;
-    this.filterCustomers();
+    this.filterCustomers(true);
   }
 
-  setSort(column: string): void {
-    if (this.sortBy === column) {
-      this.sortOrder = this.sortOrder === 'ASC' ? 'DESC' : 'ASC';
-    } else {
-      this.sortBy = column;
-      this.sortOrder = 'ASC';
-    }
-    this.page = 1;
-    this.filterCustomers();
+  // Sorting disabled
+
+  firstPage(): void {
+    if (this.page === 1) return;
+    this.cursorId = null;
+    this.cursorStack = [];
+    this.filterCustomers(true);
   }
+
+  // Removed page number logic for keyset pagination
 
   private computeStatusOptions(rows: any[]): void {
     const set = new Set<string>();

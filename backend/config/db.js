@@ -16,13 +16,15 @@ const sequelize = new Sequelize(process.env.DB_NAME, null, null, {
     },
     options: {
       instanceName: process.env.DB_INSTANCE,
-      trustServerCertificate: true
+      trustServerCertificate: true,
+      // Increase request timeout to reduce ETIMEOUT on large queries
+      requestTimeout: 60000
     }
   },
   pool: {
-    max: 5,
+    max: 10,
     min: 0,
-    acquire: 30000,
+    acquire: 60000,
     idle: 10000
   }
 });

@@ -18,18 +18,11 @@ const Customer = sequelize.define('Customer', {
     type: DataTypes.STRING,
     allowNull: true
   },
-  assignedAgentId: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  },
   status: {
     type: DataTypes.STRING,
     defaultValue: 'active'
   },
-  notes: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  }
+  
 }, {
   timestamps: true
 });

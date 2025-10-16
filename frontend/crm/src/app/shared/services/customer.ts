@@ -33,11 +33,15 @@ export class CustomerService {
     pageSize = 10,
     status: string = '',
     sortBy: string = 'createdAt',
-    sortOrder: 'ASC' | 'DESC' = 'DESC'
-  ): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
-    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(this.apiUrl, {
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+    cursorId?: number
+  ): Observable<{ data: any[]; total: number; page: number; pageSize: number; hasMore?: boolean; nextCursor?: number | null }> {
+    // Sorting removed; backend orders by id DESC for performance
+    const params: any = { q, page, pageSize, status };
+    if (cursorId !== undefined && cursorId !== null) params.cursorId = cursorId;
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number; hasMore?: boolean; nextCursor?: number | null }>(this.apiUrl, {
       headers: this.getHeaders(),
-      params: { q, page, pageSize, status, sortBy, sortOrder }
+      params
     });
   }
 

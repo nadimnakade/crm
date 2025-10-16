@@ -2,7 +2,7 @@
   <div class="card-header d-flex justify-content-between align-items-center">
     <h5 class="mb-0">Customer Medicine Detail</h5>
     <div class="d-flex align-items-center gap-2">
-      <input type="text" class="form-control" [(ngModel)]="searchText" placeholder="Search name/mobile/address" style="max-width:300px;">
+      <input type="text" class="form-control" [(ngModel)]="searchText" inputmode="numeric" placeholder="Search mobile number (min 5 digits)" style="max-width:300px;">
       <button class="btn btn-outline-secondary" (click)="search()">Search</button>
       <button class="btn btn-primary" (click)="openUpload()">Add</button>
     </div>
@@ -47,10 +47,12 @@
         </tbody>
       </table>
       <div class="d-flex justify-content-between align-items-center mt-2">
-        <div class="small text-muted">Page {{page}} of {{ Math.max(1, Math.ceil(total / pageSize)) }}</div>
+        <div class="small text-muted">
+          Showing {{ (backStack.length * pageSize) + 1 }}–{{ (backStack.length * pageSize) + (items?.length || 0) }}
+        </div>
         <div class="btn-group">
-          <button class="btn btn-outline-secondary" (click)="loadList(page - 1)" [disabled]="page <= 1">Prev</button>
-          <button class="btn btn-outline-secondary" (click)="loadList(page + 1)" [disabled]="page >= Math.ceil(total / pageSize)">Next</button>
+          <button class="btn btn-outline-secondary" (click)="prevPage()" [disabled]="backStack.length === 0">Prev</button>
+          <button class="btn btn-outline-secondary" (click)="nextPage()" [disabled]="!hasMore">Next</button>
         </div>
       </div>
     </div>
@@ -117,10 +119,12 @@
         </tbody>
       </table>
       <div class="d-flex justify-content-between align-items-center mt-2">
-        <div class="small text-muted">Page {{detailPage}} of {{ Math.max(1, Math.ceil(detailTotal / detailPageSize)) }}</div>
+        <div class="small text-muted">
+          Showing {{ (detailBackStack.length * detailPageSize) + 1 }}–{{ (detailBackStack.length * detailPageSize) + (detailItems?.length || 0) }}
+        </div>
         <div class="btn-group">
-          <button class="btn btn-outline-secondary btn-sm" (click)="loadDetail(detailMobile, detailPage - 1)" [disabled]="detailPage <= 1">Prev</button>
-          <button class="btn btn-outline-secondary btn-sm" (click)="loadDetail(detailMobile, detailPage + 1)" [disabled]="detailPage >= Math.ceil(detailTotal / detailPageSize)">Next</button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="prevDetailPage()" [disabled]="detailBackStack.length === 0">Prev</button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="nextDetailPage()" [disabled]="!detailHasMore">Next</button>
         </div>
       </div>
     </div>

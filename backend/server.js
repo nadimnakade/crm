@@ -73,6 +73,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/portfolio', require('./routes/portfolioRoutes'));
 app.use('/api/customer-medicine-details', require('./routes/customerMedicineDetailRoutes'));
+ // Import customers route removed per user instruction
 
 // Serve frontend static files after API routes
 const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm');

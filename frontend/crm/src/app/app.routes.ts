@@ -19,6 +19,7 @@ export const routes: Routes = [
       // Customers (standalone components)
       { path: 'customers', loadComponent: () => import('./features/customers/customer-list/customer-list').then(m => m.CustomerListComponent) },
       { path: 'customers/new', loadComponent: () => import('./features/customers/customer-detail/customer-detail').then(m => m.CustomerDetailComponent) },
+      { path: 'customers/:id/edit', loadComponent: () => import('./features/customers/customer-detail/customer-detail').then(m => m.CustomerDetailComponent), data: { editMode: true } },
       { path: 'customers/:id', loadComponent: () => import('./features/customers/customer-detail/customer-detail').then(m => m.CustomerDetailComponent) },
       { path: 'customers/:id/history', loadComponent: () => import('./features/customers/customer-history/customer-history').then(m => m.CustomerHistoryComponent) },
       { path: 'portfolio', loadComponent: () => import('./features/portfolio/customer-portfolio/customer-portfolio').then(m => m.CustomerPortfolioComponent) },

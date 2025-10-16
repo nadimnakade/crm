@@ -108,10 +108,11 @@ exports.uploadPortfolio = async (req, res) => {
   }
 };
 
-// @desc    List portfolio items
-//          - unique=true: returns one record per mobile with latest file + count
-//          - mobile=xxxx: returns all records for the mobile (detail view)
-//          Supports pagination via page & pageSize
+// @desc    List portfolio items (CustomerMedicineDetails)
+//          Keyset cursor pagination for consistent performance
+//          - unique=true: one row per mobile (latest record fields + count)
+//          - mobile=xxxx: raw records for that mobile (detail view)
+//          - q search: digits>=5 -> unique-by-mobile; otherwise text search across name/address/mobile
 // @route   GET /api/portfolio
 // @access  Private
 exports.listPortfolio = async (req, res) => {
@@ -123,157 +124,221 @@ exports.listPortfolio = async (req, res) => {
     const from = (req.query.from || '').toString().trim();
     const to = (req.query.to || '').toString().trim();
     const unique = ['true', '1'].includes((req.query.unique || '').toString().toLowerCase());
-    const page = parseInt(req.query.page, 10) || 1;
-    const pageSize = parseInt(req.query.pageSize, 10) || 10;
-    const offset = (page - 1) * pageSize;
 
-    const { Op } = require('sequelize');
-    const baseFilters = {};
-    if (groupId) baseFilters.GroupId = groupId;
-    if (pinCode) baseFilters.PinCode = pinCode;
-    // Date range filter
-    if (from || to) {
-      const range = {};
-      if (from) range[Op.gte] = new Date(from);
-      if (to) {
-        // Include entire day for 'to'
-        const end = new Date(to);
-        end.setHours(23, 59, 59, 999);
-        range[Op.lte] = end;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const cursorIdRaw = req.query.cursorId;
+    const cursorId = cursorIdRaw !== undefined && cursorIdRaw !== null && `${cursorIdRaw}` !== ''
+      ? parseInt(cursorIdRaw, 10)
+      : null;
+    const fetchLimit = pageSize + 1;
+
+    // Build common filter params
+    const fromDate = from ? new Date(from) : null;
+    let toDate = null;
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      toDate = end;
+    }
+
+    const digits = q.replace(/[^0-9]/g, '');
+
+    // Helper to run raw query with parameters
+    const runQuery = async (sql, replacements) => {
+      const [rows] = await sequelize.query(sql, { replacements, raw: true });
+      return rows || [];
+    };
+
+    // Detail mode: specific mobile -> raw rows with Id keyset
+    if (mobile) {
+      const rows = await runQuery(`
+        SELECT TOP (:fetchLimit)
+          Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+        FROM CustomerPortfolio WITH (NOLOCK)
+        WHERE Mobile = :mobile
+          AND (:groupId IS NULL OR GroupId = :groupId)
+          AND (:pinCode IS NULL OR PinCode = :pinCode)
+          AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+          AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          AND (:cursorId IS NULL OR Id < :cursorId)
+        ORDER BY Id DESC
+        OPTION (RECOMPILE);
+      `, { mobile, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
+
+      const hasMore = rows.length > pageSize;
+      const items = hasMore ? rows.slice(0, pageSize) : rows;
+      const nextCursor = hasMore ? items[items.length - 1]?.Id || null : null;
+      // Total count for detail view can be expensive; only compute on first page
+      let total = undefined;
+      if (!cursorId) {
+        const totalRows = await runQuery(`
+          SELECT COUNT(1) AS Total
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE Mobile = :mobile
+            AND (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate);
+        `, { mobile, groupId, pinCode, fromDate, toDate });
+        total = Number(totalRows?.[0]?.Total || 0);
       }
-      baseFilters.UploadedAt = range;
+      return res.json({ items, hasMore, nextCursor, total, mode: 'detail' });
     }
 
     // Search mode
-    // - If the query contains mobile digits (>=6), return UNIQUE-by-mobile results
-    //   This ensures searching by mobile shows a single representative record per mobile
-    // - Otherwise, perform general search across name/address (and partial mobile) returning raw rows
     if (q) {
-      const digits = q.replace(/[^0-9]/g, '');
+      // Mobile-focused search -> unique per mobile using LatestId keyset
+      if (digits && digits.length >= 5) {
+        const whereMobileLike = `%${digits}%`;
+        const rows = await runQuery(`
+          WITH Filtered AS (
+            SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+            FROM CustomerPortfolio WITH (NOLOCK)
+            WHERE Mobile LIKE :whereMobileLike
+              AND (:groupId IS NULL OR GroupId = :groupId)
+              AND (:pinCode IS NULL OR PinCode = :pinCode)
+              AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+              AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          ), Agg AS (
+            SELECT Mobile, MAX(Id) AS LatestId, MAX(UploadedAt) AS LatestAt, COUNT(1) AS [Count]
+            FROM Filtered
+            GROUP BY Mobile
+          )
+          SELECT TOP (:fetchLimit)
+            a.Mobile,
+            a.[Count] AS Count,
+            a.LatestAt,
+            cp.GroupId, cp.Name, cp.Address, cp.PinCode, cp.SkuName, cp.FileName, cp.FilePath, cp.UploadedAt,
+            a.LatestId
+          FROM Agg a
+          JOIN CustomerPortfolio cp WITH (NOLOCK) ON cp.Id = a.LatestId
+          WHERE (:cursorId IS NULL OR a.LatestId < :cursorId)
+          ORDER BY a.LatestId DESC
+          OPTION (RECOMPILE);
+        `, { whereMobileLike, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
 
-      // Mobile-focused search -> unique per mobile
-      if (digits && digits.length >= 6) {
-        const where = { [Op.and]: [ baseFilters, { Mobile: { [Op.like]: `%${digits}%` } } ] };
-
-        // Count distinct mobiles matching the search
-        const totalDistinct = await CustomerPortfolio.count({ distinct: true, col: 'Mobile', where });
-
-        // Group by mobile to get latest timestamp and count
-        const groups = await CustomerPortfolio.findAll({
-          attributes: [
-            'Mobile',
-            [sequelize.fn('COUNT', sequelize.col('Id')), 'count'],
-            [sequelize.fn('MAX', sequelize.col('UploadedAt')), 'LatestAt']
-          ],
-          group: ['Mobile'],
-          order: [[sequelize.literal('LatestAt'), 'DESC']],
-          offset,
-          limit: pageSize,
-          where
-        });
-
-        const items = await Promise.all(groups.map(async (g) => {
-          const m = g.get('Mobile');
-          const latest = await CustomerPortfolio.findOne({
-            where: { ...baseFilters, Mobile: m },
-            order: [['UploadedAt', 'DESC']]
-          });
-          return {
-            Mobile: m,
-            Count: parseInt(g.get('count'), 10) || 0,
-            LatestAt: g.get('LatestAt'),
-            GroupId: latest?.GroupId || null,
-            Name: latest?.Name || null,
-            Address: latest?.Address || null,
-            PinCode: latest?.PinCode || null,
-            SkuName: latest?.SkuName || null,
-            FileName: latest?.FileName || null,
-            FilePath: latest?.FilePath || null,
-            UploadedAt: latest?.UploadedAt || g.get('LatestAt')
-          };
-        }));
-
-        return res.json({ items, total: totalDistinct, page, pageSize, mode: 'search-unique' });
+        const hasMore = rows.length > pageSize;
+        const items = hasMore ? rows.slice(0, pageSize) : rows;
+        const nextCursor = hasMore ? items[items.length - 1]?.LatestId || null : null;
+        let total = undefined;
+        if (!cursorId) {
+          const totalRows = await runQuery(`
+            SELECT COUNT(DISTINCT Mobile) AS Total
+            FROM CustomerPortfolio WITH (NOLOCK)
+            WHERE Mobile LIKE :whereMobileLike
+              AND (:groupId IS NULL OR GroupId = :groupId)
+              AND (:pinCode IS NULL OR PinCode = :pinCode)
+              AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+              AND (:toDate IS NULL OR UploadedAt <= :toDate);
+          `, { whereMobileLike, groupId, pinCode, fromDate, toDate });
+          total = Number(totalRows?.[0]?.Total || 0);
+        }
+        return res.json({ items, hasMore, nextCursor, total, mode: 'search-unique' });
       }
 
-      // General text search (name/address and partial mobile) -> raw rows
-      const orClauses = [
-        { Name: { [Op.like]: `%${q}%` } },
-        { Address: { [Op.like]: `%${q}%` } }
-      ];
-      if (digits) {
-        orClauses.push({ Mobile: { [Op.like]: `%${digits}%` } });
+      // General text search (name/address and partial mobile) -> raw rows by Id keyset
+      const qLike = `%${q}%`;
+      const digitsLike = digits ? `%${digits}%` : null;
+      const rows = await runQuery(`
+        SELECT TOP (:fetchLimit)
+          Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+        FROM CustomerPortfolio WITH (NOLOCK)
+        WHERE (
+            Name LIKE :qLike OR Address LIKE :qLike
+            OR (:digitsLike IS NOT NULL AND Mobile LIKE :digitsLike)
+          )
+          AND (:groupId IS NULL OR GroupId = :groupId)
+          AND (:pinCode IS NULL OR PinCode = :pinCode)
+          AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+          AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          AND (:cursorId IS NULL OR Id < :cursorId)
+        ORDER BY Id DESC
+        OPTION (RECOMPILE);
+      `, { qLike, digitsLike, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
+
+      const hasMore = rows.length > pageSize;
+      const items = hasMore ? rows.slice(0, pageSize) : rows;
+      const nextCursor = hasMore ? items[items.length - 1]?.Id || null : null;
+      // total on first page only (optional)
+      let total = undefined;
+      if (!cursorId) {
+        const totalRows = await runQuery(`
+          SELECT COUNT(1) AS Total
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE (
+              Name LIKE :qLike OR Address LIKE :qLike
+              OR (:digitsLike IS NOT NULL AND Mobile LIKE :digitsLike)
+            )
+            AND (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate);
+        `, { qLike, digitsLike, groupId, pinCode, fromDate, toDate });
+        total = Number(totalRows?.[0]?.Total || 0);
       }
-      const where = { [Op.and]: [ baseFilters, { [Op.or]: orClauses } ] };
-      const total = await CustomerPortfolio.count({ where });
-      const items = await CustomerPortfolio.findAll({
-        where,
-        order: [['UploadedAt', 'DESC']],
-        offset,
-        limit: pageSize
-      });
-      return res.json({ items, total, page, pageSize, mode: 'search' });
+      return res.json({ items, hasMore, nextCursor, total, mode: 'search' });
     }
 
-    // Detail mode: specific mobile
-    if (mobile) {
-      const where = { ...baseFilters, Mobile: mobile };
-      const total = await CustomerPortfolio.count({ where });
-      const items = await CustomerPortfolio.findAll({
-        where,
-        order: [['UploadedAt', 'DESC']],
-        offset,
-        limit: pageSize
-      });
-      return res.json({ items, total, page, pageSize, mode: 'detail' });
-    }
-
-    // Unique mode (default when no mobile specified)
+    // Unique mode (default list) -> one row per mobile using LatestId keyset
     if (unique || !mobile) {
-      // Count distinct mobiles with filters
-      const totalDistinct = await CustomerPortfolio.count({ distinct: true, col: 'Mobile', where: baseFilters });
-      // Get distinct mobiles page with latest timestamp and count per mobile
-      const groups = await CustomerPortfolio.findAll({
-        attributes: [
-          'Mobile',
-          [sequelize.fn('COUNT', sequelize.col('Id')), 'count'],
-          [sequelize.fn('MAX', sequelize.col('UploadedAt')), 'LatestAt']
-        ],
-        group: ['Mobile'],
-        order: [[sequelize.literal('LatestAt'), 'DESC']],
-        offset,
-        limit: pageSize,
-        where: baseFilters
-      });
+      const rows = await runQuery(`
+        WITH Filtered AS (
+          SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate)
+        ), Agg AS (
+          SELECT Mobile, MAX(Id) AS LatestId, MAX(UploadedAt) AS LatestAt, COUNT(1) AS [Count]
+          FROM Filtered
+          GROUP BY Mobile
+        )
+        SELECT TOP (:fetchLimit)
+          a.Mobile,
+          a.[Count] AS Count,
+          a.LatestAt,
+          cp.GroupId, cp.Name, cp.Address, cp.PinCode, cp.SkuName, cp.FileName, cp.FilePath, cp.UploadedAt,
+          a.LatestId
+        FROM Agg a
+        JOIN CustomerPortfolio cp WITH (NOLOCK) ON cp.Id = a.LatestId
+        WHERE (:cursorId IS NULL OR a.LatestId < :cursorId)
+        ORDER BY a.LatestId DESC
+        OPTION (RECOMPILE);
+      `, { groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
 
-      // For each mobile, fetch the latest record to populate representative fields
-      const items = await Promise.all(groups.map(async (g) => {
-        const m = g.get('Mobile');
-        const latest = await CustomerPortfolio.findOne({
-          where: { ...baseFilters, Mobile: m },
-          order: [['UploadedAt', 'DESC']]
-        });
-        return {
-          Mobile: m,
-          Count: parseInt(g.get('count'), 10) || 0,
-          LatestAt: g.get('LatestAt'),
-          GroupId: latest?.GroupId || null,
-          Name: latest?.Name || null,
-          Address: latest?.Address || null,
-          PinCode: latest?.PinCode || null,
-          SkuName: latest?.SkuName || null,
-          FileName: latest?.FileName || null,
-          FilePath: latest?.FilePath || null,
-          UploadedAt: latest?.UploadedAt || g.get('LatestAt')
-        };
-      }));
-
-      return res.json({ items, total: totalDistinct, page, pageSize, mode: 'unique' });
+      const hasMore = rows.length > pageSize;
+      const items = hasMore ? rows.slice(0, pageSize) : rows;
+      const nextCursor = hasMore ? items[items.length - 1]?.LatestId || null : null;
+      // total distinct on first page only
+      let total = undefined;
+      if (!cursorId) {
+        const totalRows = await runQuery(`
+          SELECT COUNT(DISTINCT Mobile) AS Total
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate);
+        `, { groupId, pinCode, fromDate, toDate });
+        total = Number(totalRows?.[0]?.Total || 0);
+      }
+      return res.json({ items, hasMore, nextCursor, total, mode: 'unique' });
     }
 
     // Fallback (shouldn't reach here)
-    const items = await CustomerPortfolio.findAll({ order: [['UploadedAt', 'DESC']], offset, limit: pageSize });
-    return res.json({ items, total: items.length, page, pageSize, mode: 'all' });
+    const rows = await runQuery(`
+      SELECT TOP (:fetchLimit)
+        Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+      FROM CustomerPortfolio WITH (NOLOCK)
+      WHERE (:cursorId IS NULL OR Id < :cursorId)
+      ORDER BY Id DESC
+      OPTION (RECOMPILE);
+    `, { cursorId, fetchLimit });
+    const hasMore = rows.length > pageSize;
+    const items = hasMore ? rows.slice(0, pageSize) : rows;
+    const nextCursor = hasMore ? items[items.length - 1]?.Id || null : null;
+    return res.json({ items, hasMore, nextCursor, total: undefined, mode: 'all' });
   } catch (error) {
     console.error('Portfolio list failed:', error);
     res.status(500).json({ message: 'Failed to list items', error: error.message });
