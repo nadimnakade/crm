@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { User, Role } = require('../models');
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -34,18 +34,36 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Check user role
+// Check user role with case-insensitive matching, wildcard permission, and roleId fallback
 exports.authorize = (...roles) => {
   return async (req, res, next) => {
-    // Get user role
+    // Get user with role
     const user = await User.findByPk(req.user.id, {
-      include: 'Role'
+      include: [{ model: Role }]
     });
 
-    if (!user || !roles.includes(user.Role.name)) {
-      return res.status(403).json({ message: 'User role not authorized to access this route' });
+    const allowed = roles.map(r => `${r}`.toLowerCase());
+    const userRoleName = (user && user.Role && user.Role.name) ? user.Role.name.toLowerCase() : '';
+    const permissions = (user && user.Role && Array.isArray(user.Role.permissions)) ? user.Role.permissions : [];
+    const roleId = (user && user.Role && user.Role.id) ? Number(user.Role.id) : Number(user && user.roleId);
+
+    // Allow if role name matches (case-insensitive)
+    if (user && user.Role && allowed.includes(userRoleName)) {
+      return next();
+    }
+    console.log(user)
+    console.log(userRoleName)
+    console.log(permissions)
+    console.log(roleId)
+    // Allow if wildcard permission present (Super Admin style)
+    if (permissions.includes('*')) {
+      return next();
+    }
+    // Allow specific role IDs (e.g., 1=Admin, 2=Super Admin)
+    if ([1, 2].includes(roleId)) {
+      return next();
     }
 
-    next();
+    return res.status(403).json({ message: 'User role not authorized to access this route' });
   };
 };

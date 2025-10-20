@@ -115,6 +115,187 @@ exports.uploadPortfolio = async (req, res) => {
 //          - q search: digits>=5 -> unique-by-mobile; otherwise text search across name/address/mobile
 // @route   GET /api/portfolio
 // @access  Private
+exports.exportPortfolio = async (req, res) => {
+  try {
+    // Extend request/response timeouts for long-running exports
+    try { req.setTimeout(300000); } catch {}
+    try { res.setTimeout(300000); } catch {}
+    const mobile = (req.query.mobile || '').replace(/[^0-9]/g, '');
+    const q = (req.query.q || '').toString().trim();
+    const groupId = (req.query.groupId || '').toString().trim() || null;
+    const pinCode = (req.query.pinCode || '').toString().trim() || null;
+    const from = (req.query.from || '').toString().trim();
+    const to = (req.query.to || '').toString().trim();
+    const unique = ['true', '1'].includes((req.query.unique || '').toString().toLowerCase());
+    const limit = parseInt(req.query.limit, 10) || 10000;
+
+    const fromDate = from ? new Date(from) : null;
+    let toDate = null;
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      toDate = end;
+    }
+
+    const digits = q.replace(/[^0-9]/g, '');
+
+    const runQuery = async (sql, replacements) => {
+      const [rows] = await sequelize.query(sql, { replacements, raw: true });
+      return rows || [];
+    };
+
+    let rows = [];
+    let mode = 'unique';
+
+    if (mobile) {
+      rows = await runQuery(`
+        SELECT TOP (:limit)
+          Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+        FROM CustomerPortfolio WITH (NOLOCK)
+        WHERE Mobile = :mobile
+          AND (:groupId IS NULL OR GroupId = :groupId)
+          AND (:pinCode IS NULL OR PinCode = :pinCode)
+          AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+          AND (:toDate IS NULL OR UploadedAt <= :toDate)
+        ORDER BY Id DESC
+        OPTION (RECOMPILE);
+      `, { mobile, groupId, pinCode, fromDate, toDate, limit });
+      mode = 'detail';
+    } else if (q) {
+      if (digits && digits.length >= 5) {
+        const whereMobileLike = `%${digits}%`;
+        rows = await runQuery(`
+          WITH Base AS (
+            SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+            FROM CustomerPortfolio WITH (NOLOCK)
+            WHERE Mobile LIKE :whereMobileLike
+              AND (:groupId IS NULL OR GroupId = :groupId)
+              AND (:pinCode IS NULL OR PinCode = :pinCode)
+              AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+              AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          ), Marked AS (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY Mobile ORDER BY Id DESC) AS rn,
+                   COUNT(1) OVER (PARTITION BY Mobile) AS [Count],
+                   MAX(UploadedAt) OVER (PARTITION BY Mobile) AS LatestAt
+            FROM Base
+          )
+          SELECT TOP (:limit)
+            Mobile,
+            [Count] AS Count,
+            LatestAt,
+            GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt,
+            Id AS LatestId
+          FROM Marked
+          WHERE rn = 1
+          ORDER BY Id DESC
+          OPTION (RECOMPILE);
+        `, { whereMobileLike, groupId, pinCode, fromDate, toDate, limit });
+        mode = 'search-unique';
+      } else {
+        const qLike = `%${q}%`;
+        const digitsLike = digits ? `%${digits}%` : null;
+        rows = await runQuery(`
+          SELECT TOP (:limit)
+            Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE (
+              Name LIKE :qLike OR Address LIKE :qLike
+              OR (:digitsLike IS NOT NULL AND Mobile LIKE :digitsLike)
+            )
+            AND (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          ORDER BY Id DESC
+          OPTION (RECOMPILE);
+        `, { qLike, digitsLike, groupId, pinCode, fromDate, toDate, limit });
+        mode = 'search';
+      }
+    } else {
+      const rowsUnique = await runQuery(`
+        WITH Base AS (
+          SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+          FROM CustomerPortfolio WITH (NOLOCK)
+          WHERE (:groupId IS NULL OR GroupId = :groupId)
+            AND (:pinCode IS NULL OR PinCode = :pinCode)
+            AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+            AND (:toDate IS NULL OR UploadedAt <= :toDate)
+        ), Marked AS (
+          SELECT *,
+                 ROW_NUMBER() OVER (PARTITION BY Mobile ORDER BY Id DESC) AS rn,
+                 COUNT(1) OVER (PARTITION BY Mobile) AS [Count],
+                 MAX(UploadedAt) OVER (PARTITION BY Mobile) AS LatestAt
+          FROM Base
+        )
+        SELECT TOP (:limit)
+          Mobile,
+          [Count] AS Count,
+          LatestAt,
+          GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+        FROM Marked
+        WHERE rn = 1
+        ORDER BY Id DESC
+        OPTION (RECOMPILE);
+      `, { groupId, pinCode, fromDate, toDate, limit });
+      rows = rowsUnique;
+      mode = 'unique';
+    }
+
+    // Prepare Excel
+    let headers = [];
+    let data = [];
+    if (mode === 'detail' || mode === 'search') {
+      headers = ['Id', 'Mobile', 'GroupId', 'Name', 'Address', 'PinCode', 'SkuName', 'FileName', 'FilePath', 'UploadedAt'];
+      data = rows.map(r => ({
+        Id: r.Id,
+        Mobile: r.Mobile,
+        GroupId: r.GroupId,
+        Name: r.Name,
+        Address: r.Address,
+        PinCode: r.PinCode,
+        SkuName: r.SkuName,
+        FileName: r.FileName,
+        FilePath: r.FilePath,
+        UploadedAt: r.UploadedAt ? new Date(r.UploadedAt) : null
+      }));
+    } else {
+      headers = ['Mobile', 'Count', 'Name', 'Address', 'PinCode', 'SkuName', 'FileName', 'FilePath', 'LatestAt', 'UploadedAt'];
+      data = rows.map(r => ({
+        Mobile: r.Mobile,
+        Count: r.Count || 1,
+        Name: r.Name,
+        Address: r.Address,
+        PinCode: r.PinCode,
+        SkuName: r.SkuName,
+        FileName: r.FileName,
+        FilePath: r.FilePath,
+        LatestAt: r.LatestAt ? new Date(r.LatestAt) : null,
+        UploadedAt: r.UploadedAt ? new Date(r.UploadedAt) : null
+      }));
+    }
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+    xlsx.utils.book_append_sheet(wb, ws, 'Export');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="customer-medicine-details.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    return res.send(buf);
+  } catch (error) {
+    console.error('Portfolio export failed:', error);
+    res.status(500).json({ message: 'Failed to export items', error: error.message });
+  }
+};
+
+// @desc    List portfolio items (CustomerMedicineDetails)
+//          Keyset cursor pagination for consistent performance
+//          - unique=true: one row per mobile (latest record fields + count)
+//          - mobile=xxxx: raw records for that mobile (detail view)
+//          - q search: digits>=5 -> unique-by-mobile; otherwise text search across name/address/mobile
+// @route   GET /api/portfolio
+// @access  Private
 exports.listPortfolio = async (req, res) => {
   try {
     const mobile = (req.query.mobile || '').replace(/[^0-9]/g, '');
@@ -191,7 +372,7 @@ exports.listPortfolio = async (req, res) => {
       if (digits && digits.length >= 5) {
         const whereMobileLike = `%${digits}%`;
         const rows = await runQuery(`
-          WITH Filtered AS (
+          WITH Base AS (
             SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
             FROM CustomerPortfolio WITH (NOLOCK)
             WHERE Mobile LIKE :whereMobileLike
@@ -199,23 +380,24 @@ exports.listPortfolio = async (req, res) => {
               AND (:pinCode IS NULL OR PinCode = :pinCode)
               AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
               AND (:toDate IS NULL OR UploadedAt <= :toDate)
-          ), Agg AS (
-            SELECT Mobile, MAX(Id) AS LatestId, MAX(UploadedAt) AS LatestAt, COUNT(1) AS [Count]
-            FROM Filtered
-            GROUP BY Mobile
-          )
-          SELECT TOP (:fetchLimit)
-            a.Mobile,
-            a.[Count] AS Count,
-            a.LatestAt,
-            cp.GroupId, cp.Name, cp.Address, cp.PinCode, cp.SkuName, cp.FileName, cp.FilePath, cp.UploadedAt,
-            a.LatestId
-          FROM Agg a
-          JOIN CustomerPortfolio cp WITH (NOLOCK) ON cp.Id = a.LatestId
-          WHERE (:cursorId IS NULL OR a.LatestId < :cursorId)
-          ORDER BY a.LatestId DESC
-          OPTION (RECOMPILE);
-        `, { whereMobileLike, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
+          ), Marked AS (
+            SELECT *,
+                 ROW_NUMBER() OVER (PARTITION BY Mobile ORDER BY Id DESC) AS rn,
+                 COUNT(1) OVER (PARTITION BY Mobile) AS [Count],
+                 MAX(UploadedAt) OVER (PARTITION BY Mobile) AS LatestAt
+          FROM Base
+        )
+        SELECT TOP (:fetchLimit)
+          Mobile,
+          [Count] AS Count,
+          LatestAt,
+          GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt,
+          Id AS LatestId
+        FROM Marked
+        WHERE rn = 1
+        ORDER BY Id DESC
+        OPTION (RECOMPILE);
+      `, { whereMobileLike, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
 
         const hasMore = rows.length > pageSize;
         const items = hasMore ? rows.slice(0, pageSize) : rows;

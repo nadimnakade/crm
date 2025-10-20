@@ -33,36 +33,43 @@ export class CustomerListComponent implements OnInit {
   constructor(private customerService: CustomerService, private sanitizer: DomSanitizer) { }
 
   ngOnInit(): void {
-    this.loadCustomers();
+    // Do not auto-load customers; require mobile digit search
+    this.filteredCustomers = [];
+    this.customers = [];
+    this.total = 0;
+    this.hasMore = false;
+    this.cursorId = null;
+    this.nextCursor = null;
+    this.cursorStack = [];
   }
 
   loadCustomers(): void {
-    // Load initial page without filter
-    this.customerService.searchCustomers('', this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
-      next: (resp) => {
-        this.customers = resp.data;
-        this.filteredCustomers = resp.data;
-        this.total = resp.total;
-        this.page = 1;
-        this.pageSize = resp.pageSize;
-        this.hasMore = !!resp.hasMore;
-        this.nextCursor = (resp.nextCursor ?? null);
-        this.computeStatusOptions(resp.data);
-      },
-      error: (error) => {
-        console.error('Error loading customers', error);
-      }
-    });
+    // Intentionally left blank per requirement: no default listing
+    this.filteredCustomers = [];
+    this.total = 0;
+    this.hasMore = false;
+    this.nextCursor = null;
+    this.computeStatusOptions([]);
   }
 
   filterCustomers(resetPage: boolean = false): void {
-    const term = (this.searchTerm || '').trim();
+    const raw = (this.searchTerm || '').trim();
+    const digits = raw.replace(/\D/g, '');
     if (resetPage) {
       this.page = 1;
       this.cursorId = null;
       this.cursorStack = [];
     }
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
+    // Require at least 5 digits to search
+    if (digits.length < 5) {
+      this.filteredCustomers = [];
+      this.total = 0;
+      this.hasMore = false;
+      this.nextCursor = null;
+      this.computeStatusOptions([]);
+      return;
+    }
+    this.customerService.searchCustomers(digits, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
@@ -74,13 +81,9 @@ export class CustomerListComponent implements OnInit {
       },
       error: err => {
         console.error('Search failed, falling back to client filter', err);
-        const lower = term.toLowerCase();
+        const lower = digits.toLowerCase();
         this.filteredCustomers = this.customers.filter(customer => {
-          const fullName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim().toLowerCase();
-          return (
-            fullName.includes(lower) ||
-            (customer.phone || '').toLowerCase().includes(lower)
-          );
+          return (customer.phone || '').toLowerCase().includes(lower);
         });
         this.total = this.filteredCustomers.length;
       }
@@ -88,12 +91,13 @@ export class CustomerListComponent implements OnInit {
   }
 
   nextPage(): void {
-    const term = (this.searchTerm || '').trim();
+    const digits = (this.searchTerm || '').trim().replace(/\D/g, '');
+    if (digits.length < 5) return;
     if (!this.hasMore) return;
     // push current cursor to stack for back navigation
     this.cursorStack.push(this.cursorId);
     this.cursorId = this.nextCursor || null;
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
+    this.customerService.searchCustomers(digits, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
@@ -107,11 +111,12 @@ export class CustomerListComponent implements OnInit {
   }
 
   prevPage(): void {
-    const term = (this.searchTerm || '').trim();
+    const digits = (this.searchTerm || '').trim().replace(/\D/g, '');
+    if (digits.length < 5) return;
     if (this.cursorStack.length === 0) return;
     // pop previous cursor and fetch
     this.cursorId = this.cursorStack.pop() ?? null;
-    this.customerService.searchCustomers(term, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
+    this.customerService.searchCustomers(digits, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
         this.total = resp.total;
@@ -150,7 +155,7 @@ export class CustomerListComponent implements OnInit {
   }
 
   highlight(text: string | undefined | null): SafeHtml {
-    const term = (this.searchTerm || '').trim();
+    const term = (this.searchTerm || '').trim().replace(/\D/g, '');
     const source = (text || '').toString();
     if (!term) return source;
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

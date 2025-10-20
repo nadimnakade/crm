@@ -257,7 +257,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Customer Mobile No</label>
-              <input class="form-control" type="tel" inputmode="numeric" maxlength="10" pattern="\\d{10}" formControlName="customerMobileNo" placeholder="Enter 10-digit phone">
+              <input class="form-control" type="tel" inputmode="numeric" maxlength="10" formControlName="customerMobileNo" (input)="onOrderMobileInput($event)" placeholder="Enter 10-digit phone">
               <div class="invalid" *ngIf="orderDetailsForm.get('customerMobileNo')?.invalid && orderDetailsForm.get('customerMobileNo')?.touched">Enter 10-digit number</div>
             </div>
             <div class="col-md-4 mb-3">

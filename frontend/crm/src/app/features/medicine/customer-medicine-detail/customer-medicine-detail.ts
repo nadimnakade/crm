@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CustomerMedicineDetailService } from '../../../shared/services/customer-medicine-detail';
+
  
 @Component({
   selector: 'app-customer-medicine-detail',
@@ -39,20 +40,24 @@ export class CustomerMedicineDetailComponent {
   detailBackStack: Array<number | null> = [];
   detailHasMore: boolean = false;
 
-  constructor(private svc: CustomerMedicineDetailService) {
-    this.loadList();
-  }
+
+  constructor(private svc: CustomerMedicineDetailService) {}
 
   loadList(): void {
     const digits = (this.searchText || '').replace(/[^0-9]/g, '');
+    if (!digits || digits.length < 5) {
+      // Do NOT load anything by default; require a valid mobile search
+      this.items = [];
+      this.hasMore = false;
+      this.nextCursor = null;
+      return;
+    }
     const params: any = {
       pageSize: this.pageSize,
       cursorId: this.cursor,
+      mobile: digits,
       unique: true
     };
-    if (digits && digits.length >= 5) {
-      params.q = digits;
-    }
 
     this.svc
       .list(params)
@@ -244,4 +249,8 @@ export class CustomerMedicineDetailComponent {
     this.detailCursor = this.detailNextCursor ?? null;
     this.loadDetail(this.detailMobile);
   }
+
+
+
+
 }

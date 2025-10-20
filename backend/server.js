@@ -122,7 +122,7 @@ async function seedDefaults() {
 // Kick off seed after DB sync
 (async () => {
   try {
-    //await seedDefaults();
+    await seedDefaults();
   } catch {}
 })();
 
@@ -137,10 +137,43 @@ const startServer = async () => {
     
     // Sync database models
     await syncDatabase();
-    
-    // Start server
-    app.listen(PORT, () => {
+
+    // Start server immediately (do not block on index creation)
+    const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+    });
+    // Increase server timeouts for long-running export requests
+    server.timeout = 300000; // 5 minutes
+    server.headersTimeout = 300000; // 5 minutes
+
+    // Kick off index creation asynchronously after startup
+    setImmediate(async () => {
+      try {
+        await sequelize.query(`
+          IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CustomerPortfolio_UploadedAt' AND object_id = OBJECT_ID('dbo.CustomerPortfolio'))
+          BEGIN
+            CREATE INDEX IX_CustomerPortfolio_UploadedAt ON dbo.CustomerPortfolio (UploadedAt);
+          END
+
+          IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CustomerPortfolio_Mobile' AND object_id = OBJECT_ID('dbo.CustomerPortfolio'))
+          BEGIN
+            CREATE INDEX IX_CustomerPortfolio_Mobile ON dbo.CustomerPortfolio (Mobile);
+          END
+
+          IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CustomerPortfolio_GroupId' AND object_id = OBJECT_ID('dbo.CustomerPortfolio'))
+          BEGIN
+            CREATE INDEX IX_CustomerPortfolio_GroupId ON dbo.CustomerPortfolio (GroupId);
+          END
+
+          IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CustomerPortfolio_PinCode' AND object_id = OBJECT_ID('dbo.CustomerPortfolio'))
+          BEGIN
+            CREATE INDEX IX_CustomerPortfolio_PinCode ON dbo.CustomerPortfolio (PinCode);
+          END
+        `);
+        console.log('Ensured CustomerPortfolio indexes exist');
+      } catch (e) {
+        console.warn('Index creation skipped:', e.message);
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);

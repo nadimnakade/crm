@@ -57,7 +57,8 @@
         <thead>
           <tr>
             <th>OrderId</th>
-            <th>CustomerName, Address</th>
+            <th>CustomerName,</th>
+            <th>Address</th>
             <th>MobileNo</th>
             <th>Action</th>
           </tr>
@@ -65,7 +66,8 @@
         <tbody>
           <tr *ngFor="let r of results">
             <td>{{ r.orderId || r.orderDetails?.orderId || '-' }}</td>
-            <td>{{ customerName(r) }}<span *ngIf="customerAddress(r)">, {{ customerAddress(r) }}</span></td>
+            <td>{{ customerName(r) }}</td>
+            <td style="width: 35%">{{ customerAddress(r)  }}</td>
             <td>{{ customerPhone(r) }}</td>
             <td><button class="btn btn-sm btn-outline-primary" (click)="view(r)">View</button></td>
           </tr>
@@ -93,7 +95,7 @@
         <button class="close btn btn-sm btn-light" (click)="closeModal()">×</button>
       </div>
       <div class="modal-body">
-        <table class="details-table" *ngIf="selectedCall?.orderDetails as d">
+        <table class="table table-bordered" *ngIf="selectedCall?.orderDetails as d">
           <tr>
             <th>Order ID</th>
             <td>{{ selectedCall.orderId || d?.orderId || '-' }}</td>

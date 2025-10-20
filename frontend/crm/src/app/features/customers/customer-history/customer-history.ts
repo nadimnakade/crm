@@ -188,6 +188,19 @@ export class CustomerHistoryComponent implements OnInit {
     });
   }
 
+  // Sanitize mobile input to digits-only and clamp to 10
+  onOrderMobileInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const raw = input.value || '';
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 10);
+    if (input.value !== digits) {
+      input.value = digits;
+    }
+    const ctrl = this.orderDetailsForm.get('customerMobileNo');
+    ctrl?.setValue(digits);
+    ctrl?.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+  }
+
   toggleDetails(id: number): void {
     this.expandedId = this.expandedId === id ? null : id;
     if (this.expandedId) {

@@ -18,7 +18,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, null, null, {
       instanceName: process.env.DB_INSTANCE,
       trustServerCertificate: true,
       // Increase request timeout to reduce ETIMEOUT on large queries
-      requestTimeout: 60000
+      requestTimeout: 300000
     }
   },
   pool: {

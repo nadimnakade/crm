@@ -90,7 +90,7 @@
         <button class="close btn btn-sm btn-light" (click)="closeModal()">×</button>
       </div>
       <div class="modal-body">
-        <table class="details-table" *ngIf="selectedCall?.refundDetails as d">
+        <table class="table table-bordered" *ngIf="selectedCall?.refundDetails as d">
           <tr>
             <th>Order ID</th>
             <td>{{ d?.customerOrderId || selectedCall.orderId || '-' }}</td>
@@ -140,7 +140,7 @@
 
         <!-- Order Details Section -->
         <h5 class="mt-4">Order Details</h5>
-        <table class="details-table" *ngIf="selectedCall?.orderDetails as o">
+        <table class="table table-bordered" *ngIf="selectedCall?.orderDetails as o">
           <tr *ngFor="let kv of o | keyvalue">
             <th>{{ kv.key }}</th>
             <td>{{ formatValue(kv.value) }}</td>
