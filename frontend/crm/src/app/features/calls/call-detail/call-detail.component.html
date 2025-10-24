@@ -189,6 +189,35 @@
           </li>
         </ul>
       </div>
+
+      <!-- Customer Interactions Export (Admin only) -->
+      <div *ngIf="!isNewCall && isAdmin" class="mt-4" id="interactions-export">
+        <h3>Customer Interactions Export</h3>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">From</label>
+            <input type="date" class="form-control" [(ngModel)]="exportFrom">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">To</label>
+            <input type="date" class="form-control" [(ngModel)]="exportTo">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Limit</label>
+            <input type="number" min="1" class="form-control" [(ngModel)]="exportLimit">
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button class="btn btn-outline-primary" (click)="exportInteractions('xlsx')" [disabled]="exporting">
+              {{ exporting ? 'Exporting…' : 'Download Excel' }}
+            </button>
+            <button class="btn btn-outline-secondary" (click)="exportInteractions('csv')" [disabled]="exporting">
+              CSV
+            </button>
+          </div>
+        </div>
+        <div class="mt-2" *ngIf="exportMessage" [ngClass]="{'text-success': exportMessage==='Export completed', 'text-danger': exportMessage!=='Export completed'}">{{ exportMessage }}</div>
+        <div class="small text-muted mt-1">Exports calls for the selected customer with latest status per call.</div>
+      </div>
     </div>
   </div>
 </div>

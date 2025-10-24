@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const { connectDB, sequelize } = require('./config/db');
 const { syncDatabase, Role, User } = require('./models');
+const reportRoutes = require('./routes/reportRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +74,8 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/portfolio', require('./routes/portfolioRoutes'));
 app.use('/api/customer-medicine-details', require('./routes/customerMedicineDetailRoutes'));
+ // Import customers route removed per user instruction
+app.use('/api/reports', reportRoutes);
  // Import customers route removed per user instruction
 
 // Serve frontend static files after API routes

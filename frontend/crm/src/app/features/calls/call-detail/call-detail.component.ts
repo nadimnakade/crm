@@ -3,6 +3,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CallService } from '../../../core/services/call.service';
 import { CustomerService } from '../../../core/services/customer.service';
+import { ReportService } from '../../../core/services/report.service';
+import { AuthService as SharedAuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-call-detail',
@@ -36,12 +38,21 @@ export class CallDetailComponent implements OnInit {
     additional: ''
   };
 
+  // Admin-only interactions export state
+  exportFrom: string | null = null;
+  exportTo: string | null = null;
+  exportLimit: number = 5000;
+  exporting = false;
+  exportMessage = '';
+
   constructor(
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private router: Router,
     private callService: CallService,
-    private customerService: CustomerService
+    private customerService: CustomerService,
+    private reportService: ReportService,
+    private auth: SharedAuthService
   ) { }
 
   ngOnInit(): void {
@@ -243,5 +254,48 @@ export class CallDetailComponent implements OnInit {
         console.error('Error uploading document', error);
       }
     );
+  }
+
+  get isAdmin(): boolean {
+    const role = this.auth.getUser()?.role?.toLowerCase();
+    return role === 'admin' || role === 'super admin' || role === 'super_admin' || role === 'superadmin';
+  }
+
+  exportInteractions(format: 'xlsx' | 'csv' = 'xlsx'): void {
+    if (!this.isAdmin) {
+      this.exportMessage = 'You are not authorized to export interactions.';
+      return;
+    }
+    const customerIdVal = this.callForm.get('customerId')?.value;
+    const options = {
+      from: this.exportFrom || undefined,
+      to: this.exportTo || undefined,
+      customerId: customerIdVal ? Number(customerIdVal) : null,
+      agentId: null,
+      limit: this.exportLimit || 5000,
+      format
+    };
+    this.exporting = true;
+    this.exportMessage = '';
+    this.reportService.exportInteractions(options).subscribe({
+      next: (blob: Blob) => {
+        const filename = format === 'csv' ? 'customer-interactions.csv' : 'customer-interactions.xlsx';
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.exporting = false;
+        this.exportMessage = 'Export completed';
+      },
+      error: (err) => {
+        console.error('Export failed', err);
+        this.exporting = false;
+        this.exportMessage = err?.error?.message || 'Export failed';
+      }
+    });
   }
 }

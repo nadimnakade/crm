@@ -22,6 +22,7 @@
     </div>
 
     <div class="actions align-center align-items-center mt-3">
+      <button class="btn btn-outline-primary m-1" (click)="setCmdRangeMonths(1)">Last 1 month</button>
       <button class="btn btn-outline-primary m-1" (click)="setCmdRangeMonths(3)">Last 3 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setCmdRangeMonths(6)">Last 6 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setCmdRangeMonths(12)">Last 12 months</button>
@@ -49,6 +50,7 @@
       </div>
     </div>
     <div class="actions align-center align-items-center mt-3">
+      <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(1)">Last 1 month</button>
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(3)">Last 3 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(6)">Last 6 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(12)">Last 12 months</button>
@@ -57,6 +59,34 @@
         <i class="fa-solid fa-download"></i>
         <span *ngIf="!exportingOrders">Export Excel</span>
         <span *ngIf="exportingOrders">Exporting...</span>
+      </button>
+    </div>
+  </div>
+
+  <hr class="my-4">
+
+  <div class="card-body">
+    <h5 class="mb-0">Customer Interactions detail</h5>
+    <div class="mb-3 row">
+      <label class="col-sm-2 col-form-label">From</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="interFrom" class="form-control" />
+      </div>
+
+      <label class="col-sm-2 col-form-label">To</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="interTo" class="form-control" />
+      </div>
+    </div>
+    <div class="actions align-center align-items-center mt-3">
+      <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(1)">Last 1 month</button>
+      <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(3)">Last 3 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(6)">Last 6 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(12)">Last 12 months</button>
+      <button class="btn btn-primary m-1" (click)="exportInteractions()" [disabled]="!interFrom || !interTo || exportingInteractions">
+        <i class="fa-solid fa-download"></i>
+        <span *ngIf="!exportingInteractions">Export Excel</span>
+        <span *ngIf="exportingInteractions">Exporting...</span>
       </button>
     </div>
   </div>
