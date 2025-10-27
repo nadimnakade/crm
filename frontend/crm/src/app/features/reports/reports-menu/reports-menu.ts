@@ -1,11 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { CustomerMedicineDetailService } from '../../../shared/services/customer-medicine-detail';
 import { CallService } from '../../../shared/services/call';
 import { ReportService } from '../../../core/services/report.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-reports-menu',
@@ -14,7 +15,7 @@ import { ReportService } from '../../../core/services/report.service';
   templateUrl: './reports-menu.html',
   styleUrls: []
 })
-export class ReportsMenuComponent {
+export class ReportsMenuComponent implements OnInit {
   // Customer Medicine Orders date range (mandatory)
   cmdFrom: string = '';
   cmdTo: string = '';
@@ -33,8 +34,18 @@ export class ReportsMenuComponent {
   constructor(
     private cmdSvc: CustomerMedicineDetailService,
     private callSvc: CallService,
-    private reportSvc: ReportService
+    private reportSvc: ReportService,
+    private authService: AuthService,
+    private router: Router
   ) {}
+
+  ngOnInit() {
+    // Check if user has admin or superadmin role
+    const user = this.authService.getUser();
+    if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
+      this.router.navigate(['/dashboard']);
+    }
+  }
 
   // Quick range helpers
   setCmdRangeMonths(months: number): void {
