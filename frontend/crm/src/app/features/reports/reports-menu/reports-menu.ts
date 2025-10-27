@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { CustomerMedicineDetailService } from '../../../shared/services/customer-medicine-detail';
 import { CallService } from '../../../shared/services/call';
 import { ReportService } from '../../../core/services/report.service';
-import { AuthService } from '../../../core/services/auth.service';
+import { AuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-reports-menu',
@@ -42,7 +42,9 @@ export class ReportsMenuComponent implements OnInit {
   ngOnInit() {
     // Check if user has admin or superadmin role
     const user = this.authService.getUser();
-    if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
+    const role = (user?.role || '').toLowerCase();
+    const isAdmin = role === 'admin' || role === 'superadmin';
+    if (!isAdmin) {
       this.router.navigate(['/dashboard']);
     }
   }
