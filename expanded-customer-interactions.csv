@@ -1,0 +1,54 @@
+CallId,CustomerId,CustomerName,Phone,Address,AgentId,AgentName,AgentEmail,CallDate,Duration,CallType,Category,Outcome,Notes,FollowUpRequired,FollowUpDate,OrderId,CreatedAt,UpdatedAt,Orderalternate,OrdercustomerMobileNo,OrdercustomerName,OrderfollowupDate,Ordermrp,OrderorderId,Orderpay,RefundaccountHolderName,RefundaccountNumber,RefundcustomerName,RefundcustomerNumber,RefundcustomerOrderId,RefundifscCode,RefundimageName,RefundmedicineName,RefundmedicineQty,RefundreturnReason
+1021,128669,Dr Sandesh Kedia,9082772947,"Near Shri Vitthal Rukmini Mandir, Pravin Nagar, VMV, Amravati
+mo.9822722763 nagpurmaharashtra444604",1005,Farhaan Mirza,farhaan.m@crm.com,11/5/25,,outbound,sales-call,No,5 nov Follow up,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1020,127829,Abida shaikh,9867062206,"B/403 atlantic sagar jp road andheri west sagar city,
+
+ mumbaimaharashtra400058",1,Super Admin,superadmin@crm.com,10/30/25,,inbound,lab-option,lab-enquiry,Call transfer to Farhaan,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+2018,127829,Abida shaikh,9867062206,"B/403 atlantic sagar jp road andheri west sagar city,
+
+ mumbaimaharashtra400058",1,Super Admin,superadmin@crm.com,10/21/25,,inbound,new-order-related,lead,Order ,0,11/7/25,PO27325216094998,10/21/25,10/21/25,Yes,9867062206,Ibrahim,2025-11-07,1580,PO27325216094998,1200,,,,,,,,,,
+1026,130483,Saif Bagwan,9920635416,"Juhu Lane Andheri West
+Kwg 287",4,Sarah Smith,agent1@crm.com,10/17/25,,outbound,sales-call,Yes,Lead call next call on 17th November,0,11/17/25,PO28925250357649,10/17/25,10/17/25,Yes,9920635416,Saif Bagwan,2025-11-17,2880,PO28925250357649,1999,,,,,,,,,,
+1025,75389,Kapil mendiratta,9810208993,"home
+D 38 Delhi citizen society sec 13 rohini, D c chowk,
+ new delhidelhi110085",1,Super Admin,superadmin@crm.com,10/16/25,,inbound,lab-option,lab-enquiry,tests,0,10/17/25,111asfasd,10/17/25,10/17/25,Yes,9810208993,Saif,2025-10-17,200,111asfasd,148,,,,,,,,,,
+1024,130483,Saif Bagwan,9920635416,"Juhu Lane Andheri West
+Kwg 287",4,Sarah Smith,agent1@crm.com,10/16/25,,inbound,new-order-related,lead,lead next call on 16th november,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1023,130483,Saif Bagwan,9920635416,"Juhu Lane Andheri West
+Kwg 287",4,Sarah Smith,agent1@crm.com,10/16/25,,inbound,new-order-related,lead,Lead next call on 16th November,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1022,101917,umar,9082772947,"Mohammed Umar Saad Shaikh S/O Abdul Jabbar Shaikh, 9, Jaggurawali Chawl, Mogra Pada, Near Nikunj School,, VTC: Andheri (East), District: Mumbai, State: Maharashtra, PIN Code: 400069, Mobile: 836930351, Mogra Village
+Mumbai, Maharashtra ()
+
+9082772947 mumb",4,Sarah Smith,agent1@crm.com,10/16/25,,inbound,new-order-related,lead,ordere placed,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1017,124514,Seema Jain,9833814700,"
+701 Atlanta Manor
+On Western Express High Way
+Adjacent to Reliance office
+Malad East Mumbai 
+ mumbaimaharashtra400097",4,Sarah Smith,agent1@crm.com,10/16/25,,inbound,existing-order,refund-complaint,very polite customer handle with care,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1019,124910,fancy jain,9004181818,"9821120027 Sejal jewellers Shop8,near rly crossing, Shanta jog marg Chembur fatak (west) Mumbai-,
+Mumbai, Maharashtra ()
+fancy jain
+ mumbaimaharashtra400089",1,Super Admin,superadmin@crm.com,10/16/25,,inbound,new-order-related,follow-up-scheduled,Confirm after 30 min,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1018,127829,Abida shaikh,9867062206,"B/403 atlantic sagar jp road andheri west sagar city,
+
+ mumbaimaharashtra400058",4,Sarah Smith,agent1@crm.com,10/16/25,,inbound,existing-order,refund-order-status,inform delivery status,0,,,10/16/25,10/16/25,,,,,,,,,,,,,,,,,
+1016,1010,Baishakhi Mandan,9674485651,231/1 NSC Bosh road near Usha gate  kolkatawest bengal700047,1,Super Admin,superadmin@crm.com,10/15/25,,inbound,lab-option,lab-report,Testing,0,,,10/15/25,10/15/25,,,,,,,,,,,,,,,,,
+1015,1005,Rachana Jain,7000251293,"Rachana Jain
+Rachana Jain 7000251293 Saurabh Jain Karrapur Sagar. pincode 470337 Sagar-1-470337 , Madhya Pradesh , Madhya Pradesh, 470337
+ sagarmadhya pradesh470337",4,Sarah Smith,agent1@crm.com,10/7/25,,inbound,return-related,for-return,testing,0,10/8/25,od456,10/8/25,10/8/25,Yes,1234567890,cc1213,2025-10-08,123,od456,66,,,,,,,,,,
+1014,1,Kapil mendiratta,9810208993,"D 38 Delhi citizen society sec 13 rohini, D c chowk,
+DELHI, DELHI ()
+
+ new delhidelhi110085",4,Sarah Smith,agent1@crm.com,10/7/25,,inbound,existing-order,refund-generation,"Refund Details: Customer Name=Safe, Number=1112223334, OrderId=odi123, Medicine=CROCIN, Qty=5, Reason=NOT NEEDED, Account Holder=ASC123456, Account No=1234567890, IFSC=XXXX0YYYYYY",0,,odi123,10/7/25,10/7/25,,,,,,,,ASC123456,1234567890,Safe,1112223334,odi123,XXXX0YYYYYY,logo.png,CROCIN,5,NOT NEEDED
+1013,1005,Rachana Jain,7000251293,"Rachana Jain
+Rachana Jain 7000251293 Saurabh Jain Karrapur Sagar. pincode 470337 Sagar-1-470337 , Madhya Pradesh , Madhya Pradesh, 470337
+ sagarmadhya pradesh470337",4,Sarah Smith,agent1@crm.com,10/6/25,,inbound,existing-order,refund-generation,"Refund Details: Customer Name=Nadd, Number=1234567899, OrderId=1111, Medicine=d, Qty=1, Reason=test, Account Holder=aaaaa, Account No=999999999999, IFSC=XXXX0YYYYYY",0,,1111,10/7/25,10/7/25,,,,,,,,aaaaa,999999999999,Nadd,1234567899,1111,XXXX0YYYYYY,logo.png,d,1,test
+1012,1003,Shiv Kumar,9481366595,"1736, 3rd main 23rd cross c block Sahakarnagar- , Karnataka,  bangalorekarnataka560092",4,Sarah Smith,agent1@crm.com,10/6/25,,outbound,,positive,sALES PITCH,0,,,10/6/25,10/6/25,,,,,,,,,,,,,,,,,
+1010,2,Alakh dayal,8709642989,Nayagawn bagrangwali chowk jamalpur mungerbihar811214,4,Sarah Smith,agent1@crm.com,10/6/25,,new-order,,New Order,Order dolo 650,0,,,10/6/25,10/6/25,,,,,,,,,,,,,,,,,
+1009,4,Vijender Kumar,9833054728,"1 /A 1 ST FLOOR , CSC-7 SECTOR 15 ROHINI
+ new delhidelhi400086",4,Sarah Smith,agent1@crm.com,10/6/25,,enquiry,,Enquiry,My first interaction with client he wants dolo 650 ,0,,,10/6/25,10/6/25,,,,,,,,,,,,,,,,,
+1011,1003,Shiv Kumar,9481366595,"1736, 3rd main 23rd cross c block Sahakarnagar- , Karnataka,  bangalorekarnataka560092",4,Sarah Smith,agent1@crm.com,10/6/25,,outbound,,other-details,TESTING IT OUT AGAIN,0,,,10/6/25,10/6/25,,,,,,,,,,,,,,,,,
+1008,1005,Rachana Jain,7000251293,"Rachana Jain
+Rachana Jain 7000251293 Saurabh Jain Karrapur Sagar. pincode 470337 Sagar-1-470337 , Madhya Pradesh , Madhya Pradesh, 470337
+ sagarmadhya pradesh470337",1,Super Admin,superadmin@crm.com,10/5/25,,enquiry,,New Order,Testtestetse,0,,,10/5/25,10/5/25,,,,,,,,,,,,,,,,,

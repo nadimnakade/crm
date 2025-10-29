@@ -22,7 +22,7 @@ exports.exportInteractions = async (req, res) => {
 
     const sql = `
       SELECT TOP (:limit)
-        c.customerId,
+    
         c.[date] AS CallDate,
         c.duration,
         c.callType,
@@ -31,12 +31,18 @@ exports.exportInteractions = async (req, res) => {
         c.notes,
         c.followUpRequired,
         c.followUpDate,
+        c.orderId,
+        c.orderDetails,
+        c.refundDetails,
+        c.createdAt,
+        c.updatedAt,
         cust.firstName,
         cust.lastName,
         cust.phone,
         cust.address,
         agent.firstName AS agentFirstName,
-        agent.lastName AS agentLastName
+        agent.lastName AS agentLastName,
+        agent.email AS agentEmail
       FROM dbo.Calls c WITH (NOLOCK)
       LEFT JOIN dbo.Customers cust WITH (NOLOCK) ON cust.id = c.customerId
       LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
@@ -59,24 +65,81 @@ exports.exportInteractions = async (req, res) => {
       }
     });
 
-    const headers = [
-      'CustomerId','CustomerName','Phone','Address','AgentName','CallDate','Duration','CallType','Category','Outcome','Notes','FollowUpRequired','FollowUpDate'
+    // Dynamically flatten orderDetails/refundDetails to columns
+    const baseHeaders = [
+      'CustomerName','Phone','Address','AgentName','AgentEmail','CallDate','Duration','CallType','Category','Outcome','Notes','FollowUpRequired','FollowUpDate','OrderId','CreatedAt','UpdatedAt'
     ];
-    const data = (rows || []).map(r => ({
-      CustomerId: r.customerId,
-      CustomerName: [r.firstName, r.lastName].filter(Boolean).join(' ').trim(),
-      Phone: r.phone,
-      Address: r.address,
-      AgentName: [r.agentFirstName, r.agentLastName].filter(Boolean).join(' ').trim(),
-      CallDate: r.CallDate ? new Date(r.CallDate) : null,
-      Duration: r.duration,
-      CallType: r.callType,
-      Category: r.category,
-      Outcome: r.outcome,
-      Notes: r.notes,
-      FollowUpRequired: r.followUpRequired ? 1 : 0,
-      FollowUpDate: r.followUpDate ? new Date(r.followUpDate) : null
-    }));
+
+    function flattenObject(obj, prefix = '') {
+      const out = {};
+      if (!obj || typeof obj !== 'object') return out;
+      const isArray = Array.isArray(obj);
+      const entries = isArray ? obj.entries() : Object.entries(obj);
+      for (const [k, v] of entries) {
+        const key = isArray ? `${prefix}${k}` : `${prefix}${k}`;
+        if (v && typeof v === 'object') {
+          Object.assign(out, flattenObject(v, `${key}.`));
+        } else {
+          out[key] = v;
+        }
+      }
+      return out;
+    }
+
+    // Collect union of order/refund keys across all rows
+    const orderKeysSet = new Set();
+    const refundKeysSet = new Set();
+    for (const r of rows || []) {
+      const od = typeof r.orderDetails === 'string' ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails;
+      const rd = typeof r.refundDetails === 'string' ? (() => { try { return JSON.parse(r.refundDetails); } catch { return null; } })() : r.refundDetails;
+      const odFlat = flattenObject(od, 'Order');
+      const rdFlat = flattenObject(rd, 'Refund');
+      Object.keys(odFlat).forEach(k => orderKeysSet.add(k));
+      Object.keys(rdFlat).forEach(k => refundKeysSet.add(k));
+    }
+    const dynamicOrderHeaders = Array.from(orderKeysSet).sort().map(k => k);
+    const dynamicRefundHeaders = Array.from(refundKeysSet).sort().map(k => k);
+    const headers = [...baseHeaders, ...dynamicOrderHeaders, ...dynamicRefundHeaders];
+
+    const data = (rows || []).map(r => {
+      const row = {
+        
+        CustomerName: [r.firstName, r.lastName].filter(Boolean).join(' ').trim(),
+        Phone: r.phone,
+        Address: r.address,
+        
+        AgentName: [r.agentFirstName, r.agentLastName].filter(Boolean).join(' ').trim(),
+        AgentEmail: r.agentEmail,
+        CallDate: r.CallDate ? new Date(r.CallDate) : null,
+        Duration: r.duration,
+        CallType: r.callType,
+        Category: r.category,
+        Outcome: r.outcome,
+        Notes: r.notes,
+        FollowUpRequired: r.followUpRequired ? 1 : 0,
+        FollowUpDate: r.followUpDate ? new Date(r.followUpDate) : null,
+        OrderId: r.orderId || null,
+        CreatedAt: r.createdAt ? new Date(r.createdAt) : null,
+        UpdatedAt: r.updatedAt ? new Date(r.updatedAt) : null
+      };
+
+      const od = typeof r.orderDetails === 'string' ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails;
+      const rd = typeof r.refundDetails === 'string' ? (() => { try { return JSON.parse(r.refundDetails); } catch { return null; } })() : r.refundDetails;
+      const odFlat = flattenObject(od, 'Order');
+      const rdFlat = flattenObject(rd, 'Refund');
+
+      // Fill dynamic columns
+      for (const k of dynamicOrderHeaders) {
+        const val = odFlat[k];
+        row[k] = (val && typeof val === 'object') ? JSON.stringify(val) : val ?? null;
+      }
+      for (const k of dynamicRefundHeaders) {
+        const val = rdFlat[k];
+        row[k] = (val && typeof val === 'object') ? JSON.stringify(val) : val ?? null;
+      }
+
+      return row;
+    });
 
     if (format === 'csv') {
       const ws = xlsx.utils.json_to_sheet(data, { header: headers });
