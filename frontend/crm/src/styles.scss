@@ -130,3 +130,10 @@ body {
 {
   padding: 10px !important;
 }
+
+
+.modal-body > .table-responsive
+{
+  height: 450px;
+  overflow-y: scroll;
+}

@@ -73,10 +73,9 @@
                       <tr>
                         <th scope="col">Mobile</th>
                         <th scope="col">Name</th>
-                        <th scope="col">Address</th>
-                        <!-- <th scope="col">Pin</th> -->
+                        <!-- <th scope="col">Address</th>                        
                         <th scope="col">Latest Upload</th>
-                        <th scope="col">Count</th>
+                        <th scope="col">Count</th> -->
                         <th scope="col">Action</th>
                       </tr>
                     </thead>
@@ -84,10 +83,9 @@
                       <tr *ngFor="let it of cmdItems">
                         <td>{{it.Mobile}}</td>
                         <td>{{it.Name || '—'}}</td>
-                        <td class="w-50">{{it.Address || '—'}}</td>
-                        <!-- <td>{{it.PinCode || '—'}}</td> --> 
+                        <!-- <td class="w-50">{{it.Address || '—'}}</td>                        
                         <td>{{it.UploadedAt | date:'short'}}</td>
-                        <td>{{it.Count || 1}}</td>
+                        <td>{{it.Count || 1}}</td> -->
                         <td>
                           <button class="btn btn-sm btn-outline-primary p-1" (click)="openCmdDetail(it.Mobile)">View</button>
                         </td>

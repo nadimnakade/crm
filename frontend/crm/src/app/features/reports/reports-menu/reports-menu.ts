@@ -107,52 +107,20 @@ export class ReportsMenuComponent implements OnInit {
     if (this.exportingOrders) return;
     this.exportingOrders = true;
     try {
-      const pageSize = 1000;
-      let page = 1;
-      let total = 0;
-      const all: any[] = [];
-      do {
-        const res = await firstValueFrom(this.callSvc.getCalls({
-          page,
-          pageSize,
-          hasOrderDetails: true,
-          startDate: this.orderFrom,
-          endDate: this.orderTo,
-          sortBy: 'date',
-          sortOrder: 'DESC'
-        }));
-        const data = Array.isArray(res.data) ? res.data : [];
-        total = res.total || data.length;
-        all.push(...data);
-        page++;
-      } while ((page - 1) * pageSize < total && page <= 100); // hard cap pages to avoid runaway
-
-      // Normalize and build CSV
-      const rows = all.map((r: any) => {
-        const dateStr = r.date ? new Date(r.date).toISOString() : '';
-        const orderId = r.orderId || (typeof r.orderDetails === 'string' ? this.safeParse(r.orderDetails)?.orderId : (r.orderDetails?.orderId || ''));
-        const agentName = r.agent ? `${r.agent.firstName || ''} ${r.agent.lastName || ''}`.trim() : '';
-        const customerName = r.Customer ? `${r.Customer.firstName || ''} ${r.Customer.lastName || ''}`.trim() : '';
-        const outcome = r.outcome || '';
-        const duration = r.duration || '';
-        return { date: dateStr, orderId, agentName, customerName, outcome, duration };
-      });
-      const csv = this.toCsv([
-        ['Date', 'Order ID', 'Agent', 'Customer', 'Outcome', 'Duration'],
-        ...rows.map(r => [r.date, r.orderId, r.agentName, r.customerName, r.outcome, r.duration])
-      ]);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = await firstValueFrom(
+        this.reportSvc.exportOrders({ from: this.orderFrom, to: this.orderTo, limit: 10000, format: 'xlsx' })
+      );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'orders-detail.csv';
+      a.download = 'orders-detail.xlsx';
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Orders export failed', err);
-      alert('Export failed. Try narrower date range or contact admin.');
+      alert('Export failed. Please ensure admin access or try narrower date range.');
     } finally {
       this.exportingOrders = false;
     }

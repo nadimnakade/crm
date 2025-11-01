@@ -56,7 +56,8 @@ export class CustomerMedicineDetailComponent {
       pageSize: this.pageSize,
       cursorId: this.cursor,
       mobile: digits,
-      unique: true
+      unique: true,
+      uniqueBy: 'name,mobile,address'
     };
 
     this.svc

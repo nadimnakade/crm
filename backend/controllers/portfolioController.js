@@ -330,40 +330,94 @@ exports.listPortfolio = async (req, res) => {
       return rows || [];
     };
 
-    // Detail mode: specific mobile -> raw rows with Id keyset
+    // Detail mode: specific mobile
     if (mobile) {
-      const rows = await runQuery(`
-        SELECT TOP (:fetchLimit)
-          Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
-        FROM CustomerPortfolio WITH (NOLOCK)
-        WHERE Mobile = :mobile
-          AND (:groupId IS NULL OR GroupId = :groupId)
-          AND (:pinCode IS NULL OR PinCode = :pinCode)
-          AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
-          AND (:toDate IS NULL OR UploadedAt <= :toDate)
-          AND (:cursorId IS NULL OR Id < :cursorId)
-        ORDER BY Id DESC
-        OPTION (RECOMPILE);
-      `, { mobile, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
+      if (unique) {
+        // Unique by Name+Mobile+Address within this mobile, latest record per group
+        const rows = await runQuery(`
+          WITH Base AS (
+            SELECT Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
+            FROM CustomerPortfolio WITH (NOLOCK)
+            WHERE Mobile = :mobile
+              AND (:groupId IS NULL OR GroupId = :groupId)
+              AND (:pinCode IS NULL OR PinCode = :pinCode)
+              AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+              AND (:toDate IS NULL OR UploadedAt <= :toDate)
+          ), Agg AS (
+            SELECT Mobile, Name, Address, MAX(Id) AS LatestId, MAX(UploadedAt) AS LatestAt, COUNT(1) AS [Count]
+            FROM Base
+            GROUP BY Mobile, Name, Address
+          )
+          SELECT TOP (:fetchLimit)
+            a.Mobile, a.Name, a.Address, a.[Count] AS Count, a.LatestAt,
+            cp.GroupId, cp.PinCode, cp.SkuName, cp.FileName, cp.FilePath, cp.UploadedAt,
+            a.LatestId
+          FROM Agg a
+          JOIN CustomerPortfolio cp WITH (NOLOCK) ON cp.Id = a.LatestId
+          WHERE (:cursorId IS NULL OR a.LatestId < :cursorId)
+          ORDER BY a.LatestId DESC
+          OPTION (RECOMPILE);
+        `, { mobile, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
 
-      const hasMore = rows.length > pageSize;
-      const items = hasMore ? rows.slice(0, pageSize) : rows;
-      const nextCursor = hasMore ? items[items.length - 1]?.Id || null : null;
-      // Total count for detail view can be expensive; only compute on first page
-      let total = undefined;
-      if (!cursorId) {
-        const totalRows = await runQuery(`
-          SELECT COUNT(1) AS Total
+        const hasMore = rows.length > pageSize;
+        const items = hasMore ? rows.slice(0, pageSize) : rows;
+        const nextCursor = hasMore ? items[items.length - 1]?.LatestId || null : null;
+        let total = undefined;
+        if (!cursorId) {
+          const totalRows = await runQuery(`
+            WITH Base AS (
+              SELECT Id, Mobile, Name, Address, UploadedAt
+              FROM CustomerPortfolio WITH (NOLOCK)
+              WHERE Mobile = :mobile
+                AND (:groupId IS NULL OR GroupId = :groupId)
+                AND (:pinCode IS NULL OR PinCode = :pinCode)
+                AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+                AND (:toDate IS NULL OR UploadedAt <= :toDate)
+            )
+            SELECT COUNT(*) AS Total
+            FROM (
+              SELECT Mobile, Name, Address
+              FROM Base
+              GROUP BY Mobile, Name, Address
+            ) t;
+          `, { mobile, groupId, pinCode, fromDate, toDate });
+          total = Number(totalRows?.[0]?.Total || 0);
+        }
+        return res.json({ items, hasMore, nextCursor, total, mode: 'detail-unique' });
+      } else {
+        const rows = await runQuery(`
+          SELECT TOP (:fetchLimit)
+            Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
           FROM CustomerPortfolio WITH (NOLOCK)
           WHERE Mobile = :mobile
             AND (:groupId IS NULL OR GroupId = :groupId)
             AND (:pinCode IS NULL OR PinCode = :pinCode)
             AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
-            AND (:toDate IS NULL OR UploadedAt <= :toDate);
-        `, { mobile, groupId, pinCode, fromDate, toDate });
-        total = Number(totalRows?.[0]?.Total || 0);
+            AND (:toDate IS NULL OR UploadedAt <= :toDate)
+            AND (:cursorId IS NULL OR Id < :cursorId)
+          ORDER BY Id DESC
+          OPTION (RECOMPILE);
+        `, { mobile, groupId, pinCode, fromDate, toDate, cursorId, fetchLimit });
+
+        const hasMore = rows.length > pageSize;
+        const items = hasMore ? rows.slice(0, pageSize) : rows;
+        const nextCursor = hasMore ? items[items.length - 1]?.Id || null : null;
+        // Total count for detail view can be expensive; only compute on first page
+        let total = undefined;
+        if (!cursorId) {
+          const totalRows = await runQuery(`
+            SELECT COUNT(1) AS Total
+            FROM CustomerPortfolio WITH (NOLOCK)
+            WHERE Mobile = :mobile
+              AND (:groupId IS NULL OR GroupId = :groupId)
+              AND (:pinCode IS NULL OR PinCode = :pinCode)
+              AND (:fromDate IS NULL OR UploadedAt >= :fromDate)
+              AND (:toDate IS NULL OR UploadedAt <= :toDate);
+          `, { mobile, groupId, pinCode, fromDate, toDate });
+          total = Number(totalRows?.[0]?.Total || 0);
+        }
+        return res.json({ items, hasMore, nextCursor, total, mode: 'detail' });
       }
-      return res.json({ items, hasMore, nextCursor, total, mode: 'detail' });
     }
 
     // Search mode

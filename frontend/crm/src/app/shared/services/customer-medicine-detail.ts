@@ -9,13 +9,14 @@ export class CustomerMedicineDetailService {
 
   constructor(private http: HttpClient) {}
 
-  list(params: { pageSize: number; cursorId?: number | null; q?: string; mobile?: string; unique?: boolean }): Observable<any> {
+  list(params: { pageSize: number; cursorId?: number | null; q?: string; mobile?: string; unique?: boolean; uniqueBy?: string }): Observable<any> {
     let hp = new HttpParams()
       .set('pageSize', String(params.pageSize));
     if (params.cursorId !== undefined && params.cursorId !== null) hp = hp.set('cursorId', String(params.cursorId));
     if (params.q) hp = hp.set('q', params.q);
     if (params.mobile) hp = hp.set('mobile', params.mobile);
     if (params.unique) hp = hp.set('unique', 'true');
+    if (params.uniqueBy) hp = hp.set('uniqueBy', params.uniqueBy);
     return this.http.get<any>(this.baseUrl, { params: hp });
   }
 

@@ -1,0 +1,14 @@
+CallId,CustomerId,CustomerName,Phone,Address,AgentId,AgentName,AgentEmail,CallDate,Duration,CallType,Category,Outcome,Notes,FollowUpRequired,FollowUpDate,CreatedAt,UpdatedAt
+1021,128669,Dr Sandesh Kedia,9082772947,"Near Shri Vitthal Rukmini Mandir, Pravin Nagar, VMV, Amravati
+mo.9822722763 nagpurmaharashtra444604",1005,Farhaan Mirza,farhaan.m@crm.com,11/5/25,,outbound,sales-call,No,5 nov Follow up,0,,10/16/25,10/16/25
+1020,127829,Abida shaikh,9867062206,"B/403 atlantic sagar jp road andheri west sagar city,
+
+ mumbaimaharashtra400058",1,Super Admin,superadmin@crm.com,10/30/25,,inbound,lab-option,lab-enquiry,Call transfer to Farhaan,0,,10/16/25,10/16/25
+2018,127829,Abida shaikh,9867062206,"B/403 atlantic sagar jp road andheri west sagar city,
+
+ mumbaimaharashtra400058",1,Super Admin,superadmin@crm.com,10/21/25,,inbound,new-order-related,lead,Order ,0,11/7/25,10/21/25,10/21/25
+1026,130483,Saif Bagwan,9920635416,"Juhu Lane Andheri West
+Kwg 287",4,Sarah Smith,agent1@crm.com,10/17/25,,outbound,sales-call,Yes,Lead call next call on 17th November,0,11/17/25,10/17/25,10/17/25
+1025,75389,Kapil mendiratta,9810208993,"home
+D 38 Delhi citizen society sec 13 rohini, D c chowk,
+ new delhidelhi110085",1,Super Admin,superadmin@crm.com,10/16/25,,inbound,lab-option,lab-enquiry,tests,0,10/17/25,10/17/25,10/17/25

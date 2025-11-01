@@ -30,4 +30,22 @@ export class ReportService {
       responseType: 'blob'
     });
   }
+
+  exportOrders(options: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    format?: 'xlsx' | 'csv';
+  }): Observable<Blob> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+    params = params.set('format', options.format || 'xlsx');
+
+    return this.http.get(`${this.apiUrl}/orders/export`, {
+      params,
+      responseType: 'blob'
+    });
+  }
 }

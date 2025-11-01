@@ -6,7 +6,7 @@
 
 
 
-  <div class="card-body">
+  <!-- <div class="card-body">
     <h5 class="mb-0">Customer Medicine Order detail</h5>
 
     <div class="mb-3 row">
@@ -34,10 +34,10 @@
     </div>
   </div>
 
-  <hr class="my-4">
+  <hr class="my-4"> -->
   
   <div class="card-body">
-    <h5 class="mb-0">Order detail</h5>
+    <h5 class="mb-1 text-center">Order detail</h5>
     <div class="mb-3 row">
       <label for="staticEmail" class="col-sm-2 col-form-label">From</label>
       <div class="col-sm-4">
@@ -49,7 +49,7 @@
         <input type="date" [(ngModel)]="orderTo" class="form-control" />
       </div>
     </div>
-    <div class="actions align-center align-items-center mt-3">
+    <div class="actions align-center align-items-center  text-center mt-3">
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(1)">Last 1 month</button>
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(3)">Last 3 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setOrderRangeMonths(6)">Last 6 months</button>
@@ -66,7 +66,7 @@
   <hr class="my-4">
 
   <div class="card-body">
-    <h5 class="mb-0">Customer Interactions detail</h5>
+    <h5 class="mb-1 text-center">Interactions detail</h5>
     <div class="mb-3 row">
       <label class="col-sm-2 col-form-label">From</label>
       <div class="col-sm-4">
@@ -78,7 +78,7 @@
         <input type="date" [(ngModel)]="interTo" class="form-control" />
       </div>
     </div>
-    <div class="actions align-center align-items-center mt-3">
+    <div class="actions align-center align-items-center text-center mt-3">
       <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(1)">Last 1 month</button>
       <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(3)">Last 3 months</button>
       <button class="btn btn-outline-primary m-1" (click)="setInterRangeMonths(6)">Last 6 months</button>

@@ -183,9 +183,31 @@ export class CustomerHistoryComponent implements OnInit {
       mrp: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
       pay: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
       orderId: ['', Validators.required],
-      followupDate: ['', Validators.required],
+      followupDate: [''], // conditional
       alternate: ['No', Validators.required]
     });
+
+    // React to interaction context to toggle followup validator
+    const applyFollowupRequirement = () => {
+      const ct = (this.historyForm.get('callType')?.value || '').toString().toLowerCase();
+      const cat = (this.historyForm.get('category')?.value || '').toString().toLowerCase();
+      const sub = (this.historyForm.get('subCategory')?.value || '').toString().toLowerCase();
+      const isOutboundFollowUp = ct === 'outbound' && cat === 'sales-call' && sub === 'no';
+      const isInboundScheduled = ct === 'inbound' && cat === 'new-order-related' && sub === 'follow-up-scheduled';
+      const ctrl = this.orderDetailsForm.get('followupDate');
+      if (!ctrl) return;
+      if (isOutboundFollowUp || isInboundScheduled) {
+        ctrl.setValidators([Validators.required]);
+      } else {
+        ctrl.clearValidators();
+      }
+      ctrl.updateValueAndValidity({ emitEvent: false });
+    };
+
+    applyFollowupRequirement();
+    this.historyForm.get('callType')?.valueChanges.subscribe(() => applyFollowupRequirement());
+    this.historyForm.get('category')?.valueChanges.subscribe(() => applyFollowupRequirement());
+    this.historyForm.get('subCategory')?.valueChanges.subscribe(() => applyFollowupRequirement());
   }
 
   // Sanitize mobile input to digits-only and clamp to 10
@@ -251,6 +273,14 @@ export class CustomerHistoryComponent implements OnInit {
     this.showRefundModal = false;
     // Proceed with main submission
     this.submitHistory();
+  }
+
+  get isFollowupRequired(): boolean {
+    const ct = (this.historyForm.get('callType')?.value || '').toString().toLowerCase();
+    const cat = (this.historyForm.get('category')?.value || '').toString().toLowerCase();
+    const sub = (this.historyForm.get('subCategory')?.value || '').toString().toLowerCase();
+    return (ct === 'outbound' && cat === 'sales-call' && sub === 'no') ||
+           (ct === 'inbound' && cat === 'new-order-related' && sub === 'follow-up-scheduled');
   }
 
   openOrderModal(): void {

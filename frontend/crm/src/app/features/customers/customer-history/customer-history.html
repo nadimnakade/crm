@@ -275,7 +275,7 @@
               <input class="form-control" formControlName="orderId">
             </div>
             <div class="col-md-6 mb-3">
-              <label class="form-label">Followup Date</label>
+              <label class="form-label">Followup Date <span class="text-muted small">({{ isFollowupRequired ? 'required' : 'optional' }})</span></label>
               <input type="date" class="form-control" formControlName="followupDate">
             </div>
             <div class="col-md-6 mb-3">

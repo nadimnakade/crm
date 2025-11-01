@@ -1,6 +1,17 @@
 const { Call, Customer, User, Role, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
+// Helper: determine if follow-up date is required based on type/category/outcome
+function requiresFollowUpDate(callType, category, outcome) {
+  const t = (callType || '').toString().trim().toLowerCase();
+  const c = (category || '').toString().trim().toLowerCase();
+  const o = (outcome || '').toString().trim().toLowerCase();
+  const mentionsFollowUp = o.includes('follow'); // matches 'follow up', 'follow-up scheduled', 'followup'
+  const case1 = t === 'outbound' && c === 'sales-call' && mentionsFollowUp;
+  const case2 = t === 'inbound' && c === 'new order related' && mentionsFollowUp;
+  return case1 || case2;
+}
+
 // @desc    Get calls with server-side pagination and filters
 // @route   GET /api/calls
 // @access  Private
@@ -135,6 +146,15 @@ exports.createCall = async (req, res) => {
       followUpDate
     } = req.body;
 
+    // Validate follow-up requirements
+    const mustHaveFollowUpDate = requiresFollowUpDate(callType, category, outcome);
+    if (mustHaveFollowUpDate && !followUpDate) {
+      return res.status(422).json({
+        message: 'Follow-up date is required for this interaction',
+        rule: 'outbound > sales-call > followup OR inbound > new order related > follow-up scheduled'
+      });
+    }
+
     const call = await Call.create({
       customerId,
       agentId: agentId || (req.user ? req.user.id : null),
@@ -147,8 +167,8 @@ exports.createCall = async (req, res) => {
       orderId,
       orderDetails,
       refundDetails,
-      followUpRequired,
-      followUpDate
+      followUpRequired: mustHaveFollowUpDate ? true : !!followUpRequired,
+      followUpDate: followUpDate || null
     });
 
     res.status(201).json(call);
@@ -186,6 +206,19 @@ exports.updateCall = async (req, res) => {
     } = req.body;
 
     const previousOutcome = call.outcome;
+
+    // Validate follow-up requirements against incoming changes
+    const nextType = callType !== undefined ? callType : call.callType;
+    const nextCategory = category !== undefined ? category : call.category;
+    const nextOutcome = outcome !== undefined ? outcome : call.outcome;
+    const mustHaveFollowUpDate = requiresFollowUpDate(nextType, nextCategory, nextOutcome);
+    if (mustHaveFollowUpDate && (followUpDate === undefined ? !call.followUpDate : !followUpDate)) {
+      return res.status(422).json({
+        message: 'Follow-up date is required for this interaction',
+        rule: 'outbound > sales-call > followup OR inbound > new order related > follow-up scheduled'
+      });
+    }
+
     // Update call fields
     if (customerId) call.customerId = customerId;
     if (agentId) call.agentId = agentId;
@@ -198,8 +231,8 @@ exports.updateCall = async (req, res) => {
     if (orderId !== undefined) call.orderId = orderId;
     if (orderDetails !== undefined) call.orderDetails = orderDetails;
     if (refundDetails !== undefined) call.refundDetails = refundDetails;
-    if (followUpRequired !== undefined) call.followUpRequired = followUpRequired;
-    if (followUpDate !== undefined) call.followUpDate = followUpDate;
+    if (followUpRequired !== undefined) call.followUpRequired = mustHaveFollowUpDate ? true : !!followUpRequired;
+    if (followUpDate !== undefined) call.followUpDate = followUpDate || null;
 
     await call.save();
 

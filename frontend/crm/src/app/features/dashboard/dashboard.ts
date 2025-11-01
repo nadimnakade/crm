@@ -373,12 +373,18 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    this.cmdService.list({
+    const isFullMobile = digits.length === 10;
+    const params: any = {
       pageSize: this.cmdPageSize,
       unique: true,
-      q: digits,
       cursorId: this.cmdCursor
-    }).subscribe({
+    };
+    if (isFullMobile) {
+      params.mobile = digits; // faster equality search
+    } else {
+      params.q = digits; // partial mobile search
+    }
+    this.cmdService.list(params).subscribe({
       next: (res) => {
         this.cmdItems = res?.items || [];
         this.cmdHasMore = !!res?.hasMore;
