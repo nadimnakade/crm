@@ -72,13 +72,16 @@ exports.getCalls = async (req, res) => {
         { outcome: { [Op.like]: `%${searchTerm}%` } },
         { orderId: { [Op.like]: `%${searchTerm}%` } }
       );
-      // Search customer name
-      customerWhere = {
-        [Op.or]: [
-          { firstName: { [Op.like]: `%${searchTerm}%` } },
-          { lastName: { [Op.like]: `%${searchTerm}%` } }
-        ]
-      };
+      // Detect potential phone search (digits-only >= 5)
+      const digitsOnly = (searchTerm || '').replace(/[^0-9]/g, '');
+      const phoneFilter = digitsOnly.length >= 5 ? { phone: { [Op.like]: `%${digitsOnly}%` } } : undefined;
+      // Search customer name and optionally phone
+      const ors = [
+        { firstName: { [Op.like]: `%${searchTerm}%` } },
+        { lastName: { [Op.like]: `%${searchTerm}%` } }
+      ];
+      if (phoneFilter) ors.push(phoneFilter);
+      customerWhere = { [Op.or]: ors };
     }
 
     const offset = (page - 1) * pageSize;

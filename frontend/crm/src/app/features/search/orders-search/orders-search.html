@@ -1,4 +1,4 @@
-<div class="card glass-card h-100 shadow-sm">
+<div class="card glass-card container mt-4 h-100 shadow-sm p-0">
 
   <div class="card-header d-flex justify-content-between align-items-center">
     <h5 class="mb-0">Orders Details</h5>
@@ -14,6 +14,11 @@
         </div>
 
         <div class="col-md-4">
+          <label class="form-label">Mobile No</label>
+          <input class="form-control" type="tel" formControlName="mobileNo" inputmode="numeric" maxlength="10" placeholder="Enter 10-digit mobile" />
+        </div>
+
+        <!-- <div class="col-md-4">
           <label class="form-label">Start Date</label>
           <input class="form-control" type="date" formControlName="startDate" />
         </div>
@@ -21,9 +26,9 @@
         <div class="col-md-4">
           <label class="form-label">End Date</label>
           <input class="form-control" type="date" formControlName="endDate" />
-        </div>
+        </div> -->
 
-        <div class="col-md-4">
+        <!-- <div class="col-md-4">
           <label class="form-label">Agent</label>
           <select class="form-control" formControlName="agentId">
             <option value="">All</option>
@@ -31,7 +36,7 @@
               {{ u.firstName }} {{ u.lastName }}
             </option>
           </select>
-        </div>
+        </div> -->
 
         <div class="col-md-4">
           <label class="form-label">Page size</label>
@@ -46,13 +51,16 @@
       <div class="row mt-4">
         
         <div class="form-actions text-center">
-          <button class="btn btn-primary text-center w-25" type="submit">Search</button>
+          <button class="btn btn-primary text-center" type="submit">Search</button>
         </div>
       </div>
     </form>
 
+    <div class="mt-4 text-muted" *ngIf="!hasSearched">
+      Enter Order ID or 10-digit Mobile No and click Search.
+    </div>
 
-    <div class="table-responsive mt-4" *ngIf="!isLoading">
+    <div class="table-responsive mt-4" *ngIf="hasSearched && !isLoading">
       <table class="table table-striped table-bordered table-hover">
         <thead>
           <tr>
@@ -82,8 +90,8 @@
           [disabled]="currentPage === totalPages()">Next</button>
       </div>
     </div>
-
-    <div class="loading" *ngIf="isLoading">Loading…</div>
+  
+     <div class="loading" *ngIf="isLoading">Loading…</div>
 
     <!-- Details Modal -->
     <div class="modal-backdrop" *ngIf="selectedCall" (click)="closeModal()"

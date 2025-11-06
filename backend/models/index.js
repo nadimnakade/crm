@@ -5,6 +5,7 @@ const Call = require('./Call');
 const CallAttachment = require('./CallAttachment');
 const CustomerPortfolio = require('./CustomerPortfolio');
 const CallStatusHistory = require('./CallStatusHistory');
+const Session = require('./Session');
 const { sequelize } = require('../config/db');
 
 // Define associations
@@ -29,6 +30,10 @@ CallAttachment.belongsTo(Call, { foreignKey: 'CallId' });
 
 Call.hasMany(CallStatusHistory, { foreignKey: 'CallId', as: 'statusHistory' });
 CallStatusHistory.belongsTo(Call, { foreignKey: 'CallId' });
+
+// Session associations
+User.hasMany(Session, { foreignKey: 'userId', as: 'sessions' });
+Session.belongsTo(User, { foreignKey: 'userId' });
 
 // Sync database. Alter only the Call table to avoid impacting other tables.
 const ensureCallColumns = async () => {
@@ -148,6 +153,7 @@ module.exports = {
   CallAttachment,
   CallStatusHistory,
   CustomerPortfolio,
+  Session,
   sequelize,
   syncDatabase
 };

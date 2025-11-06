@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User, Role } = require('../models');
+const { User, Role, Session } = require('../models');
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -18,6 +18,45 @@ exports.protect = async (req, res, next) => {
   try {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+
+    // Check if session is active
+    const session = await Session.findOne({
+      where: {
+        jwtToken: token,
+        isActive: true,
+        userId: decoded.id
+      }
+    });
+
+    if (!session) {
+      return res.status(401).json({ message: 'Session expired or invalid' });
+    }
+
+    // Enforce idle timeout of 30 minutes
+    const IDLE_LIMIT_MS = 30 * 60 * 1000;
+    const lastActivityMs = new Date(session.lastActivity).getTime();
+    if (Date.now() - lastActivityMs > IDLE_LIMIT_MS) {
+      await Session.update(
+        { isActive: false },
+        { where: { id: session.id } }
+      );
+      return res.status(401).json({ message: 'Session expired due to inactivity' });
+    }
+
+    // Check if session has expired
+    if (new Date() > session.expiresAt) {
+      await Session.update(
+        { isActive: false },
+        { where: { id: session.id } }
+      );
+      return res.status(401).json({ message: 'Session expired' });
+    }
+
+    // Update last activity
+    await Session.update(
+      { lastActivity: new Date() },
+      { where: { id: session.id } }
+    );
 
     // Get user from token
     const user = await User.findByPk(decoded.id);

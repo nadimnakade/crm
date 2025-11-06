@@ -21,18 +21,20 @@ export class OrdersSearchComponent implements OnInit {
   currentPage = 1;
   pageSize = 10;
   users: any[] = [];
+  hasSearched = false;
 
   constructor(private fb: FormBuilder, private callService: CallService, private userService: UserService) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
       orderId: [''],
+      mobileNo: [''],
       startDate: [''],
       endDate: [''],
       agentId: ['']
     });
     this.loadUsers();
-    this.search();
+    // Do NOT auto-search; require explicit input
   }
 
   loadUsers(): void {
@@ -47,19 +49,37 @@ export class OrdersSearchComponent implements OnInit {
   }
 
   search(): void {
-    const { orderId, startDate, endDate, agentId } = this.form.value;
+    const { orderId, mobileNo, startDate, endDate, agentId } = this.form.value;
+    const mobileDigits = (mobileNo || '').replace(/[^0-9]/g, '');
+    const hasOrderId = !!(orderId && orderId.trim());
+    const hasMobile = /^[0-9]{10}$/.test(mobileDigits);
+
+    // Require either OrderId or 10-digit mobile to search
+    if (!hasOrderId && !hasMobile) {
+      this.hasSearched = true;
+      this.results = [];
+      this.total = 0;
+      return; // do not hit API
+    }
+
     this.isLoading = true;
-    this.callService.getCalls({
+    this.hasSearched = true;
+
+    const params: any = {
       page: this.currentPage,
       pageSize: this.pageSize,
-      orderId: orderId || '',
       hasOrderDetails: true,
       startDate: startDate || '',
       endDate: endDate || '',
       agentId: agentId ? Number(agentId) : undefined,
       sortBy: 'date',
       sortOrder: 'DESC'
-    }).subscribe({
+    };
+
+    if (hasOrderId) params.orderId = orderId.trim();
+    if (hasMobile) params.searchTerm = mobileDigits; // backend matches on customer phone digits
+
+    this.callService.getCalls(params).subscribe({
       next: (res) => {
         const data = Array.isArray(res.data) ? res.data : [];
         // Normalize NVARCHAR JSON fields coming from MSSQL

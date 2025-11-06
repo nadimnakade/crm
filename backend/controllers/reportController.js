@@ -131,11 +131,16 @@ exports.exportOrders = async (req, res) => {
       SELECT TOP (:limit)
         c.orderId,
         c.orderDetails,
-        c.[date] AS CallDate
+        c.[date] AS CallDate,
+        c.createdAt,
+        c.followUpDate,
+        agent.firstName AS agentFirstName,
+        agent.lastName AS agentLastName
       FROM dbo.Calls c WITH (NOLOCK)
-      WHERE (c.orderDetails IS NOT NULL OR c.orderId IS NOT NULL)
-        OR (:fromDate IS NULL OR c.[date] >= :fromDate)
-        OR (:toDate IS NULL OR c.[date] <= :toDate)
+      LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
+      WHERE c.orderDetails IS NOT NULL
+        AND (:fromDate IS NULL OR c.[date] >= :fromDate)
+        AND (:toDate IS NULL OR c.[date] <= :toDate)
       ORDER BY c.[date] DESC, c.Id DESC
       OPTION (RECOMPILE);
     `;
@@ -145,41 +150,36 @@ exports.exportOrders = async (req, res) => {
       replacements: { fromDate, toDate, limit }
     });
 
-    // Flatten orderDetails only
-    function flattenObject(obj, prefix = '') {
-      const out = {};
-      if (!obj || typeof obj !== 'object') return out;
-      const isArray = Array.isArray(obj);
-      const entries = isArray ? obj.entries() : Object.entries(obj);
-      for (const [k, v] of entries) {
-        const key = isArray ? `${prefix}${k}` : `${prefix}${k}`;
-        if (v && typeof v === 'object') {
-          Object.assign(out, flattenObject(v, `${key}.`));
-        } else {
-          out[key] = v;
-        }
-      }
-      return out;
-    }
-
-    const orderKeysSet = new Set();
-    for (const r of rows || []) {
-      const od = typeof r.orderDetails === 'string' ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails;
-      const odFlat = flattenObject(od, 'Order');
-      Object.keys(odFlat).forEach(k => orderKeysSet.add(k));
-    }
-
-    const dynamicOrderHeaders = Array.from(orderKeysSet).sort();
-    const headers = ['OrderId', ...dynamicOrderHeaders];
+    // Targeted columns from orderDetails JSON + createdOn + agentName
+    const headers = [
+      'OrderId',
+      'CustomerName',
+      'CustomerMobileNo',
+      'MRP',
+      'Pay',
+      'Alternate',
+      'FollowupDate',
+      'AgentName',
+      'CreatedOn'
+    ];
 
     const data = (rows || []).map(r => {
-      const od = typeof r.orderDetails === 'string' ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails;
-      const odFlat = flattenObject(od, 'Order');
-      const row = { OrderId: r.orderId || null };
-      for (const k of dynamicOrderHeaders) {
-        const val = odFlat[k];
-        row[k] = (val && typeof val === 'object') ? JSON.stringify(val) : val ?? null;
-      }
+      const od = typeof r.orderDetails === 'string'
+        ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })()
+        : r.orderDetails;
+
+      const row = {
+        OrderId: (od && od.orderId) ?? r.orderId ?? null,
+        CustomerName: od?.customerName ?? null,
+        CustomerMobileNo: od?.customerMobileNo ?? null,
+        MRP: (od && (od.mrp ?? od.MRP)) ?? null,
+        Pay: (od && (od.pay ?? od.Pay)) ?? null,
+        Alternate: od?.alternate ?? null,
+        FollowupDate: (od && od.followupDate) ? new Date(od.followupDate) : null,
+        AgentName: [r.agentFirstName, r.agentLastName].filter(Boolean).join(' ').trim() || null,
+        CreatedOn: r.createdAt ? new Date(r.createdAt) : null
+      };
+
       return row;
     });
 

@@ -29,16 +29,28 @@ export class UserDetailComponent implements OnInit {
   ngOnInit(): void {
     this.loadRoles();
 
-    const userId = this.route.snapshot.paramMap.get('id');
-    if (userId === 'new') {
+    const paramId = this.route.snapshot.paramMap.get('id');
+    const isNewPath = (this.route.snapshot.routeConfig?.path || '').endsWith('new');
+    const isNewUrl = (this.route.snapshot.url || []).some(seg => seg.path === 'new');
+
+    if (paramId === 'new' || isNewPath || isNewUrl) {
       this.isNewMode = true;
       this.initForm();
-    } else if (userId) {
-      this.loadUser(userId);
+      return;
+    }
+
+    if (paramId) {
+      this.loadUser(paramId);
+    } else {
+      // Fallback: treat as new if no id provided
+      this.isNewMode = true;
+      this.initForm();
     }
   }
 
   initForm(user?: any): void {
+    const roleId = user?.Role?.id ?? user?.roleId ?? '';
+    const isActive = (user?.isActive !== undefined) ? user.isActive : (user?.active !== undefined ? user.active : true);
     this.userForm = this.fb.group({
       firstName: [user?.firstName || '', Validators.required],
       lastName: [user?.lastName || '', Validators.required],
@@ -48,8 +60,8 @@ export class UserDetailComponent implements OnInit {
         this.isNewMode ? [Validators.required, Validators.minLength(6)] :
                         (this.isEditMode ? [Validators.minLength(6)] : [])
       ],
-      role: [user?.role || '', Validators.required],
-      active: [user?.active !== undefined ? user.active : true]
+      role: [roleId, Validators.required],
+      active: [isActive]
     });
 
     if (!this.isNewMode && !this.isEditMode) {
@@ -100,16 +112,28 @@ export class UserDetailComponent implements OnInit {
       return;
     }
 
-    const userData = this.userForm.value;
+    const v = this.userForm.value;
+
+    // Build payload to match backend expectations
+    const payload: any = {
+      firstName: v.firstName,
+      lastName: v.lastName,
+      email: v.email,
+      roleId: Number(v.role),
+      isActive: !!v.active
+    };
+    // Derive a username if not provided in the form (use email local part)
+    const emailLocal = (v.email || '').split('@')[0];
+    payload.username = emailLocal || `${v.firstName}.${v.lastName}`.replace(/\s+/g, '').toLowerCase();
 
     // Only include password if it's provided
-    if (!userData.password) {
-      delete userData.password;
+    if (v.password) {
+      payload.password = v.password;
     }
 
     if (this.isNewMode) {
-      this.userService.createUser(userData).subscribe({
-        next: (response) => {
+      this.userService.createUser(payload).subscribe({
+        next: () => {
           this.router.navigate(['/users']);
         },
         error: (error) => {
@@ -117,8 +141,8 @@ export class UserDetailComponent implements OnInit {
         }
       });
     } else if (this.isEditMode) {
-      this.userService.updateUser(this.user.id, userData).subscribe({
-        next: (response) => {
+      this.userService.updateUser(this.user.id, payload).subscribe({
+        next: () => {
           this.isEditMode = false;
           this.userForm.disable();
           this.loadUser(this.user.id); // Reload user data

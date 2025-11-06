@@ -364,8 +364,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     this.cmdLoading = true;
     const digits = this.cmdSearch.replace(/[^0-9]/g, '');
-    if (!digits || digits.length < 5) {
-      // Require at least 5 digits for CMD search
+    // Enforce exactly 10-digit mobile search
+    if (!digits || digits.length !== 10) {
       this.cmdItems = [];
       this.cmdHasMore = false;
       this.cmdNextCursor = null;
@@ -373,17 +373,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    const isFullMobile = digits.length === 10;
     const params: any = {
       pageSize: this.cmdPageSize,
       unique: true,
-      cursorId: this.cmdCursor
+      cursorId: this.cmdCursor,
+      mobile: digits
     };
-    if (isFullMobile) {
-      params.mobile = digits; // faster equality search
-    } else {
-      params.q = digits; // partial mobile search
-    }
     this.cmdService.list(params).subscribe({
       next: (res) => {
         this.cmdItems = res?.items || [];
@@ -398,6 +393,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.cmdLoading = false;
       }
     });
+  }
+
+  onCmdSearchInput(event: any): void {
+    const val: string = event?.target?.value || '';
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    this.cmdSearch = digits;
+  }
+
+  isTenDigits(val: string): boolean {
+    const digits = (val || '').replace(/\D/g, '');
+    return digits.length === 10;
   }
 
   searchCmd(): void {

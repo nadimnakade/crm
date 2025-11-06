@@ -64,8 +64,8 @@
               </div>
               <div class="card-body p-0">
                 <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                  <input type="text" class="form-control w-50" [(ngModel)]="cmdSearch" inputmode="numeric" placeholder="Search mobile number (min 5 digits)">
-                  <button class="btn btn-primary" (click)="searchCmd()">Search</button>
+                  <input type="text" class="form-control w-50" [(ngModel)]="cmdSearch" (input)="onCmdSearchInput($event)" inputmode="numeric" maxlength="10" placeholder="Enter 10-digit mobile number">
+                   <button class="btn btn-primary" (click)="searchCmd()" [disabled]="!isTenDigits(cmdSearch)">Search</button>
                 </div>
                 <div class="table-responsive" *ngIf="cmdItems?.length; else noCmd">
                   <table class="table table-striped table-hover align-middle mb-0" [ngClass]="{'table-dark': isDarkTheme}">
@@ -108,7 +108,7 @@
               <div class="p-3 text-center text-secondary">
                 <div *ngIf="!cmdSearch || cmdSearch.trim() === ''; else noResults">
                   <i class="fas fa-search fa-2x mb-2 opacity-50"></i>
-                  <p class="mb-0">Enter at least 5 digits to search</p>
+                  <p class="mb-0">Enter a valid 10-digit mobile number to search</p>
                 </div>
                 <ng-template #noResults>
                   <i class="fas fa-exclamation-circle fa-2x mb-2 opacity-50"></i>

@@ -45,8 +45,8 @@ export class CustomerMedicineDetailComponent {
 
   loadList(): void {
     const digits = (this.searchText || '').replace(/[^0-9]/g, '');
-    if (!digits || digits.length < 5) {
-      // Do NOT load anything by default; require a valid mobile search
+    // Enforce exactly 10-digit mobile search
+    if (!digits || digits.length !== 10) {
       this.items = [];
       this.hasMore = false;
       this.nextCursor = null;
@@ -92,6 +92,17 @@ export class CustomerMedicineDetailComponent {
     this.cursor = null;
     this.backStack = [];
     this.loadList();
+  }
+
+  onSearchTextInput(event: any): void {
+    const val: string = event?.target?.value || '';
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    this.searchText = digits;
+  }
+
+  isTenDigits(val: string): boolean {
+    const digits = (val || '').replace(/\D/g, '');
+    return digits.length === 10;
   }
 
   search(): void {

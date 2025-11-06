@@ -1,10 +1,12 @@
 const jwt = require('jsonwebtoken');
-const { User, Role } = require('../models');
+const crypto = require('crypto');
+const { User, Role, Session } = require('../models');
 
 // Generate JWT token
 const generateToken = (id) => {
+  // Set session to expire in 1 day to enforce re-login next day
   return jwt.sign({ id }, process.env.JWT_SECRET || 'your_jwt_secret', {
-    expiresIn: '30d'
+    expiresIn: '1d'
   });
 };
 
@@ -68,6 +70,29 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Invalidate all existing sessions for this user (concurrent session control)
+    await Session.update(
+      { isActive: false },
+      { where: { userId: user.id, isActive: true } }
+    );
+
+    // Generate new token and session
+    const token = generateToken(user.id);
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Create new session record
+    await Session.create({
+      userId: user.id,
+      sessionToken,
+      jwtToken: token,
+      isActive: true,
+      lastActivity: new Date(),
+      expiresAt,
+      userAgent: req.headers['user-agent'] || null,
+      ipAddress: req.ip || req.connection.remoteAddress || null
+    });
+
     // Get user role
     const role = await Role.findByPk(user.roleId);
 
@@ -78,8 +103,29 @@ exports.login = async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       role: role ? role.name : null,
-      token: generateToken(user.id)
+      token: token,
+      sessionToken: sessionToken
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      // Invalidate the session
+      await Session.update(
+        { isActive: false },
+        { where: { jwtToken: token, isActive: true } }
+      );
+    }
+    res.json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
