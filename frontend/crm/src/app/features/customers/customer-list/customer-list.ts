@@ -54,21 +54,23 @@ export class CustomerListComponent implements OnInit {
 
   filterCustomers(resetPage: boolean = false): void {
     const raw = (this.searchTerm || '').trim();
-    const digits = raw.replace(/\D/g, '');
+    const digits = raw.replace(/\D/g, '').slice(0, 10);
     if (resetPage) {
       this.page = 1;
       this.cursorId = null;
       this.cursorStack = [];
     }
-    // Require at least 5 digits to search
-    if (digits.length < 5) {
+    // Enforce exactly 10-digit mobile search
+    if (digits.length !== 10) {
       this.filteredCustomers = [];
       this.total = 0;
       this.hasMore = false;
       this.nextCursor = null;
       this.computeStatusOptions([]);
+      this.searchTerm = digits; // reflect sanitized input
       return;
     }
+    this.searchTerm = digits;
     this.customerService.searchCustomers(digits, this.page, this.pageSize, this.statusFilter, 'createdAt', 'DESC', this.cursorId || undefined).subscribe({
       next: resp => {
         this.filteredCustomers = resp.data;
@@ -91,8 +93,8 @@ export class CustomerListComponent implements OnInit {
   }
 
   nextPage(): void {
-    const digits = (this.searchTerm || '').trim().replace(/\D/g, '');
-    if (digits.length < 5) return;
+    const digits = (this.searchTerm || '').trim().replace(/\D/g, '').slice(0, 10);
+    if (digits.length !== 10) return;
     if (!this.hasMore) return;
     // push current cursor to stack for back navigation
     this.cursorStack.push(this.cursorId);
@@ -111,8 +113,8 @@ export class CustomerListComponent implements OnInit {
   }
 
   prevPage(): void {
-    const digits = (this.searchTerm || '').trim().replace(/\D/g, '');
-    if (digits.length < 5) return;
+    const digits = (this.searchTerm || '').trim().replace(/\D/g, '').slice(0, 10);
+    if (digits.length !== 10) return;
     if (this.cursorStack.length === 0) return;
     // pop previous cursor and fetch
     this.cursorId = this.cursorStack.pop() ?? null;

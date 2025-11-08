@@ -30,7 +30,7 @@
           </td>
            <td colspan="2">
             <div class="search-bar float-end">
-              <input type="text" placeholder="Search mobile number (min 5 digits)" inputmode="numeric" [(ngModel)]="searchTerm" (input)="filterCustomers(true)">
+              <input type="text" placeholder="Enter 10-digit mobile number" inputmode="numeric" maxlength="10" [(ngModel)]="searchTerm" (input)="filterCustomers(true)">
               
             </div>
           </td>
@@ -45,7 +45,7 @@
       </thead>
       <tbody>
         <tr *ngIf="filteredCustomers.length === 0">
-          <td colspan="3" class="no-data">Enter mobile number (min 5 digits) to search</td>
+          <td colspan="3" class="no-data">Enter a valid 10-digit mobile number to search</td>
         </tr>
         <tr *ngFor="let customer of filteredCustomers">
           <td [innerHTML]="highlight((customer.firstName || '') + ' ' + (customer.lastName || ''))"></td>
