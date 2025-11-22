@@ -17,6 +17,7 @@ export class LayoutComponent implements OnInit {
   isSidebarCollapsed = false;
   userRole: string | null = null;
   canManageUsersAndRoles: boolean = false;
+  isOrdersOnlyRole: boolean = false;
 
   constructor(private authService: AuthService, private router: Router) {}
 
@@ -35,10 +36,11 @@ export class LayoutComponent implements OnInit {
     const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
     this.userName = fullName || user?.email || 'User';
 
-    // Determine role-based visibility for admin/superadmin
+    // Determine role-based visibility for admin/superadmin and orders-only role
     this.userRole = user?.role || null;
     const role = (this.userRole || '').toLowerCase();
     this.canManageUsersAndRoles = role === 'admin' || role === 'superadmin';
+    this.isOrdersOnlyRole = role === 'orders viewer' || role === 'orders_viewer' || role === 'ordersviewer';
   }
 
   toggleTheme(): void {

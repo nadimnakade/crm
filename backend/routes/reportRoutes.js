@@ -6,6 +6,6 @@ const { exportInteractions, exportOrders } = require('../controllers/reportContr
 // Admin-only export for customer-wise interaction logs
 router.get('/interactions/export', protect, authorize('Admin', 'Super Admin', 'admin'), exportInteractions);
 // Admin-only export for order-only details
-router.get('/orders/export', protect, authorize('Admin', 'Super Admin', 'admin'), exportOrders);
+router.get('/orders/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Orders Viewer', 'orders viewer'), exportOrders);
 
 module.exports = router;

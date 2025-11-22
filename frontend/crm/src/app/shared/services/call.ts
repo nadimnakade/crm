@@ -88,6 +88,21 @@ export class CallService {
     });
   }
 
+  // Recent order details (today)
+  getRecentOrderDetails(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'ASC'|'DESC'; search?: string; agentId?: number }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
+    const q: any = {};
+    if (params?.page) q.page = String(params.page);
+    if (params?.pageSize) q.pageSize = String(params.pageSize);
+    if (params?.sortBy) q.sortBy = params.sortBy;
+    if (params?.sortOrder) q.sortOrder = params.sortOrder;
+    if (params?.search) q.search = params.search;
+    if (params?.agentId) q.agentId = String(params.agentId);
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/orders/recent`, {
+      headers: this.getHeaders(),
+      params: q
+    });
+  }
+
   // Upload a general document attachment for a call
   uploadDocument(id: number | string, file: File): Observable<any> {
     const formData = new FormData();

@@ -4,7 +4,9 @@ import { RouterModule, ActivatedRoute } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CustomerService } from '../../../shared/services/customer';
 import { CallService } from '../../../shared/services/call';
+
 import Swal from 'sweetalert2';
+import { AuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-customer-history',
@@ -16,7 +18,7 @@ import Swal from 'sweetalert2';
 export class CustomerHistoryComponent implements OnInit {
   customerId!: number;
   customer: any;
-  calls: any[] = [];
+  calls: any[] = []
   historyForm!: FormGroup;
   isLoading = false;
   // Category/Sub Category options keyed by call type
@@ -72,9 +74,12 @@ export class CustomerHistoryComponent implements OnInit {
   // Order Details modal state
   showOrderModal = false;
   orderDetailsForm!: FormGroup;
+  // Context for modal header (agent + created)
+  orderContextAgentName: string = '';
+  orderContextCreatedAt: Date | null = null;
 
   // Listing data captured via modals (UI-only for now)
-  orderDetailsList: Array<{ customerName: string; customerMobileNo: string; mrp: string; pay: string; orderId: string; followupDate: string; alternate: 'Yes' | 'No' }> = [];
+  orderDetailsList: Array<{ customerName: string; customerMobileNo: string; mrp: string; pay: string; orderId: string; followupDate: string; alternate: 'Yes' | 'No'; agentName?: string; createdAt?: Date | string }> = [];
   refundDetailsList: Array<{ customerName: string; customerNumber: string; customerOrderId: string; medicineName: string; medicineQty: string; returnReason: string; accountHolderName: string; accountNumber: string; ifscCode: string; imageName?: string }> = [];
 
   // Expanded interaction details row state
@@ -90,7 +95,8 @@ export class CustomerHistoryComponent implements OnInit {
     private route: ActivatedRoute,
     private customerService: CustomerService,
     private callService: CallService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -182,7 +188,7 @@ export class CustomerHistoryComponent implements OnInit {
       customerMobileNo: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
       mrp: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
       pay: ['', [Validators.required, Validators.pattern(/^[0-9]+(\.[0-9]{1,2})?$/)]],
-      orderId: ['', Validators.required],
+      orderId: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9]{16}$/)]],
       followupDate: [''], // conditional
       alternate: ['No', Validators.required]
     });
@@ -212,15 +218,18 @@ export class CustomerHistoryComponent implements OnInit {
 
   // Sanitize mobile input to digits-only and clamp to 10
   onOrderMobileInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const raw = input.value || '';
-    const digits = raw.replace(/[^0-9]/g, '').slice(0, 10);
-    if (input.value !== digits) {
-      input.value = digits;
-    }
-    const ctrl = this.orderDetailsForm.get('customerMobileNo');
-    ctrl?.setValue(digits);
-    ctrl?.updateValueAndValidity({ onlySelf: true, emitEvent: false });
+    const target = event.target as HTMLInputElement;
+    const digits = (target.value || '').replace(/\D/g, '').slice(0, 10);
+    target.value = digits;
+    this.orderDetailsForm.get('customerMobileNo')?.setValue(digits);
+  }
+
+  // Sanitize orderId input to alphanumeric only and clamp to 16
+  onOrderIdInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const clean = (target.value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 16);
+    target.value = clean;
+    this.orderDetailsForm.get('orderId')?.setValue(clean);
   }
 
   toggleDetails(id: number): void {
@@ -285,6 +294,10 @@ export class CustomerHistoryComponent implements OnInit {
 
   openOrderModal(): void {
     this.orderModalMode = 'add';
+    const user = this.auth.getUser();
+    const name = `${(user?.firstName || '').trim()} ${(user?.lastName || '').trim()}`.trim();
+    this.orderContextAgentName = name || (user?.email || '');
+    this.orderContextCreatedAt = new Date();
     this.showOrderModal = true;
   }
 
@@ -338,6 +351,11 @@ export class CustomerHistoryComponent implements OnInit {
       alternate: od.alternate || 'No'
     });
     this.orderModalMode = 'view';
+    // Context: agent and created date from the existing call
+    const agent = call?.agent;
+    const name = `${(agent?.firstName || '').trim()} ${(agent?.lastName || '').trim()}`.trim();
+    this.orderContextAgentName = name || '';
+    this.orderContextCreatedAt = call?.createdAt ? new Date(call.createdAt) : null;
     this.showOrderModal = true;
   }
 
@@ -386,7 +404,9 @@ export class CustomerHistoryComponent implements OnInit {
             pay: c.orderDetails.pay || '',
             orderId: c.orderDetails.orderId || '',
             followupDate: c.orderDetails.followupDate || '',
-            alternate: c.orderDetails.alternate || 'No'
+            alternate: c.orderDetails.alternate || 'No',
+            agentName: `${(c.agent?.firstName || '').trim()} ${(c.agent?.lastName || '').trim()}`.trim(),
+            createdAt: c.createdAt || null
           }));
         this.isLoading = false;
       },

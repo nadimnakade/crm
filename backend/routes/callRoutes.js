@@ -16,6 +16,9 @@ router.get('/recent', protect, getRecentCalls);
 router.get('/top-callers/daily', protect, getTopCallersDaily);
 router.get('/top-callers/weekly', protect, getTopCallersWeekly);
 
+// Recent order details (today)
+router.get('/orders/recent', protect, require('../controllers/callController').getRecentOrderDetails);
+
 router.route('/:id')
   .get(protect, getCallById)
   .put(protect, authorize('Admin', 'Super Admin', 'admin'), updateCall)

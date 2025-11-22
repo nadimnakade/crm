@@ -16,6 +16,7 @@ import { AuthService } from '../../../shared/auth/auth';
   styleUrls: []
 })
 export class ReportsMenuComponent implements OnInit {
+  isOrdersOnly = false;
   // Customer Medicine Orders date range (mandatory)
   cmdFrom: string = '';
   cmdTo: string = '';
@@ -40,13 +41,16 @@ export class ReportsMenuComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    // Check if user has admin or superadmin role
     const user = this.authService.getUser();
     const role = (user?.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'superadmin';
-    if (!isAdmin) {
+    const isOrdersOnly = role === 'orders viewer' || role === 'orders_viewer' || role === 'ordersviewer';
+    if (!isAdmin && !isOrdersOnly) {
       this.router.navigate(['/dashboard']);
+      return;
     }
+    // Hide interactions section for orders-only role via field
+    this.isOrdersOnly = isOrdersOnly;
   }
 
   // Quick range helpers

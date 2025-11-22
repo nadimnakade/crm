@@ -82,6 +82,12 @@ BEGIN
   INSERT INTO dbo.Roles (name, description, permissions, createdAt, updatedAt)
   VALUES ('Agent', 'Agent role', '["manage_calls","manage_customers","view_reports"]', GETDATE(), GETDATE());
 END
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE name = 'Orders Viewer')
+BEGIN
+  INSERT INTO dbo.Roles (name, description, permissions, createdAt, updatedAt)
+  VALUES ('Orders Viewer', 'Can view Customers and Orders reports only', '["view_customers","view_reports_orders"]', GETDATE(), GETDATE());
+END
 `;
   try {
     await sequelize.query(sql);

@@ -26,19 +26,23 @@
       <table class="table table-striped table-hover" *ngIf="!isLoading">
         <thead>
           <tr>
-            <th>Date</th>
+            
+            <th>Created On</th>
+            <th>Agent</th>
             <th>Call Type</th>
             <th>Category</th>
             <th>Sub Category</th>
             <th>Order Id</th>
-            <!-- <th>Notes</th> -->
+            <!-- <th>Notes</th>s -->
             <th>Actions</th>
             <th>Details</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let c of calls">
-            <td>{{ c.date | date: 'short' }}</td>
+            
+            <td>{{ c.createdAt | date: 'short' }}</td>
+            <td>{{ c.agent?.firstName }} {{ c.agent?.lastName }}</td>
             <td>{{ c.callType }}</td>
             <td>{{ c.category || '—' }}</td>
             <td>{{ displaySubCategory(c) }}</td>
@@ -69,6 +73,8 @@
                       <tr><th>Order Id</th><td>{{ c.orderDetails.orderId }}</td></tr>
                       <tr><th>Followup Date</th><td>{{ c.orderDetails.followupDate | date }}</td></tr>
                       <tr><th>Alternate</th><td>{{ c.orderDetails.alternate }}</td></tr>
+                      <tr><th>Agent</th><td>{{ c.agent?.firstName }} {{ c.agent?.lastName }}</td></tr>
+                      <tr><th>Created</th><td>{{ c.createdAt | date:'short' }}</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -245,10 +251,14 @@
     <div class="modal-backdrop" *ngIf="showOrderModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.35);"></div>
     <div class="modal" *ngIf="showOrderModal" style="display:block; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 80%; max-width: 900px; background: #fff; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.2);">
       <div class="modal-header p-3 border-bottom">
-        <h5 class="modal-title">Add Order Details</h5>
+        <h5 class="modal-title">{{ orderModalMode === 'add' ? 'Add Order Details' : 'Order Details' }}</h5>
         <button type="button" class="btn-close" aria-label="Close" (click)="cancelOrderModal()"></button>
       </div>
       <div class="modal-body p-3">
+        <div class="mb-2 text-muted small" *ngIf="orderContextAgentName || orderContextCreatedAt">
+          <span>Agent: {{ orderContextAgentName || '—' }}</span>
+          <span class="ms-3">Created: {{ orderContextCreatedAt ? (orderContextCreatedAt | date:'short') : '—' }}</span>
+        </div>
         <form [formGroup]="orderDetailsForm">
           <div class="row">
             <div class="col-md-6 mb-3">
@@ -272,7 +282,8 @@
             </div>
             <div class="col-md-4 mb-3">
               <label class="form-label">Order Id</label>
-              <input class="form-control" formControlName="orderId">
+              <input class="form-control" type="text" inputmode="text" maxlength="16" formControlName="orderId" (input)="onOrderIdInput($event)" placeholder="Enter 16-character alphanumeric order id">
+               <div class="invalid" *ngIf="orderDetailsForm.get('orderId')?.invalid && orderDetailsForm.get('orderId')?.touched">Order Id must be exactly 16 characters (letters and digits only).</div>
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Followup Date <span class="text-muted small">({{ isFollowupRequired ? 'required' : 'optional' }})</span></label>
@@ -341,6 +352,8 @@
             <th>MRP</th>
             <th>Pay</th>
             <th>Order Id</th>
+            <th>Agent</th>
+            <th>Created</th>
             <th>Followup Date</th>
             <th>Alternate</th>
           </tr>
@@ -352,6 +365,8 @@
             <td>{{ o.mrp }}</td>
             <td>{{ o.pay }}</td>
             <td>{{ o.orderId }}</td>
+            <td>{{ o.agentName || '—' }}</td>
+            <td>{{ o.createdAt | date:'short' }}</td>
             <td>{{ o.followupDate | date }}</td>
             <td>{{ o.alternate }}</td>
           </tr>

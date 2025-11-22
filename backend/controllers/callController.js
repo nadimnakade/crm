@@ -1,6 +1,15 @@
 const { Call, Customer, User, Role, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
+const hasOrdersViewerAccess = async (user) => {
+  if (!user) return false;
+  try {
+    const role = await Role.findByPk(user.roleId);
+    const name = role ? (role.name || '').toLowerCase() : '';
+    return name === 'orders viewer' || name === 'orders_viewer' || name === 'ordersviewer' || name === 'admin' || name === 'super admin' || name === 'superadmin';
+  } catch { return false; }
+};
+
 // Helper: determine if follow-up date is required based on type/category/outcome
 function requiresFollowUpDate(callType, category, outcome) {
   const t = (callType || '').toString().trim().toLowerCase();
@@ -368,6 +377,98 @@ exports.getTopCallersDaily = async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Recent Order Details (today) with pagination, sorting, search
+// @route   GET /api/calls/orders/recent
+// @access  Private
+exports.getRecentOrderDetails = async (req, res) => {
+  try {
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const sortBy = (req.query.sortBy || 'createdAt').toString();
+    const sortOrder = ((req.query.sortOrder || 'DESC').toString().toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+    const searchTerm = (req.query.search || '').toString().trim();
+    const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
+
+    // Visibility: Agents see only their records; Admin/SuperAdmin/OrdersViewer can filter by any agent
+    const isElevated = await hasOrdersViewerAccess(req.user);
+    const where = {
+      [Op.and]: [
+        { createdAt: { [Op.between]: [start, end] } },
+        { [Op.or]: [
+          { orderDetails: { [Op.ne]: null } },
+          { orderId: { [Op.ne]: null } }
+        ] }
+      ]
+    };
+
+    if (isElevated) {
+      if (requestedAgentId) where.agentId = requestedAgentId;
+    } else {
+      where.agentId = req.user.id;
+    }
+
+    // Apply search across orderId, customer phone/name, and NVARCHAR orderDetails JSON string
+    if (searchTerm) {
+      const digits = searchTerm.replace(/[^0-9]/g, '');
+      const like = { [Op.like]: `%${searchTerm}%` };
+      const ors = [
+        { orderId: like },
+        { notes: like },
+        { outcome: like }
+      ];
+      if (digits.length >= 5) {
+        // join customer phone via include where
+      }
+
+      // We'll apply customer name/phone filter through include below
+      req._searchTerm = searchTerm; // pass to include
+      req._searchDigits = digits;
+    }
+
+    const offset = (page - 1) * pageSize;
+    const allowedSort = ['createdAt','date','orderId'];
+    const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['createdAt','DESC']];
+
+    const include = [
+      // Customer include with optional search
+      (req._searchTerm ? { model: Customer, where: {
+        [Op.or]: [
+          { firstName: { [Op.like]: `%${req._searchTerm}%` } },
+          { lastName: { [Op.like]: `%${req._searchTerm}%` } },
+          ...(req._searchDigits && req._searchDigits.length >= 5 ? [{ phone: { [Op.like]: `%${req._searchDigits}%` } }] : [])
+        ]
+      }, required: false } : { model: Customer }),
+      { model: User, as: 'agent', attributes: ['id','firstName','lastName'] }
+    ];
+
+    const { rows, count } = await Call.findAndCountAll({
+      where,
+      include,
+      order,
+      limit: pageSize,
+      offset
+    });
+
+    // Normalize NVARCHAR JSON
+    const data = rows.map(r => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      date: r.date,
+      agent: r.agent,
+      customer: r.Customer,
+      orderId: r.orderId,
+      orderDetails: typeof r.orderDetails === 'string' ? (function(){ try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails
+    }));
+
+    res.json({ data, total: count, page, pageSize });
+  } catch (error) {
+    console.error('Recent order details failed:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

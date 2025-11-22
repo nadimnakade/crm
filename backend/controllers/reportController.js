@@ -45,9 +45,9 @@ exports.exportInteractions = async (req, res) => {
       LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
       WHERE (:customerId IS NULL OR c.customerId = :customerId)
         AND (:agentId IS NULL OR c.agentId = :agentId)
-        AND (:fromDate IS NULL OR c.[date] >= :fromDate)
-        AND (:toDate IS NULL OR c.[date] <= :toDate)
-      ORDER BY c.[date] DESC, c.Id DESC
+        AND (:fromDate IS NULL OR c.[createdAt] >= :fromDate)
+        AND (:toDate IS NULL OR c.[createdAt] <= :toDate)
+      ORDER BY c.[createdAt] DESC, c.Id DESC
       OPTION (RECOMPILE);
     `;
 
@@ -139,9 +139,9 @@ exports.exportOrders = async (req, res) => {
       FROM dbo.Calls c WITH (NOLOCK)
       LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
       WHERE c.orderDetails IS NOT NULL
-        AND (:fromDate IS NULL OR c.[date] >= :fromDate)
-        AND (:toDate IS NULL OR c.[date] <= :toDate)
-      ORDER BY c.[date] DESC, c.Id DESC
+        AND (:fromDate IS NULL OR c.[createdAt] >= :fromDate)
+        AND (:toDate IS NULL OR c.[createdAt] <= :toDate)
+      ORDER BY c.[createdAt] DESC, c.Id DESC
       OPTION (RECOMPILE);
     `;
 

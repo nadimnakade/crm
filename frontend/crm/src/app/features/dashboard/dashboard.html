@@ -171,8 +171,8 @@
         </div>
       </div>
 
-      <div class="stats-cards d-none">
-        <div class="stat-card weekly-balance">
+      <div class="stats-cards">
+        <div class="stat-card weekly-balance d-none">
           <div class="stat-content">
             <h3>Weekly Balance</h3>
             <div class="stat-value">$20k</div>
@@ -183,18 +183,18 @@
           </div>
         </div>
 
-        <div class="stat-card orders">
+        <div class="stat-card orders col-md-4">
           <div class="stat-content">
-            <h3>Orders In Line</h3>
-            <div class="stat-value">750</div>
-            <a class="view-link" [routerLink]="['/calls']">View entire list</a>
+            <h3>Orders Today</h3>
+            <div class="stat-value">{{ ordersTodayCount }}</div>
+            <a class="view-link" [routerLink]="['/orders/recent']">View recent orders</a>
           </div>
           <div class="stat-icon">
-            <img src="https://via.placeholder.com/60" alt="Orders icon">
+            <i class="fa-solid fa-cart-shopping"></i>
           </div>
         </div>
 
-        <div class="stat-card clients">
+        <div class="stat-card clients d-none">
           <div class="stat-content">
             <h3>New Clients</h3>
             <div class="stat-value">150</div>

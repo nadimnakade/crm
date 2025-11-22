@@ -63,6 +63,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   typeChart!: Chart;
   weeklySalesChart!: Chart;
 
+  // Orders today count
+  ordersTodayCount: number = 0;
+
   constructor(
     private authService: AuthService,
     private callService: CallService,
@@ -149,6 +152,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     //   next: (calls) => this.recentCalls = calls || [],
     //   error: () => this.recentCalls = []
     // });
+
+    // Orders count (today)
+    this.loadOrdersTodayCount();
 
     // Daily top callers
     // const today = new Date();
@@ -293,6 +299,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
   }
   
+  private loadOrdersTodayCount(): void {
+    this.callService.getRecentOrderDetails({ page: 1, pageSize: 1 }).subscribe({
+      next: (res) => { this.ordersTodayCount = Number(res?.total || 0); },
+      error: () => { this.ordersTodayCount = 0; }
+    });
+  }
+
   initWeeklySalesChart(): void {
     const canvas = document.getElementById('weeklySalesChart') as HTMLCanvasElement;
     if (!canvas) return;
