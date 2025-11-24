@@ -110,7 +110,7 @@ exports.getCalls = async (req, res) => {
     res.json({ data: rows, total: count, page, pageSize });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -133,7 +133,7 @@ exports.getCallById = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -186,7 +186,7 @@ exports.createCall = async (req, res) => {
     res.status(201).json(call);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -265,7 +265,7 @@ exports.updateCall = async (req, res) => {
     res.json(call);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -284,7 +284,7 @@ exports.deleteCall = async (req, res) => {
     res.json({ message: 'Call removed' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -339,7 +339,7 @@ exports.getRecentCalls = async (req, res) => {
     res.json(calls);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -377,7 +377,7 @@ exports.getTopCallersDaily = async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -448,7 +448,13 @@ exports.getRecentOrderDetails = async (req, res) => {
     ];
 
     const { rows, count } = await Call.findAndCountAll({
-      where,
+      // Use computed column HasOrder for performance when possible
+      where: {
+        [Op.and]: [
+          sequelize.where(sequelize.col('HasOrder'), 1),
+          where
+        ]
+      },
       include,
       order,
       limit: pageSize,
@@ -469,7 +475,128 @@ exports.getRecentOrderDetails = async (req, res) => {
     res.json({ data, total: count, page, pageSize });
   } catch (error) {
     console.error('Recent order details failed:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    Recent Orders count (today) — optimized count-only without joins
+// @route   GET /api/calls/orders/recent/count
+// @access  Private
+exports.getRecentOrderCount = async (req, res) => {
+  try {
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
+
+    const visibility = await getVisibility(req.user);
+    const where = {
+      [Op.and]: [
+        // Leverage persisted computed column + index for fast counts
+        sequelize.where(sequelize.col('HasOrder'), 1),
+        { createdAt: { [Op.between]: [start, end] } }
+      ]
+    };
+
+    if (visibility.scope === 'agent') {
+      where.agentId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+      where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    } else if (visibility.scope === 'admin') {
+      if (requestedAgentId) where.agentId = requestedAgentId;
+    }
+
+    const total = await Call.count({ where });
+    return res.json({ total });
+  } catch (error) {
+    console.error('Recent order count failed:', error);
+    return res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    Followup Report: orders with follow-up date in requested range (defaults to today only)
+// @route   GET /api/calls/orders/followups
+// @access  Private (role-based visibility)
+exports.getFollowupReport = async (req, res) => {
+  try {
+    // Accept optional query params: from (YYYY-MM-DD), to (YYYY-MM-DD)
+    // If not provided, default to TODAY ONLY
+    // IMPORTANT: Parse dates in LOCAL time to avoid UTC shift with 'YYYY-MM-DD'
+    const parseLocalYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0); // local midnight
+    };
+    const fromStr = (req.query.from || '').toString().trim();
+    const toStr = (req.query.to || '').toString().trim();
+    const today = new Date();
+    let start = parseLocalYMD(fromStr) || new Date(today);
+    let end = parseLocalYMD(toStr) || new Date(start);
+    // Normalize to full-day bounds (local) and use half-open range [start, nextDayStart)
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(end.getTime());
+    endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 20;
+    const sortBy = (req.query.sortBy || 'followUpDate').toString();
+    const sortOrder = ((req.query.sortOrder || 'ASC').toString().toUpperCase() === 'DESC') ? 'DESC' : 'ASC';
+    const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
+
+    const visibility = await getVisibility(req.user);
+    const where = {
+      [Op.and]: [
+        { followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } },
+        { [Op.or]: [
+          { orderDetails: { [Op.ne]: null } },
+          { orderId: { [Op.ne]: null } }
+        ] }
+      ]
+    };
+
+    // Role-based visibility
+    if (visibility.scope === 'agent') {
+      where.agentId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+      // Allow manager to view their team (and themselves)
+      where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    } else if (visibility.scope === 'admin') {
+      if (requestedAgentId) where.agentId = requestedAgentId;
+    }
+
+    const offset = (page - 1) * pageSize;
+    const allowedSort = ['followUpDate', 'createdAt', 'orderId'];
+    const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['followUpDate', 'ASC']];
+
+    const { rows, count } = await Call.findAndCountAll({
+      where,
+      include: [
+        { model: Customer },
+        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+      ],
+      order,
+      limit: pageSize,
+      offset
+    });
+
+    const data = rows.map(r => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      followUpDate: r.followUpDate,
+      agent: r.agent,
+      customer: r.Customer,
+      orderId: r.orderId,
+      orderDetails: typeof r.orderDetails === 'string' ? (function(){ try { return JSON.parse(r.orderDetails); } catch { return null; } })() : r.orderDetails
+    }));
+
+    res.json({ data, total: count, page, pageSize });
+  } catch (error) {
+    console.error('Followup report failed:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -510,7 +637,7 @@ exports.getTopCallersWeekly = async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -554,7 +681,7 @@ exports.getCallFiles = async (req, res) => {
     return res.json(files);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -597,7 +724,7 @@ exports.getCallHistory = async (req, res) => {
     return res.json(history);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -629,7 +756,7 @@ exports.getCallFilesSource = async (req, res) => {
     return res.json({ source: 'fs', count: files.length });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -667,6 +794,6 @@ exports.getCallHistorySource = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };

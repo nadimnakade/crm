@@ -8,7 +8,8 @@ import { AdminGuard } from '../../shared/guards/admin.guard';
 const routes: Routes = [
   { path: 'users', component: UserListComponent, canActivate: [AuthGuard, AdminGuard] },
   { path: 'users/new', component: UserDetailComponent, canActivate: [AuthGuard, AdminGuard] },
-  { path: 'users/:id', component: UserDetailComponent, canActivate: [AuthGuard, AdminGuard] }
+  { path: 'users/:id', component: UserDetailComponent, canActivate: [AuthGuard, AdminGuard] },
+  { path: 'users/:id/edit', component: UserDetailComponent, canActivate: [AuthGuard, AdminGuard] }
 ];
 
 @NgModule({

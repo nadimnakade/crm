@@ -18,6 +18,7 @@ export class LayoutComponent implements OnInit {
   userRole: string | null = null;
   canManageUsersAndRoles: boolean = false;
   isOrdersOnlyRole: boolean = false;
+  reportsOpen: boolean = false;
 
   constructor(private authService: AuthService, private router: Router) {}
 
@@ -40,7 +41,8 @@ export class LayoutComponent implements OnInit {
     this.userRole = user?.role || null;
     const role = (this.userRole || '').toLowerCase();
     this.canManageUsersAndRoles = role === 'admin' || role === 'superadmin';
-    this.isOrdersOnlyRole = role === 'orders viewer' || role === 'orders_viewer' || role === 'ordersviewer';
+    // Orders-only role is explicitly named 'vieworder'
+    this.isOrdersOnlyRole = role === 'vieworder';
   }
 
   toggleTheme(): void {
@@ -52,6 +54,10 @@ export class LayoutComponent implements OnInit {
 
   toggleSidebar(): void {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
+  }
+
+  toggleReports(): void {
+    this.reportsOpen = !this.reportsOpen;
   }
 
   logout(): void {

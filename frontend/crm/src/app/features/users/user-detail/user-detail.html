@@ -61,6 +61,14 @@
     </div>
 
     <div class="form-group">
+      <label for="managerId">Manager</label>
+      <select id="managerId" formControlName="managerId" [disabled]="!isNewMode && !isEditMode">
+        <option value="">None</option>
+        <option *ngFor="let m of managers" [value]="m.id">{{ m.firstName }} {{ m.lastName }} ({{ m.email }})</option>
+      </select>
+    </div>
+
+    <div class="form-group">
       <label for="active">Status</label>
       <div class="toggle-container">
         <input type="checkbox" id="active" formControlName="active" [disabled]="!isNewMode && !isEditMode">

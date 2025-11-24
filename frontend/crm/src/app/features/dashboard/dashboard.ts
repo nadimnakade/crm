@@ -300,7 +300,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
   
   private loadOrdersTodayCount(): void {
-    this.callService.getRecentOrderDetails({ page: 1, pageSize: 1 }).subscribe({
+    // Use lightweight count-only endpoint to avoid heavy join/count
+    this.callService.getRecentOrderCount().subscribe({
       next: (res) => { this.ordersTodayCount = Number(res?.total || 0); },
       error: () => { this.ordersTodayCount = 0; }
     });

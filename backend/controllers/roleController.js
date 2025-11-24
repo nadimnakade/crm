@@ -20,7 +20,7 @@ exports.getRoles = async (req, res) => {
     res.json(roles);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -32,7 +32,7 @@ exports.getPermissions = async (_req, res) => {
     res.json(PERMISSIONS);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -50,7 +50,7 @@ exports.getRoleById = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -75,7 +75,7 @@ exports.createRole = async (req, res) => {
     res.status(201).json(role);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -102,7 +102,7 @@ exports.updateRole = async (req, res) => {
     res.json(role);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -121,6 +121,6 @@ exports.deleteRole = async (req, res) => {
     res.json({ message: 'Role removed' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };

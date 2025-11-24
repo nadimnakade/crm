@@ -76,7 +76,13 @@
             <td>{{ r.orderId || r.orderDetails?.orderId || '-' }}</td>
             <td>{{ customerName(r) }}</td>
             <td style="width: 35%">{{ customerAddress(r)  }}</td>
-            <td>{{ customerPhone(r) }}</td>
+            <td>
+              <a [routerLink]="['/customers']"
+                 [queryParams]="{ mobile: customerPhone(r) }"
+                 title="Open customer search by mobile">
+                {{ displayPhone(customerPhone(r)) }}
+              </a>
+            </td>
             <td><button class="btn btn-sm btn-outline-primary" (click)="view(r)">View</button></td>
           </tr>
         </tbody>

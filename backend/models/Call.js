@@ -55,7 +55,8 @@ const Call = sequelize.define('Call', {
     allowNull: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'Calls'
 });
 
 module.exports = Call;

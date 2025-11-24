@@ -301,7 +301,7 @@ exports.createCustomer = async (req, res) => {
     if (error && (error.name === 'SequelizeUniqueConstraintError' || error.original?.code === 'EREQUEST')) {
       return res.status(409).json({ message: 'Phone already exists' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -355,7 +355,7 @@ exports.updateCustomer = async (req, res) => {
     if (error && (error.name === 'SequelizeUniqueConstraintError' || error.original?.code === 'EREQUEST')) {
       return res.status(409).json({ message: 'Phone already exists' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -376,7 +376,7 @@ exports.deleteCustomer = async (req, res) => {
     res.json({ message: 'Customer removed' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 

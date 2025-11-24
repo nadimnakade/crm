@@ -17,6 +17,7 @@ export class UserDetailComponent implements OnInit {
   isEditMode = false;
   isNewMode = false;
   roles: any[] = [];
+  managers: any[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -28,15 +29,22 @@ export class UserDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadRoles();
+    this.loadManagers();
 
     const paramId = this.route.snapshot.paramMap.get('id');
     const isNewPath = (this.route.snapshot.routeConfig?.path || '').endsWith('new');
     const isNewUrl = (this.route.snapshot.url || []).some(seg => seg.path === 'new');
+    const isEditPath = (this.route.snapshot.routeConfig?.path || '').endsWith('edit');
+    const isEditUrl = (this.route.snapshot.url || []).some(seg => seg.path === 'edit');
 
     if (paramId === 'new' || isNewPath || isNewUrl) {
       this.isNewMode = true;
       this.initForm();
       return;
+    }
+
+    if (isEditPath || isEditUrl) {
+      this.isEditMode = true;
     }
 
     if (paramId) {
@@ -51,6 +59,7 @@ export class UserDetailComponent implements OnInit {
   initForm(user?: any): void {
     const roleId = user?.Role?.id ?? user?.roleId ?? '';
     const isActive = (user?.isActive !== undefined) ? user.isActive : (user?.active !== undefined ? user.active : true);
+    const managerId = user?.managerId ?? '';
     this.userForm = this.fb.group({
       firstName: [user?.firstName || '', Validators.required],
       lastName: [user?.lastName || '', Validators.required],
@@ -61,12 +70,30 @@ export class UserDetailComponent implements OnInit {
                         (this.isEditMode ? [Validators.minLength(6)] : [])
       ],
       role: [roleId, Validators.required],
-      active: [isActive]
+      active: [isActive],
+      managerId: [managerId]
     });
 
     if (!this.isNewMode && !this.isEditMode) {
       this.userForm.disable();
     }
+  }
+
+  loadManagers(): void {
+    this.userService.getUsers().subscribe({
+      next: (data) => {
+        const arr = Array.isArray(data) ? data : [];
+        // Prefer users with role name 'manager' or roleId mapped to Manager
+        this.managers = arr.filter((u: any) => {
+          const roleName = (u.Role?.name || u.role || '').toString().toLowerCase();
+          return roleName.includes('manager');
+        });
+      },
+      error: (err) => {
+        console.error('Failed to load managers', err);
+        this.managers = [];
+      }
+    });
   }
 
   loadRoles(): void {
@@ -122,6 +149,11 @@ export class UserDetailComponent implements OnInit {
       roleId: Number(v.role),
       isActive: !!v.active
     };
+    if (v.managerId) {
+      payload.managerId = Number(v.managerId);
+    } else {
+      payload.managerId = null;
+    }
     // Derive a username if not provided in the form (use email local part)
     const emailLocal = (v.email || '').split('@')[0];
     payload.username = emailLocal || `${v.firstName}.${v.lastName}`.replace(/\s+/g, '').toLowerCase();

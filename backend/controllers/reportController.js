@@ -1,5 +1,54 @@
 const xlsx = require('xlsx');
 const { sequelize } = require('../models');
+const { QueryTypes } = require('sequelize');
+// IST helpers and formatting
+const IST_OFFSET_MINUTES = 5 * 60 + 30; // +05:30
+const pad2 = (n) => String(n).padStart(2, '0');
+function istTodayDateStr() {
+  const nowUTC = new Date();
+  const istMs = nowUTC.getTime() + IST_OFFSET_MINUTES * 60 * 1000;
+  const ist = new Date(istMs);
+  const y = ist.getUTCFullYear();
+  const m = ist.getUTCMonth() + 1;
+  const d = ist.getUTCDate();
+  return `${y}-${pad2(m)}-${pad2(d)}`;
+}
+function istStartUTCForDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const istMidnightUTC = Date.UTC(y, m - 1, d, 0, 0, 0);
+  const utcMs = istMidnightUTC - IST_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs);
+}
+function istEndExclusiveUTCForDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const istNextMidnightUTC = Date.UTC(y, m - 1, d + 1, 0, 0, 0);
+  const utcMs = istNextMidnightUTC - IST_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs);
+}
+function getISTRange(fromStr, toStr) {
+  const useToday = !fromStr && !toStr;
+  const startStr = (fromStr || '').trim() || istTodayDateStr();
+  const endStr = (toStr || '').trim() || startStr;
+  return {
+    start: istStartUTCForDateStr(startStr),
+    endExclusive: istEndExclusiveUTCForDateStr(endStr)
+  };
+}
+
+// Helper to format local date-time as 'YYYY-MM-DD HH:mm:ss'
+function formatLocalDateTime(dt) {
+  if (!dt) return null;
+  const utc = new Date(dt);
+  const istMs = utc.getTime() + IST_OFFSET_MINUTES * 60 * 1000;
+  const d = new Date(istMs);
+  const yyyy = d.getUTCFullYear();
+  const mm = pad2(d.getUTCMonth() + 1);
+  const dd = pad2(d.getUTCDate());
+  const hh = pad2(d.getUTCHours());
+  const mi = pad2(d.getUTCMinutes());
+  const ss = pad2(d.getUTCSeconds());
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+}
 
 // Export customer-wise interactions (Calls + latest status) as Excel or CSV
 // GET /api/reports/interactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD&customerId=&agentId=&limit=&format=xlsx|csv
@@ -12,13 +61,8 @@ exports.exportInteractions = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10000;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
-    const fromDate = from ? new Date(from) : null;
-    let toDate = null;
-    if (to) {
-      const end = new Date(to);
-      end.setHours(23, 59, 59, 999);
-      toDate = end;
-    }
+    const fromDateUTC = from ? istStartUTCForDateStr(from) : null;
+    const toDateExclusiveUTC = to ? istEndExclusiveUTCForDateStr(to) : null;
 
     const sql = `
       SELECT TOP (:limit)
@@ -45,8 +89,8 @@ exports.exportInteractions = async (req, res) => {
       LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
       WHERE (:customerId IS NULL OR c.customerId = :customerId)
         AND (:agentId IS NULL OR c.agentId = :agentId)
-        AND (:fromDate IS NULL OR c.[createdAt] >= :fromDate)
-        AND (:toDate IS NULL OR c.[createdAt] <= :toDate)
+        AND (:fromDateUTC IS NULL OR c.[createdAt] >= :fromDateUTC)
+        AND (:toDateExclusiveUTC IS NULL OR c.[createdAt] < :toDateExclusiveUTC)
       ORDER BY c.[createdAt] DESC, c.Id DESC
       OPTION (RECOMPILE);
     `;
@@ -56,8 +100,8 @@ exports.exportInteractions = async (req, res) => {
       replacements: {
         customerId: customerId ? parseInt(customerId, 10) : null,
         agentId: agentId ? parseInt(agentId, 10) : null,
-        fromDate,
-        toDate,
+        fromDateUTC,
+        toDateExclusiveUTC,
         limit
       }
     });
@@ -112,20 +156,14 @@ exports.exportInteractions = async (req, res) => {
 // Export order-only details as Excel or CSV
 exports.exportOrders = async (req, res) => {
   try {
-    try { req.setTimeout(300000); } catch {}
-    try { res.setTimeout(300000); } catch {}
+    try { req.setTimeout(300000); } catch {}    
 
     const { from, to } = req.query || {};
     const limit = parseInt(req.query.limit, 10) || 10000;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
-    const fromDate = from ? new Date(from) : null;
-    let toDate = null;
-    if (to) {
-      const end = new Date(to);
-      end.setHours(23, 59, 59, 999);
-      toDate = end;
-    }
+    const fromDateUTC = from ? istStartUTCForDateStr(from) : null;
+    const toDateExclusiveUTC = to ? istEndExclusiveUTCForDateStr(to) : null;
 
     const sql = `
       SELECT TOP (:limit)
@@ -139,15 +177,15 @@ exports.exportOrders = async (req, res) => {
       FROM dbo.Calls c WITH (NOLOCK)
       LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
       WHERE c.orderDetails IS NOT NULL
-        AND (:fromDate IS NULL OR c.[createdAt] >= :fromDate)
-        AND (:toDate IS NULL OR c.[createdAt] <= :toDate)
+        AND (:fromDateUTC IS NULL OR c.[createdAt] >= :fromDateUTC)
+        AND (:toDateExclusiveUTC IS NULL OR c.[createdAt] < :toDateExclusiveUTC)
       ORDER BY c.[createdAt] DESC, c.Id DESC
       OPTION (RECOMPILE);
     `;
 
     const [rows] = await sequelize.query(sql, {
       raw: true,
-      replacements: { fromDate, toDate, limit }
+      replacements: { fromDateUTC, toDateExclusiveUTC, limit }
     });
 
     // Targeted columns from orderDetails JSON + createdOn + agentName
@@ -177,7 +215,7 @@ exports.exportOrders = async (req, res) => {
         Alternate: od?.alternate ?? null,
         FollowupDate: (od && od.followupDate) ? new Date(od.followupDate) : null,
         AgentName: [r.agentFirstName, r.agentLastName].filter(Boolean).join(' ').trim() || null,
-        CreatedOn: r.createdAt ? new Date(r.createdAt) : null
+        CreatedOn: r.createdAt ? formatLocalDateTime(r.createdAt) : null
       };
 
       return row;
@@ -204,3 +242,102 @@ exports.exportOrders = async (req, res) => {
     res.status(500).json({ message: 'Failed to export orders', error: error.message });
   }
 };
+
+// Export followup orders (calls with orderDetails and a followUpDate within range)
+// GET /api/reports/followups/export?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=&format=xlsx|csv
+exports.exportFollowups = async (req, res) => {
+  try {
+    try { req.setTimeout(300000); } catch {}    
+
+    const { from, to } = req.query || {};
+    const limit = parseInt(req.query.limit, 10) || 10000;
+    const format = (req.query.format || 'xlsx').toLowerCase();
+
+    let fromDateUTC;
+    let toDateExclusiveUTC;
+
+    if (from || to) {
+      if (from && to) {
+        fromDateUTC        = istStartUTCForDateStr(from);
+        toDateExclusiveUTC = istEndExclusiveUTCForDateStr(to);
+      } else if (from && !to) {
+        fromDateUTC        = istStartUTCForDateStr(from);
+        toDateExclusiveUTC = istEndExclusiveUTCForDateStr(from); // same day
+      } else { // !from && to
+        fromDateUTC        = istStartUTCForDateStr(to);
+        toDateExclusiveUTC = istEndExclusiveUTCForDateStr(to);
+      }
+    } else {
+      const { start, endExclusive } = getISTRange(null, null); // today in IST
+      fromDateUTC        = start;
+      toDateExclusiveUTC = endExclusive;
+    }
+
+    const rows = await sequelize.query(
+      'EXEC dbo.ExportFollowups ' +
+        '@FromDateUTC = :fromDateUTC, ' +
+        '@ToDateExclusiveUTC = :toDateExclusiveUTC, ' +
+        '@Limit = :limit',
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: {
+          fromDateUTC,
+          toDateExclusiveUTC,
+          limit
+        }
+      }
+    );
+
+    const headers = [
+      'FollowupDate',
+      'OrderId',
+      'CustomerName',
+      'CustomerMobileNo',
+      'MRP',
+      'Pay',
+      'Alternate',
+      'AgentName',
+      'CreatedOn'
+    ];
+
+    const data = (rows || []).map(r => {
+      const od = typeof r.orderDetails === 'string'
+        ? (() => { try { return JSON.parse(r.orderDetails); } catch { return null; } })()
+        : r.orderDetails;
+
+      return {
+        FollowupDate: r.followUpDate ? formatLocalDateTime(r.followUpDate) : null,
+        OrderId: (od && od.orderId) ?? r.orderId ?? null,
+        CustomerName: od?.customerName ?? null,
+        CustomerMobileNo: od?.customerMobileNo ?? null,
+        MRP: (od && (od.mrp ?? od.MRP)) ?? null,
+        Pay: (od && (od.pay ?? od.Pay)) ?? null,
+        Alternate: od?.alternate ?? null,
+        AgentName: [r.agentFirstName, r.agentLastName].filter(Boolean).join(' ').trim() || null,
+        CreatedOn: r.createdAt ? formatLocalDateTime(r.createdAt) : null
+      };
+    });
+
+    if (format === 'csv') {
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      const csv = xlsx.utils.sheet_to_csv(ws);
+      const buf = Buffer.from(csv, 'utf8');
+      res.setHeader('Content-Disposition', 'attachment; filename="followups.csv"');
+      res.setHeader('Content-Type', 'text/csv');
+      return res.send(buf);
+    } else {
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      xlsx.utils.book_append_sheet(wb, ws, 'Followups');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename="followups.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buf);
+    }
+  } catch (error) {
+    console.error('Followups export failed:', error);
+    res.status(500).json({ message: 'Failed to export followups', error: error.message });
+  }
+};
+

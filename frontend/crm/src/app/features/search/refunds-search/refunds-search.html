@@ -63,7 +63,13 @@
           <tr *ngFor="let r of results">
             <td>{{ r.orderId || r.orderDetails?.orderId || (r.refundDetails?.customerOrderId) || '-' }}</td>
             <td>{{ customerName(r) }}<span *ngIf="customerAddress(r)">, {{ customerAddress(r) }}</span></td>
-            <td>{{ customerPhone(r) }}</td>
+            <td>
+              <a [routerLink]="['/customers']"
+                 [queryParams]="{ mobile: customerPhone(r) }"
+                 title="Open customer search by mobile">
+                {{ displayPhone(customerPhone(r)) }}
+              </a>
+            </td>
             <td><button class="btn btn-sm btn-outline-primary" (click)="view(r)">View</button></td>
           </tr>
         </tbody>
@@ -105,7 +111,13 @@
           </tr>
           <tr>
             <th>Mobile No</th>
-            <td>{{ d?.customerNumber || '-' }}</td>
+            <td>
+              <a [routerLink]="['/customers']"
+                 [queryParams]="{ mobile: d?.customerNumber || '' }"
+                 title="Open customer search by mobile">
+                {{ displayPhone(d?.customerNumber || '') }}
+              </a>
+            </td>
           </tr>
           <tr>
             <th>Medicine Name</th>

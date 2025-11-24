@@ -24,10 +24,29 @@
         <i class="fa-solid fa-folder-open nav-icon"></i>
         <span class="nav-label">Portfolio</span>
       </a>
-      <a routerLink="/orders/recent" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-clock nav-icon"></i>
-        <span class="nav-label">Recent Orders</span>
+      <!-- Reports parent menu -->
+      <a routerLink="/reports" routerLinkActive="active" class="nav-item" (click)="toggleReports()">
+        <i class="fa-solid fa-chart-line nav-icon"></i>
+        <span class="nav-label">Reports</span>
       </a>
+      <div class="nav-submenu" *ngIf="reportsOpen" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <a routerLink="/orders/recent" routerLinkActive="active" class="nav-item" title="Recent Orders">
+          <i class="fa-solid fa-clock nav-icon"></i>
+          <span class="nav-label">Recent</span>
+        </a>
+        <a routerLink="/reports/followups" routerLinkActive="active" class="nav-item" title="Followups Report">
+          <i class="fa-solid fa-clipboard-check nav-icon"></i>
+          <span class="nav-label">Followups</span>
+        </a>
+        <a routerLink="/search/orders" routerLinkActive="active" class="nav-item" title="Orders Search">
+          <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+          <span class="nav-label">Orders</span> 
+        </a>
+        <a routerLink="/search/refunds" routerLinkActive="active" class="nav-item" title="Refunds Search">
+          <i class="fa-solid fa-rotate-left nav-icon"></i>
+          <span class="nav-label">Refunds</span>
+        </a>
+      </div>
       <a *ngIf="!isOrdersOnlyRole" routerLink="/search/orders" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-magnifying-glass nav-icon"></i>
         <span class="nav-label">Orders Search</span>
@@ -39,6 +58,10 @@
       <a *ngIf="canManageUsersAndRoles || isOrdersOnlyRole" routerLink="/reports" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-file-export nav-icon"></i>
         <span class="nav-label">Reports</span>
+      </a>
+      <a routerLink="/reports/followups" routerLinkActive="active" class="nav-item">
+        <i class="fa-solid fa-calendar-check nav-icon"></i>
+        <span class="nav-label">Followup Report</span>
       </a>
       <a *ngIf="!isOrdersOnlyRole" routerLink="/customer-medicine-detail" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-pills nav-icon"></i>

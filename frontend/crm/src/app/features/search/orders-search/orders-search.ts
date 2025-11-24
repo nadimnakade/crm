@@ -2,8 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CallService } from '../../../shared/services/call';
 import { UserService } from '../../../shared/services/user';
+import { AuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-orders-search',
@@ -22,8 +24,16 @@ export class OrdersSearchComponent implements OnInit {
   pageSize = 10;
   users: any[] = [];
   hasSearched = false;
+  isAgentRole = false;
 
-  constructor(private fb: FormBuilder, private callService: CallService, private userService: UserService) {}
+  constructor(
+    private fb: FormBuilder,
+    private callService: CallService,
+    private userService: UserService,
+    private auth: AuthService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -34,7 +44,26 @@ export class OrdersSearchComponent implements OnInit {
       agentId: ['']
     });
     this.loadUsers();
-    // Do NOT auto-search; require explicit input
+    // Role-based phone masking
+    const role = (this.auth.getUser()?.role || '').toLowerCase();
+    this.isAgentRole = role === 'agent';
+
+    // Accept query params for deep-linking to order details
+    const qp = this.route.snapshot.queryParamMap;
+    const mobile = (qp.get('mobile') || '').replace(/[^0-9]/g, '');
+    const orderId = (qp.get('orderId') || '').trim();
+    const auto = qp.get('auto');
+    const ps = qp.get('pageSize');
+    if (ps) {
+      const n = parseInt(ps, 10);
+      if (!isNaN(n) && n > 0) this.pageSize = n;
+    }
+    if (mobile && mobile.length === 10) this.form.patchValue({ mobileNo: mobile });
+    if (orderId) this.form.patchValue({ orderId });
+    if (auto || mobile || orderId) {
+      // Auto-run search and open detail if single match
+      this.search(true);
+    }
   }
 
   loadUsers(): void {
@@ -48,7 +77,7 @@ export class OrdersSearchComponent implements OnInit {
     });
   }
 
-  search(): void {
+  search(autoOpenIfSingle: boolean = false): void {
     const { orderId, mobileNo, startDate, endDate, agentId } = this.form.value;
     const mobileDigits = (mobileNo || '').replace(/[^0-9]/g, '');
     const hasOrderId = !!(orderId && orderId.trim());
@@ -89,6 +118,9 @@ export class OrdersSearchComponent implements OnInit {
         }));
         this.total = res.total || 0;
         this.isLoading = false;
+        if (autoOpenIfSingle && this.results.length === 1) {
+          this.view(this.results[0]);
+        }
       },
       error: (err) => {
         console.error('Order search failed', err);
@@ -131,6 +163,15 @@ export class OrdersSearchComponent implements OnInit {
   customerPhone(call: any): string {
     const c = call?.Customer || call?.customer;
     return c?.phone || '';
+  }
+
+  displayPhone(phone: string | undefined | null): string {
+    const raw = (phone || '').replace(/[^0-9]/g, '');
+    if (!raw) return '';
+    if (!this.isAgentRole) return raw; // show full for non-agent roles
+    if (raw.length <= 4) return '****';
+    // Mask middle digits: keep first 2 and last 2
+    return `${raw.slice(0, 2)}${'*'.repeat(Math.max(0, raw.length - 4))}${raw.slice(-2)}`;
   }
 
   private parseJSON(value: any): any {

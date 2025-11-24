@@ -12,6 +12,8 @@ export class LoadingService {
     this.activeRequests++;
     if (!this._loading$.value) {
       this._loading$.next(true);
+      // Lock scroll globally while loading
+      try { document.body.style.overflow = 'hidden'; } catch {}
     }
   }
 
@@ -19,6 +21,8 @@ export class LoadingService {
     this.activeRequests = Math.max(0, this.activeRequests - 1);
     if (this.activeRequests === 0 && this._loading$.value) {
       this._loading$.next(false);
+      // Release scroll lock when all requests complete
+      try { document.body.style.overflow = ''; } catch {}
     }
   }
 }

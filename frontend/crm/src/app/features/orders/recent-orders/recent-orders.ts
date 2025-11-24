@@ -15,6 +15,7 @@ import { AuthService } from '../../../shared/auth/auth';
 export class RecentOrdersComponent implements OnInit {
   Math = Math;
   isElevated = false; // admin/superadmin/orders viewer
+  isAgentRole = false; // agents get masked phones
   page = 1;
   pageSize = 10;
   total = 0;
@@ -31,7 +32,9 @@ export class RecentOrdersComponent implements OnInit {
   ngOnInit(): void {
     const user = this.auth.getUser();
     const role = (user?.role || '').toLowerCase();
-    this.isElevated = ['admin','superadmin','orders viewer','orders_viewer','ordersviewer'].includes(role);
+    // Elevated roles can search/filter by agent: admin, superadmin, manager, vieworder
+    this.isElevated = ['admin','superadmin','manager','vieworder'].includes(role);
+    this.isAgentRole = role === 'agent';
     this.load();
   }
 
@@ -56,4 +59,13 @@ export class RecentOrdersComponent implements OnInit {
   setPage(delta: number): void { const max = Math.max(1, Math.ceil(this.total / this.pageSize)); this.page = Math.min(Math.max(1, this.page + delta), max); this.load(); }
   changeSort(by: string): void { if (this.sortBy === by) this.sortOrder = this.sortOrder === 'ASC' ? 'DESC' : 'ASC'; else { this.sortBy = by; this.sortOrder = 'DESC'; } this.page = 1; this.load(); }
   onSearchInput(event: any): void { this.search = (event?.target?.value || '').trim(); this.page = 1; this.load(); }
+
+  displayPhone(phone: string | undefined | null): string {
+    const raw = (phone || '').replace(/[^0-9]/g, '');
+    if (!raw) return '';
+    if (!this.isAgentRole) return raw; // show full for non-agent roles
+    if (raw.length <= 4) return '****';
+    // Mask middle digits: keep first 2 and last 2
+    return `${raw.slice(0, 2)}${'*'.repeat(Math.max(0, raw.length - 4))}${raw.slice(-2)}`;
+  }
 }

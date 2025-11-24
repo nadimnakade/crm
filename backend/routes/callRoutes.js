@@ -18,6 +18,10 @@ router.get('/top-callers/weekly', protect, getTopCallersWeekly);
 
 // Recent order details (today)
 router.get('/orders/recent', protect, require('../controllers/callController').getRecentOrderDetails);
+// Recent order count (today) — lightweight
+router.get('/orders/recent/count', protect, require('../controllers/callController').getRecentOrderCount);
+// Followup report (today through next month)
+router.get('/orders/followups', protect, require('../controllers/callController').getFollowupReport);
 
 router.route('/:id')
   .get(protect, getCallById)

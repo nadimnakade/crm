@@ -1,0 +1,85 @@
+<div class="card glass-card h-100 shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Followup Report</h5>
+    <div>
+      <button class="btn btn-sm btn-outline-secondary" (click)="load()" [disabled]="loading">
+        <i class="fa-solid fa-rotate"></i> Refresh
+      </button>
+      <button class="btn btn-sm btn-primary ms-2" (click)="export()" [disabled]="exporting || loading">
+        <i class="fa-solid fa-file-export"></i> Export
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-end gap-2 mb-2">
+      <div>
+        <label class="form-label mb-0">From</label>
+        <input type="date" class="form-control" [(ngModel)]="fromDate" (change)="page=1; load()" [disabled]="loading" style="min-width: 160px;">
+      </div>
+      <div>
+        <label class="form-label mb-0">To</label>
+        <input type="date" class="form-control" [(ngModel)]="toDate" (change)="page=1; load()" [disabled]="loading" style="min-width: 160px;">
+      </div>
+      <div class="btn-group ms-2">
+        <button class="btn btn-sm btn-outline-secondary" (click)="setQuickRange('today')" [disabled]="loading">Today only</button>
+        <button class="btn btn-sm btn-outline-secondary" (click)="setQuickRange('7days')" [disabled]="loading">Next 7 days</button>
+        <button class="btn btn-sm btn-outline-secondary" (click)="setQuickRange('1month')" [disabled]="loading">Next 1 month</button>
+      </div>
+    </div>
+    <p class="text-muted">Managers see all agents; agents see their own. Adjust range with quick toggles.</p>
+    <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+    <div class="table-responsive" *ngIf="!loading">
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th (click)="setSort('followUpDate')">Followup Date</th>
+            <th>Order Id</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Agent</th>
+            <th (click)="setSort('createdAt')">Created On</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of data">
+            <td>{{ r.followUpDate | date:'yyyy-MM-dd HH:mm' }}</td>
+            <td>{{ r.orderId || r.orderDetails?.orderId }}</td>
+            <td>{{ (r.customer?.firstName || '') + ' ' + (r.customer?.lastName || '') }}</td>
+            <td>
+              <a [routerLink]="['/customers']"
+                 [queryParams]="{ mobile: r.customer?.phone || '' }"
+                 title="Open customer search by mobile">
+                {{ displayPhone(r.customer?.phone) }}
+              </a>
+            </td>
+            <td>{{ (r.agent?.firstName || '') + ' ' + (r.agent?.lastName || '') }}</td>
+            <td>{{ r.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+          </tr>
+          <tr *ngIf="data.length === 0">
+            <td colspan="6" class="text-center text-muted">No follow-up orders in the selected period.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <div>
+        <small>Total: {{ total }} | Page {{ page }} of {{ Math.max(1, Math.ceil(total / pageSize)) }}</small>
+      </div>
+      <div class="btn-toolbar" role="toolbar" aria-label="Pagination toolbar">
+        <div class="btn-group me-2" role="group" aria-label="Prev/Next">
+          <button class="btn btn-outline-secondary" (click)="setPage(-1)" [disabled]="page <= 1">Prev</button>
+          <button class="btn btn-outline-secondary" (click)="setPage(1)" [disabled]="page >= Math.max(1, Math.ceil(total / pageSize))">Next</button>
+        </div>
+        <div class="btn-group" role="group" aria-label="Pages">
+          <button *ngFor="let pn of pageNumbers"
+                  class="btn"
+                  [ngClass]="pn === page ? 'btn-primary' : 'btn-outline-secondary'"
+                  (click)="gotoPage(pn)">{{ pn }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

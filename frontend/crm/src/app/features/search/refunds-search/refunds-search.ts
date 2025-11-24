@@ -4,6 +4,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CallService } from '../../../shared/services/call';
 import { UserService } from '../../../shared/services/user';
+import { AuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-refunds-search',
@@ -21,6 +22,7 @@ export class RefundsSearchComponent implements OnInit {
   currentPage = 1;
   pageSize = 10;
   users: any[] = [];
+  isAgentRole = false;
   // Upload state
   selectedUploadFile: File | null = null;
   uploadInProgress = false;
@@ -33,7 +35,12 @@ export class RefundsSearchComponent implements OnInit {
     { value: 'refund-status', label: 'Refund Status' }
   ];
 
-  constructor(private fb: FormBuilder, private callService: CallService, private userService: UserService) {}
+  constructor(
+    private fb: FormBuilder,
+    private callService: CallService,
+    private userService: UserService,
+    private auth: AuthService
+  ) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -43,6 +50,8 @@ export class RefundsSearchComponent implements OnInit {
       agentId: ['']
     });
     this.loadUsers();
+    const role = (this.auth.getUser()?.role || '').toLowerCase();
+    this.isAgentRole = role === 'agent';
     this.search();
   }
 
@@ -165,6 +174,14 @@ export class RefundsSearchComponent implements OnInit {
   customerPhone(call: any): string {
     const c = call?.Customer || call?.customer;
     return c?.phone || '';
+  }
+
+  displayPhone(phone: string | undefined | null): string {
+    const raw = (phone || '').replace(/[^0-9]/g, '');
+    if (!raw) return '';
+    if (!this.isAgentRole) return raw;
+    if (raw.length <= 4) return '****';
+    return `${raw.slice(0, 2)}${'*'.repeat(Math.max(0, raw.length - 4))}${raw.slice(-2)}`;
   }
 
   private parseJSON(value: any): any {

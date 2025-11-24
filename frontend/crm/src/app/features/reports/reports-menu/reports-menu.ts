@@ -44,8 +44,10 @@ export class ReportsMenuComponent implements OnInit {
     const user = this.authService.getUser();
     const role = (user?.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'superadmin';
-    const isOrdersOnly = role === 'orders viewer' || role === 'orders_viewer' || role === 'ordersviewer';
-    if (!isAdmin && !isOrdersOnly) {
+    const isManager = role === 'manager';
+    const isOrdersOnly = role === 'vieworder';
+    // Allow access for admin, superadmin, manager, and vieworder
+    if (!isAdmin && !isManager && !isOrdersOnly) {
       this.router.navigate(['/dashboard']);
       return;
     }

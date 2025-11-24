@@ -139,11 +139,75 @@ END
   }
 };
 
+// Create helpful indexes for Calls to speed up followups and agent filters
+const ensureCallIndexes = async () => {
+  const sql = `
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_FollowUpDate' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_FollowUpDate ON dbo.Calls (followUpDate);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_AgentId' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_AgentId ON dbo.Calls (agentId);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_AgentId_FollowUpDate' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_AgentId_FollowUpDate ON dbo.Calls (agentId, followUpDate);
+END
+
+-- CreatedAt and HasOrder performance helpers for Recent Orders
+IF NOT EXISTS (
+  SELECT 1 FROM sys.columns WHERE Name = N'HasOrder' AND Object_ID = Object_ID(N'dbo.Calls')
+)
+BEGIN
+  ALTER TABLE dbo.Calls ADD HasOrder AS (
+    CASE WHEN orderDetails IS NOT NULL OR orderId IS NOT NULL THEN 1 ELSE 0 END
+  ) PERSISTED;
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_CreatedAt' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_CreatedAt ON dbo.Calls (createdAt);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_AgentId_CreatedAt' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_AgentId_CreatedAt ON dbo.Calls (agentId, createdAt);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_HasOrder_CreatedAt' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_HasOrder_CreatedAt ON dbo.Calls (HasOrder, createdAt);
+END
+`;
+  try {
+    await sequelize.query(sql);
+    console.log('Ensured Calls indexes exist');
+  } catch (e) {
+    console.error('Failed ensuring Calls indexes:', e);
+  }
+};
+
 const syncDatabase = async () => {
   try {
     await ensureCallColumns();
     await ensureSeedRoles();
     await ensureCustomerIndexes();
+    await ensureCallIndexes();
     await sequelize.sync();
     console.log('Model sync complete (schema aligned)');
   } catch (error) {

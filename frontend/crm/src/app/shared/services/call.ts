@@ -103,6 +103,32 @@ export class CallService {
     });
   }
 
+  // Recent orders count (today) — optimized count-only endpoint
+  getRecentOrderCount(agentId?: number): Observable<{ total: number }> {
+    const params: any = {};
+    if (agentId) params.agentId = String(agentId);
+    return this.http.get<{ total: number }>(`${this.apiUrl}/orders/recent/count`, {
+      headers: this.getHeaders(),
+      params
+    });
+  }
+
+  // Followup report: today through next month
+  getFollowupReport(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'ASC'|'DESC'; agentId?: number; from?: string; to?: string }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
+    const q: any = {};
+    if (params?.page) q.page = String(params.page);
+    if (params?.pageSize) q.pageSize = String(params.pageSize);
+    if (params?.sortBy) q.sortBy = params.sortBy;
+    if (params?.sortOrder) q.sortOrder = params.sortOrder;
+    if (params?.agentId) q.agentId = String(params.agentId);
+    if (params?.from) q.from = params.from;
+    if (params?.to) q.to = params.to;
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/orders/followups`, {
+      headers: this.getHeaders(),
+      params: q
+    });
+  }
+
   // Upload a general document attachment for a call
   uploadDocument(id: number | string, file: File): Observable<any> {
     const formData = new FormData();

@@ -31,7 +31,13 @@
             <td>{{ r.createdAt | date:'short' }}</td>
             <td>{{ r.agent?.firstName }} {{ r.agent?.lastName }}</td>
             <td>{{ r.customer?.firstName }} {{ r.customer?.lastName }}</td>
-            <td>{{ r.customer?.phone }}</td>
+            <td>
+              <a [routerLink]="['/customers']"
+                 [queryParams]="{ mobile: r.customer?.phone || '' }"
+                 title="Open customer search by mobile">
+                {{ displayPhone(r.customer?.phone) }}
+              </a>
+            </td>
             <td>{{ r.orderId || r.orderDetails?.orderId || '—' }}</td>
             <td>{{ r.orderDetails?.mrp || '—' }}</td>
             <td>{{ r.orderDetails?.pay || '—' }}</td>

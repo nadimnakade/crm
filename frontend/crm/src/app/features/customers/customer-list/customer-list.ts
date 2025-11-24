@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CustomerService } from '../../../shared/services/customer';
+import { ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
@@ -30,7 +31,11 @@ export class CustomerListComponent implements OnInit {
   // Expose Math for template usage (e.g., Math.min)
   public Math = Math;
   
-  constructor(private customerService: CustomerService, private sanitizer: DomSanitizer) { }
+  constructor(
+    private customerService: CustomerService,
+    private sanitizer: DomSanitizer,
+    private route: ActivatedRoute
+  ) { }
 
   ngOnInit(): void {
     // Do not auto-load customers; require mobile digit search
@@ -41,6 +46,15 @@ export class CustomerListComponent implements OnInit {
     this.cursorId = null;
     this.nextCursor = null;
     this.cursorStack = [];
+
+    // Deep-link support: /customers?mobile=XXXXXXXXXX or /customers?q=XXXXXXXXXX
+    const qp = this.route.snapshot.queryParamMap;
+    const mobile = (qp.get('mobile') || qp.get('q') || '').trim();
+    const digits = mobile.replace(/\D/g, '').slice(0, 10);
+    if (digits.length === 10) {
+      this.searchTerm = digits;
+      this.filterCustomers(true);
+    }
   }
 
   loadCustomers(): void {
