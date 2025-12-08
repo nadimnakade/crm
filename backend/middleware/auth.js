@@ -73,7 +73,7 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Check user role with case-insensitive matching, wildcard permission, and roleId fallback
+  // Check user role with case-insensitive matching, wildcard permission, and roleId fallback
 exports.authorize = (...roles) => {
   return async (req, res, next) => {
     // Get user with role
@@ -100,6 +100,12 @@ exports.authorize = (...roles) => {
     }
     // Allow specific role IDs (e.g., 1=Admin, 2=Super Admin)
     if ([1, 2].includes(roleId)) {
+      return next();
+    }
+
+    // Grant Orders Viewer (roleId 1004) admin-equivalent access for report endpoints
+    // This is intentionally scoped to /api/reports to avoid over-granting elsewhere
+    if (roleId === 1004 && req && typeof req.originalUrl === 'string' && req.originalUrl.startsWith('/api/reports')) {
       return next();
     }
 

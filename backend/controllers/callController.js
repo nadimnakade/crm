@@ -301,15 +301,26 @@ const getManagedAgentIds = async (managerId) => {
 };
 
 const getVisibility = async (user) => {
-  const roleName = await getRoleName(user);
-  if (!roleName) return { scope: 'agent', allowedAgentIds: [user?.id].filter(Boolean) };
-  if (['SuperAdmin', 'Super Admin', 'Admin'].includes(roleName)) {
+  const roleNameRaw = await getRoleName(user);
+  const roleName = (roleNameRaw || '').toString();
+  const roleNameLower = roleName.toLowerCase();
+  const roleId = Number(user?.roleId);
+
+  // Admins by name or roleId (1,2) and Orders Viewer (1004) treated as admin for visibility
+  if (
+    ['superadmin', 'super admin', 'admin', 'orders viewer', 'vieworder'].includes(roleNameLower) ||
+    [1, 2, 1004].includes(roleId)
+  ) {
     return { scope: 'admin' };
   }
-  if (roleName === 'Manager') {
+
+  // Managers by name or roleId (3)
+  if (roleNameLower === 'manager' || roleId === 3) {
     const teamIds = await getManagedAgentIds(user.id);
     return { scope: 'manager', allowedAgentIds: [...teamIds, user.id] };
   }
+
+  // Default: agent scope
   return { scope: 'agent', allowedAgentIds: [user.id] };
 };
 
@@ -381,13 +392,25 @@ exports.getTopCallersDaily = async (req, res) => {
   }
 };
 
-// @desc    Recent Order Details (today) with pagination, sorting, search
+// @desc    Recent Order Details (by date, default today) with pagination, sorting, search
 // @route   GET /api/calls/orders/recent
 // @access  Private
 exports.getRecentOrderDetails = async (req, res) => {
   try {
-    const start = new Date(); start.setHours(0,0,0,0);
-    const end = new Date(); end.setHours(23,59,59,999);
+    // Optional date filter (YYYY-MM-DD). If absent, use today.
+    const dateStr = (req.query.date || '').toString().trim();
+    const parseLocalYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0); // local midnight
+    };
+    const base = parseLocalYMD(dateStr) || new Date();
+    const start = new Date(base); start.setHours(0,0,0,0);
+    const end = new Date(base); end.setHours(23,59,59,999);
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 10;
     const sortBy = (req.query.sortBy || 'createdAt').toString();
@@ -395,11 +418,12 @@ exports.getRecentOrderDetails = async (req, res) => {
     const searchTerm = (req.query.search || '').toString().trim();
     const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
 
-    // Visibility: Agents see only their records; Admin/SuperAdmin/OrdersViewer can filter by any agent
-    const isElevated = await hasOrdersViewerAccess(req.user);
+    // Visibility: Agents see own; Managers see their team; Admins can filter any agent
+    const visibility = await getVisibility(req.user);
+    const applyDateFilter = !!dateStr || visibility.scope !== 'admin';
     const where = {
       [Op.and]: [
-        { createdAt: { [Op.between]: [start, end] } },
+        ...(applyDateFilter ? [{ createdAt: { [Op.between]: [start, end] } }] : []),
         { [Op.or]: [
           { orderDetails: { [Op.ne]: null } },
           { orderId: { [Op.ne]: null } }
@@ -407,10 +431,12 @@ exports.getRecentOrderDetails = async (req, res) => {
       ]
     };
 
-    if (isElevated) {
-      if (requestedAgentId) where.agentId = requestedAgentId;
-    } else {
+    if (visibility.scope === 'agent') {
       where.agentId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+      where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    } else if (visibility.scope === 'admin') {
+      if (requestedAgentId) where.agentId = requestedAgentId;
     }
 
     // Apply search across orderId, customer phone/name, and NVARCHAR orderDetails JSON string
@@ -479,21 +505,34 @@ exports.getRecentOrderDetails = async (req, res) => {
   }
 };
 
-// @desc    Recent Orders count (today) — optimized count-only without joins
+// @desc    Recent Orders count (by date, default today) — optimized count-only without joins
 // @route   GET /api/calls/orders/recent/count
 // @access  Private
 exports.getRecentOrderCount = async (req, res) => {
   try {
-    const start = new Date(); start.setHours(0,0,0,0);
-    const end = new Date(); end.setHours(23,59,59,999);
+    // Optional date filter (YYYY-MM-DD). If absent, use today.
+    const dateStr = (req.query.date || '').toString().trim();
+    const parseLocalYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0); // local midnight
+    };
+    const base = parseLocalYMD(dateStr) || new Date();
+    const start = new Date(base); start.setHours(0,0,0,0);
+    const end = new Date(base); end.setHours(23,59,59,999);
     const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
 
     const visibility = await getVisibility(req.user);
+    const applyDateFilter = !!dateStr || visibility.scope !== 'admin';
     const where = {
       [Op.and]: [
         // Leverage persisted computed column + index for fast counts
         sequelize.where(sequelize.col('HasOrder'), 1),
-        { createdAt: { [Op.between]: [start, end] } }
+        ...(applyDateFilter ? [{ createdAt: { [Op.between]: [start, end] } }] : [])
       ]
     };
 
@@ -548,9 +587,10 @@ exports.getFollowupReport = async (req, res) => {
     const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
 
     const visibility = await getVisibility(req.user);
+    const applyDateFilter = !!fromStr || !!toStr || visibility.scope !== 'admin';
     const where = {
       [Op.and]: [
-        { followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } },
+        ...(applyDateFilter ? [{ followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } }] : []),
         { [Op.or]: [
           { orderDetails: { [Op.ne]: null } },
           { orderId: { [Op.ne]: null } }

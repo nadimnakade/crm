@@ -18,10 +18,11 @@ const getManagedAgentIds = async (managerId) => {
 const getVisibility = async (user) => {
   const roleName = await getRoleName(user);
   if (!roleName) return { scope: 'agent', allowedAgentIds: [user?.id].filter(Boolean) };
-  if (['SuperAdmin', 'Super Admin', 'Admin'].includes(roleName)) {
+  const roleLower = roleName.toLowerCase();
+  if (['superadmin', 'super admin', 'admin', 'orders viewer', 'vieworder'].includes(roleLower)) {
     return { scope: 'admin' };
   }
-  if (roleName === 'Manager') {
+  if (roleLower === 'manager') {
     const teamIds = await getManagedAgentIds(user.id);
     // Include self in scope; managers may also be agents
     return { scope: 'manager', allowedAgentIds: [...teamIds, user.id] };

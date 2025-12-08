@@ -45,14 +45,14 @@ export class ReportsMenuComponent implements OnInit {
     const role = (user?.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'superadmin';
     const isManager = role === 'manager';
-    const isOrdersOnly = role === 'vieworder';
-    // Allow access for admin, superadmin, manager, and vieworder
-    if (!isAdmin && !isManager && !isOrdersOnly) {
+    const isOrdersViewer = role === 'orders viewer' || role === 'vieworder';
+    // Allow access for admin, superadmin, manager, and orders viewer
+    if (!isAdmin && !isManager && !isOrdersViewer) {
       this.router.navigate(['/dashboard']);
       return;
     }
-    // Hide interactions section for orders-only role via field
-    this.isOrdersOnly = isOrdersOnly;
+    // Orders Viewer should see all reports like admin; do not hide interactions
+    this.isOrdersOnly = false;
   }
 
   // Quick range helpers

@@ -1,8 +1,10 @@
 <div class="card glass-card h-100 shadow-sm">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <h5 class="mb-0">Recent Order Details (Today)</h5>
+    <h5 class="mb-0">Recent Order Details</h5>
     <div class="d-flex align-items-center gap-2">
       <input type="text" class="form-control" [value]="search" (input)="onSearchInput($event)" placeholder="Search by order id, name or mobile" style="max-width:300px;">
+      <label class="form-label mb-0">Date</label>
+      <input type="date" class="form-control form-control-sm" [value]="date" (change)="onDateChange($event)" style="width:150px;">
       <label class="form-label mb-0">Page size</label>
       <select class="form-select form-select-sm" [value]="pageSize" (change)="setPageSize($any($event.target).value)" style="width:90px;">
         <option [value]="10">10</option>
@@ -53,7 +55,7 @@
       </div>
     </div>
     <ng-template #empty>
-      <div class="text-muted">No orders captured today.</div>
+      <div class="text-muted">No orders captured for the selected date.</div>
     </ng-template>
   </div>
 </div>

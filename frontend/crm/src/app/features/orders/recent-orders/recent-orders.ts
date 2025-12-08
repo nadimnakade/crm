@@ -23,6 +23,7 @@ export class RecentOrdersComponent implements OnInit {
   sortOrder: 'ASC' | 'DESC' = 'DESC';
   search: string = '';
   agentId: number | null = null;
+  date: string = ''; // YYYY-MM-DD; empty means today
 
   rows: Array<any> = [];
   users: Array<any> = [];
@@ -42,6 +43,7 @@ export class RecentOrdersComponent implements OnInit {
     const params: any = { page: this.page, pageSize: this.pageSize, sortBy: this.sortBy, sortOrder: this.sortOrder };
     if (this.search) params.search = this.search;
     if (this.isElevated && this.agentId) params.agentId = this.agentId;
+    if (this.date) params.date = this.date; // filter by selected date
     this.calls.getRecentOrderDetails(params).subscribe({
       next: (res) => {
         this.rows = res.data || [];
@@ -59,6 +61,7 @@ export class RecentOrdersComponent implements OnInit {
   setPage(delta: number): void { const max = Math.max(1, Math.ceil(this.total / this.pageSize)); this.page = Math.min(Math.max(1, this.page + delta), max); this.load(); }
   changeSort(by: string): void { if (this.sortBy === by) this.sortOrder = this.sortOrder === 'ASC' ? 'DESC' : 'ASC'; else { this.sortBy = by; this.sortOrder = 'DESC'; } this.page = 1; this.load(); }
   onSearchInput(event: any): void { this.search = (event?.target?.value || '').trim(); this.page = 1; this.load(); }
+  onDateChange(event: any): void { this.date = (event?.target?.value || '').trim(); this.page = 1; this.load(); }
 
   displayPhone(phone: string | undefined | null): string {
     const raw = (phone || '').replace(/[^0-9]/g, '');

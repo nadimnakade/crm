@@ -88,8 +88,8 @@ export class CallService {
     });
   }
 
-  // Recent order details (today)
-  getRecentOrderDetails(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'ASC'|'DESC'; search?: string; agentId?: number }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
+  // Recent order details (by date, default today)
+  getRecentOrderDetails(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'ASC'|'DESC'; search?: string; agentId?: number; date?: string }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
     const q: any = {};
     if (params?.page) q.page = String(params.page);
     if (params?.pageSize) q.pageSize = String(params.pageSize);
@@ -97,16 +97,18 @@ export class CallService {
     if (params?.sortOrder) q.sortOrder = params.sortOrder;
     if (params?.search) q.search = params.search;
     if (params?.agentId) q.agentId = String(params.agentId);
+    if (params?.date) q.date = params.date;
     return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/orders/recent`, {
       headers: this.getHeaders(),
       params: q
     });
   }
 
-  // Recent orders count (today) — optimized count-only endpoint
-  getRecentOrderCount(agentId?: number): Observable<{ total: number }> {
+  // Recent orders count (by date, default today) — optimized count-only endpoint
+  getRecentOrderCount(agentId?: number, date?: string): Observable<{ total: number }> {
     const params: any = {};
     if (agentId) params.agentId = String(agentId);
+    if (date) params.date = date;
     return this.http.get<{ total: number }>(`${this.apiUrl}/orders/recent/count`, {
       headers: this.getHeaders(),
       params

@@ -51,9 +51,9 @@ export class FollowupReportComponent implements OnInit {
     this.isAgentRole = role === 'agent';
     const today = new Date();
     const todayStr = this.localISODate(today);
-    // Default for everyone: only today's data
-    this.fromDate = todayStr;
-    this.toDate = todayStr;
+    // Elevated roles: default to no date filter (show all)
+     this.fromDate = todayStr;
+      this.toDate = todayStr;
     this.load();
   }
 
