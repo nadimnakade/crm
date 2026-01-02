@@ -78,9 +78,23 @@ export class CustomerHistoryComponent implements OnInit {
   orderContextAgentName: string = '';
   orderContextCreatedAt: Date | null = null;
 
+  private formatDateTimeLocal(d: Date): string {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const y = d.getFullYear();
+    const m = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    return `${y}-${m}-${day}T${hh}:${mm}`;
+  }
+
   // Listing data captured via modals (UI-only for now)
   orderDetailsList: Array<{ customerName: string; customerMobileNo: string; mrp: string; pay: string; orderId: string; followupDate: string; alternate: 'Yes' | 'No'; agentName?: string; createdAt?: Date | string }> = [];
   refundDetailsList: Array<{ customerName: string; customerNumber: string; customerOrderId: string; medicineName: string; medicineQty: string; returnReason: string; accountHolderName: string; accountNumber: string; ifscCode: string; imageName?: string }> = [];
+
+  // Pending details captured during THIS interaction (do not reuse history entries)
+  private pendingOrderDetails: { customerName: string; customerMobileNo: string; mrp: string; pay: string; orderId: string; followupDate: string; alternate: 'Yes' | 'No' } | null = null;
+  private pendingRefundDetails: { customerName: string; customerNumber: string; customerOrderId: string; medicineName: string; medicineQty: string; returnReason: string; accountHolderName: string; accountNumber: string; ifscCode: string; imageName?: string } | null = null;
 
   // Expanded interaction details row state
   expandedId: number | null = null;
@@ -115,7 +129,8 @@ export class CustomerHistoryComponent implements OnInit {
       category: ['', Validators.required],
       subCategory: ['', Validators.required],
       orderId: [''],
-      date: [new Date().toISOString().slice(0, 16), Validators.required],
+      // Use local time for datetime-local input to avoid UTC offset issues
+      date: [this.formatDateTimeLocal(new Date()), Validators.required],
       notes: ['', [Validators.required, Validators.minLength(5)]]
     });
 
@@ -279,6 +294,19 @@ export class CustomerHistoryComponent implements OnInit {
       ifscCode: v.ifscCode,
       imageName: this.refundImageFile?.name
     });
+    // Mark as pending for this interaction only
+    this.pendingRefundDetails = {
+      customerName: v.customerName,
+      customerNumber: v.customerNumber,
+      customerOrderId: v.customerOrderId,
+      medicineName: v.medicineName,
+      medicineQty: v.medicineQty,
+      returnReason: v.returnReason,
+      accountHolderName: v.accountHolderName,
+      accountNumber: v.accountNumber,
+      ifscCode: v.ifscCode,
+      imageName: this.refundImageFile?.name
+    };
     this.showRefundModal = false;
     // Proceed with main submission
     this.submitHistory();
@@ -331,6 +359,16 @@ export class CustomerHistoryComponent implements OnInit {
       followupDate: v.followupDate,
       alternate: v.alternate
     });
+    // Mark as pending for this interaction only
+    this.pendingOrderDetails = {
+      customerName: v.customerName,
+      customerMobileNo: v.customerMobileNo,
+      mrp: v.mrp,
+      pay: v.pay,
+      orderId: v.orderId,
+      followupDate: v.followupDate,
+      alternate: v.alternate
+    };
     this.showOrderModal = false;
   }
 
@@ -439,9 +477,24 @@ export class CustomerHistoryComponent implements OnInit {
       return;
     }
     const { callType, category, subCategory, orderId, date, notes } = this.historyForm.value;
+    const parseLocalYMD = (s: any) => {
+      if (!s) return undefined as Date | undefined;
+      if (s instanceof Date) return s as Date;
+      const str = String(s);
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(str);
+      if (!m) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? undefined : d;
+      }
+      const y = Number(m[1]);
+      const mo = Number(m[2]) - 1;
+      const d = Number(m[3]);
+      return new Date(y, mo, d, 0, 0, 0, 0);
+    };
     // Prepare structured details for backend persistence (latest entries)
-    const lastOrder = this.orderDetailsList.length > 0 ? this.orderDetailsList[this.orderDetailsList.length - 1] : null;
-    const lastRefund = this.refundDetailsList.length > 0 ? this.refundDetailsList[this.refundDetailsList.length - 1] : null;
+    // Only submit details explicitly captured during THIS interaction
+    const lastOrder = this.pendingOrderDetails;
+    const lastRefund = this.pendingRefundDetails;
     const payload = {
       customerId: this.customerId,
       callType,
@@ -459,7 +512,11 @@ export class CustomerHistoryComponent implements OnInit {
         followupDate: lastOrder.followupDate,
         alternate: lastOrder.alternate
       } : undefined,
-      followUpDate: lastOrder && lastOrder.followupDate ? new Date(lastOrder.followupDate) : undefined,
+      followUpDate: lastOrder && lastOrder.followupDate
+        ? parseLocalYMD(lastOrder.followupDate)
+        : (this.isFollowupRequired
+            ? parseLocalYMD(String(date).slice(0, 10))
+            : undefined),
       refundDetails: lastRefund ? {
         customerName: lastRefund.customerName,
         customerNumber: lastRefund.customerNumber,
@@ -486,6 +543,9 @@ export class CustomerHistoryComponent implements OnInit {
         }
         Swal.fire({ icon: 'success', title: 'Logged', text: 'Interaction logged successfully.' });
         this.historyForm.reset();
+        // Clear pending details for next interaction
+        this.pendingOrderDetails = null;
+        this.pendingRefundDetails = null;
         this.loadHistory();
       },
       error: (err) => {

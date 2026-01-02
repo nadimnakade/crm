@@ -158,6 +158,21 @@ exports.createCall = async (req, res) => {
       followUpDate
     } = req.body;
 
+    // Sanitize empty orderDetails: treat empty object/array/string as NULL
+    let sanitizedOrderDetails = orderDetails;
+    try {
+      if (typeof sanitizedOrderDetails === 'string') {
+        const parsed = JSON.parse(sanitizedOrderDetails);
+        sanitizedOrderDetails = parsed;
+      }
+    } catch {}
+    if (sanitizedOrderDetails && typeof sanitizedOrderDetails === 'object') {
+      const keys = Array.isArray(sanitizedOrderDetails)
+        ? sanitizedOrderDetails.length
+        : Object.keys(sanitizedOrderDetails).length;
+      if (keys === 0) sanitizedOrderDetails = null;
+    }
+
     // Validate follow-up requirements
     const mustHaveFollowUpDate = requiresFollowUpDate(callType, category, outcome);
     if (mustHaveFollowUpDate && !followUpDate) {
@@ -177,7 +192,7 @@ exports.createCall = async (req, res) => {
       notes,
       outcome,
       orderId,
-      orderDetails,
+      orderDetails: sanitizedOrderDetails,
       refundDetails,
       followUpRequired: mustHaveFollowUpDate ? true : !!followUpRequired,
       followUpDate: followUpDate || null
@@ -231,6 +246,21 @@ exports.updateCall = async (req, res) => {
       });
     }
 
+    // Sanitize empty orderDetails on update
+    let sanitizedOrderDetails = orderDetails;
+    try {
+      if (typeof sanitizedOrderDetails === 'string') {
+        const parsed = JSON.parse(sanitizedOrderDetails);
+        sanitizedOrderDetails = parsed;
+      }
+    } catch {}
+    if (sanitizedOrderDetails && typeof sanitizedOrderDetails === 'object') {
+      const keys = Array.isArray(sanitizedOrderDetails)
+        ? sanitizedOrderDetails.length
+        : Object.keys(sanitizedOrderDetails).length;
+      if (keys === 0) sanitizedOrderDetails = null;
+    }
+
     // Update call fields
     if (customerId) call.customerId = customerId;
     if (agentId) call.agentId = agentId;
@@ -241,7 +271,7 @@ exports.updateCall = async (req, res) => {
     if (notes !== undefined) call.notes = notes;
     if (outcome) call.outcome = outcome;
     if (orderId !== undefined) call.orderId = orderId;
-    if (orderDetails !== undefined) call.orderDetails = orderDetails;
+    if (orderDetails !== undefined) call.orderDetails = sanitizedOrderDetails;
     if (refundDetails !== undefined) call.refundDetails = refundDetails;
     if (followUpRequired !== undefined) call.followUpRequired = mustHaveFollowUpDate ? true : !!followUpRequired;
     if (followUpDate !== undefined) call.followUpDate = followUpDate || null;
@@ -425,8 +455,13 @@ exports.getRecentOrderDetails = async (req, res) => {
       [Op.and]: [
         ...(applyDateFilter ? [{ createdAt: { [Op.between]: [start, end] } }] : []),
         { [Op.or]: [
-          { orderDetails: { [Op.ne]: null } },
-          { orderId: { [Op.ne]: null } }
+          // Allow any call that has non-empty structured orderDetails
+          sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2"),
+          // Allow orderId-only calls except FollowUp outcomes
+          { [Op.and]: [
+            { orderId: { [Op.ne]: null } },
+            { outcome: { [Op.notIn]: ['No', 'follow-up-scheduled'] } }
+          ] }
         ] }
       ]
     };
@@ -532,6 +567,14 @@ exports.getRecentOrderCount = async (req, res) => {
       [Op.and]: [
         // Leverage persisted computed column + index for fast counts
         sequelize.where(sequelize.col('HasOrder'), 1),
+        // Count only non-empty orderDetails or orderId-only excluding FollowUp outcomes
+        { [Op.or]: [
+          sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2"),
+          { [Op.and]: [
+            { orderId: { [Op.ne]: null } },
+            { outcome: { [Op.notIn]: ['No', 'follow-up-scheduled'] } }
+          ] }
+        ] },
         ...(applyDateFilter ? [{ createdAt: { [Op.between]: [start, end] } }] : [])
       ]
     };
@@ -588,13 +631,38 @@ exports.getFollowupReport = async (req, res) => {
 
     const visibility = await getVisibility(req.user);
     const applyDateFilter = !!fromStr || !!toStr || visibility.scope !== 'admin';
+    // Include any interaction that has a follow-up scheduled in range,
+    // regardless of whether an orderId or orderDetails exist.
+    // Date logic:
+    // - With orderId: filter by followUpDate within range
+    // - Without orderId: filter by createdAt within range
+    const dateFilterOrderId = applyDateFilter ? { followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } } : {};
+    const dateFilterNoOrderId = applyDateFilter ? { createdAt: { [Op.gte]: start, [Op.lt]: endExclusive } } : {};
+
+    // Strict scenarios allowed:
+    // 1) Inbound > New order related > follow-up-scheduled
+    // 2) Outbound > Sales Call > FollowUp (stored as outcome 'No')
+    const inboundFollowScheduled = [
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), 'inbound'),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('category')), { [Op.in]: ['new order related','new-order-related','new_order_related'] }),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('outcome')), 'follow-up-scheduled')
+    ];
+    const outboundSalesFollowup = [
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), 'outbound'),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('category')), { [Op.in]: ['sales-call','sales call','sales_call'] }),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('outcome')), 'no')
+    ];
+
     const where = {
       [Op.and]: [
-        ...(applyDateFilter ? [{ followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } }] : []),
-        { [Op.or]: [
-          { orderDetails: { [Op.ne]: null } },
-          { orderId: { [Op.ne]: null } }
-        ] }
+        {
+          [Op.or]: [
+            // With order id: use followUpDate range and match ONLY inbound scheduled scenario
+            { [Op.and]: [ { orderId: { [Op.ne]: null } }, dateFilterOrderId, ...inboundFollowScheduled ] },
+            // Without order id: use createdAt range and match ONLY outbound followup scenario
+            { [Op.and]: [ { orderId: { [Op.eq]: null } }, dateFilterNoOrderId, ...outboundSalesFollowup ] }
+          ]
+        }
       ]
     };
 
