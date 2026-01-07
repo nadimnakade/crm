@@ -1,4 +1,4 @@
-import { Component, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,7 +6,9 @@ import { AuthService } from '../../shared/auth/auth';
 import { CallService } from '../../shared/services/call';
 import { PortfolioService } from '../../shared/services/portfolio';
 import { CustomerMedicineDetailService } from '../../shared/services/customer-medicine-detail';
+import { ReportService } from '../../core/services/report.service';
 import { Chart, registerables } from 'chart.js';
+import { Title } from '@angular/platform-browser';
 
 // Register all Chart.js components
 Chart.register(...registerables);
@@ -18,7 +20,7 @@ Chart.register(...registerables);
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss']
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   Math = Math;
   @ViewChild('callsByAgentChart') callsByAgentChart!: ElementRef;
   @ViewChild('callTypeChart') callTypeChart!: ElementRef;
@@ -34,6 +36,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   recentCalls: any[] = [];
   topCallersDaily: any[] = [];
   topCallersWeekly: any[] = [];
+  
+  // Due Follow-ups
+  dueFollowUps: any[] = [];
+
+  // New Report Data
+  topAgentsByOrder: any[] = [];
+  activeUserReport: any[] = [];
+
   // Customer Medicine Details recent list
   cmdItems: any[] = [];
   cmdSearch: string = '';
@@ -62,6 +72,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   agentChart!: Chart;
   typeChart!: Chart;
   weeklySalesChart!: Chart;
+  private refreshInterval: any;
 
   // Orders today count
   ordersTodayCount: number = 0;
@@ -70,7 +81,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private authService: AuthService,
     private callService: CallService,
     private portfolioService: PortfolioService,
-    private cmdService: CustomerMedicineDetailService
+    private cmdService: CustomerMedicineDetailService,
+    private reportService: ReportService
   ) { }
 
   ngOnInit(): void {
@@ -89,221 +101,230 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const user = this.authService.getUser();
     if (user) {
       this.userEmail = user.email || 'user@example.com';
-      this.isAdmin = user.role === 'admin'; // Admin role
-      this.isSuperAdmin = user.role === 'superadmin'; // SuperAdmin role
+      this.userName = user.firstName ? `${user.firstName} ${user.lastName || ''}` : 'User';
+      this.isAdmin = user.role === 'Admin' || user.role === 'admin';
+      this.isSuperAdmin = user.role === 'Super Admin' || user.role === 'superadmin';
     }
-    
-    // Mock data for demonstration
-    this.totalCustomers = 150;
-    this.activeUsers = 20;
-    
-    // Today's calls data with additional fields for modern UI
-    this.todaysCalls = [
-      { 
-        id: '001',
-        customerName: 'Acme Corp',
-        timestamp: new Date(),
-        agentName: 'Sarah Smith',
-        notes: 'Discussed new product requirements',
-        type: 'outbound',
-        callCount: 8,
-        amount: 54.00,
-        status: 'shipped'
-      },
-      { 
-        id: '002',
-        customerName: 'Adam.com',
-        timestamp: new Date(),
-        agentName: 'Mike Johnson',
-        notes: 'Follow-up on previous inquiry',
-        type: 'outbound',
-        callCount: 5,
-        amount: 88.00,
-        status: 'delivered'
-      },
-      { 
-        id: '003',
-        customerName: 'Charles Tao',
-        timestamp: new Date(),
-        agentName: 'John Manager',
-        notes: 'Customer support call',
-        type: 'inbound',
-        callCount: 4,
-        amount: 4.00,
-        status: 'paid'
-      }
-    ];
 
-    // Load dashboard data
+    // Mock stats
+    this.totalCustomers = 1250;
+    this.activeUsers = 42;
+    this.todaysCalls = [];
+    
     this.loadDashboardData();
+    this.loadCmdUnique(); // Load Customer Medicine Detail unique list
+    this.loadDueFollowUps();
   }
-  
+
+  loadDueFollowUps(): void {
+    // Admins can see all due follow-ups if they want, but usually notification is for the user.
+    // However, if the API supports an 'all' flag for admins, we can pass it if we want to show global due items.
+    // For now, let's just show what the API returns (agent's own or filtered).
+    // The API we implemented expects `all=true` for admin to see everyone's.
+    // Let's assume on dashboard we show "My Due Follow-ups" primarily.
+    // If admin wants to see all, we might need a toggle or just default to all.
+    // Let's pass true for admins so they can oversee pending work.
+    const showAll = this.isAdmin || this.isSuperAdmin;
+    this.callService.getDueFollowUps(showAll).subscribe({
+      next: (data: any[]) => {
+        this.dueFollowUps = data;
+      },
+      error: (err: any) => console.error('Error loading due follow-ups', err)
+    });
+  }
+
   ngAfterViewInit(): void {
-    // setTimeout(() => {
-    //   this.initCallsByAgentChart();
-    //   this.initCallTypeChart();
-    //   this.initWeeklySalesChart();
-    // }, 100);
+    setTimeout(() => {
+      this.loadWeeklyOrdersChart();
+      this.loadCallOutcomesChart();
+      // this.initWeeklySalesChart();
+    }, 100);
+
+    // Real-time updates: poll every 30 seconds
+    this.refreshInterval = setInterval(() => {
+      this.loadDashboardData();
+      this.loadWeeklyOrdersChart();
+      this.loadCallOutcomesChart();
+      this.loadDueFollowUps();
+    }, 300000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+    if (this.agentChart) {
+      this.agentChart.destroy();
+    }
+    if (this.typeChart) {
+      this.typeChart.destroy();
+    }
   }
 
   private loadDashboardData(): void {
-    // Recent calls (role-based on backend)
-    // this.callService.getRecentCalls(10).subscribe({
-    //   next: (calls) => this.recentCalls = calls || [],
-    //   error: () => this.recentCalls = []
-    // });
-
     // Orders count (today)
     this.loadOrdersTodayCount();
-
-    // Daily top callers
-    // const today = new Date();
-    // const dateStr = today.toISOString();
-    // this.callService.getTopCallersDaily(dateStr, 10).subscribe({
-    //   next: (rows) => this.topCallersDaily = rows || [],
-    //   error: () => this.topCallersDaily = []
-    // });
-
-    // Weekly top callers (last 7 days)
-    // const end = new Date();
-    // const start = new Date(end);
-    // start.setDate(end.getDate() - 6);
-    // const startStr = start.toISOString();
-    // const endStr = end.toISOString();
-    // this.callService.getTopCallersWeekly(startStr, endStr, 10).subscribe({
-    //   next: (rows) => this.topCallersWeekly = rows || [],
-    //   error: () => this.topCallersWeekly = []
-    // });
-
-    // Default portfolio list (unique by mobile)
-    // this.portfolioService.list({ unique: true, page: 1, pageSize: 10 }).subscribe({
-    //   next: (res) => {
-    //     this.portfolioItems = res.items || [];
-    //     this.portfolioTotal = res.total || this.portfolioItems.length;
-    //   },
-    //   error: () => {
-    //     this.portfolioItems = [];
-    //     this.portfolioTotal = 0;
-    //   }
-    // });
-
-    // Customer Medicine Details - don't load by default, only on search
-    // this.loadCmdUnique();
+    // New Reports
+    this.loadTopAgentsByOrder();
+    this.loadActiveUserReport();
   }
-  
-  initCallsByAgentChart(): void {
-    if (!this.callsByAgentChart) return;
-    
-    // Modern line chart for sales data
-    const ctx = this.callsByAgentChart.nativeElement.getContext('2d');
-    
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(111, 66, 193, 0.7)');
-    gradient.addColorStop(1, 'rgba(111, 66, 193, 0.1)');
-    
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const data = [65, 59, 80, 81, 56, 55, 72, 60, 67, 80, 90, 100];
-    
-    this.agentChart = new Chart(this.callsByAgentChart.nativeElement, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Sales',
-            data: data,
-            borderColor: '#6F42C1',
-            backgroundColor: gradient,
-            tension: 0.4,
-            fill: true,
-            pointBackgroundColor: '#6F42C1',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          },
-          {
-            label: 'Projected',
-            data: [60, 55, 70, 75, 50, 50, 65, 55, 60, 70, 75, 85],
-            borderColor: 'rgba(76, 201, 240, 0.7)',
-            borderDash: [5, 5],
-            borderWidth: 2,
-            tension: 0.4,
-            fill: false,
-            pointRadius: 0
-          }
-        ]
+
+  loadTopAgentsByOrder() {
+    this.reportService.getTopAgents().subscribe({
+      next: (data) => {
+        this.topAgentsByOrder = data;
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(255, 255, 255, 0.05)'
-            },
-            ticks: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
-          },
-          x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
-          }
-        }
-      }
+      error: (err) => console.error('Failed to load top agents by order', err)
     });
   }
-  
-  initCallTypeChart(): void {
-    if (!this.callTypeChart) return;
-    
-    // Modern pie chart for distribution
-    this.typeChart = new Chart(this.callTypeChart.nativeElement, {
-      type: 'doughnut',
-      data: {
-        labels: ['Facebook', 'Youtube', 'Instagram', 'Website'],
-        datasets: [{
-          data: [30, 25, 20, 25],
-          backgroundColor: [
-            '#4267B2', // Facebook blue
-            '#FF0000', // YouTube red
-            '#C13584', // Instagram purple
-            '#00C9A7'  // Website teal
-          ],
-          borderWidth: 0,
-          hoverOffset: 4
-        }]
+
+  loadActiveUserReport() {
+    this.reportService.getActiveUsers().subscribe({
+      next: (data) => {
+        this.activeUserReport = data;
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '70%',
-        plugins: {
-          legend: {
-            display: false
-          }
-        }
-      }
+      error: (err) => console.error('Failed to load active user report', err)
     });
   }
-  
+
   private loadOrdersTodayCount(): void {
-    // Use lightweight count-only endpoint to avoid heavy join/count
     this.callService.getRecentOrderCount().subscribe({
       next: (res) => { this.ordersTodayCount = Number(res?.total || 0); },
       error: () => { this.ordersTodayCount = 0; }
+    });
+  }
+
+  loadWeeklyOrdersChart() {
+    this.reportService.getWeeklyOrderStats().subscribe({
+      next: (data) => {
+        if (!this.callsByAgentChart) return;
+
+        const labels = data.map(d => d.date);
+        const counts = data.map(d => d.count);
+
+        if (this.agentChart) {
+          this.agentChart.data.labels = labels;
+          this.agentChart.data.datasets[0].data = counts;
+          this.agentChart.update();
+          return;
+        }
+
+        const ctx = this.callsByAgentChart.nativeElement.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(111, 66, 193, 0.7)');
+        gradient.addColorStop(1, 'rgba(111, 66, 193, 0.1)');
+
+        this.agentChart = new Chart(this.callsByAgentChart.nativeElement, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Orders',
+                data: counts,
+                borderColor: '#6F42C1',
+                backgroundColor: gradient,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#6F42C1',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              title: {
+                display: true,
+                text: 'Weekly Orders Trend'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                }
+              }
+            }
+          }
+        });
+      },
+      error: (err) => console.error('Failed to load weekly orders chart', err)
+    });
+  }
+
+  loadCallOutcomesChart() {
+    this.reportService.getCallOutcomeStats().subscribe({
+      next: (data) => {
+        if (!this.callTypeChart) return;
+
+        const labels = data.map(d => d.outcome || 'No Outcome');
+        const counts = data.map(d => d.count);
+        // Generate colors dynamically or use a preset
+        const colors = [
+          '#4267B2', '#FF0000', '#C13584', '#00C9A7', '#FFC107', '#28A745', '#17A2B8', '#6610F2'
+        ];
+
+        if (this.typeChart) {
+          this.typeChart.data.labels = labels;
+          this.typeChart.data.datasets[0].data = counts;
+          this.typeChart.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
+          this.typeChart.update();
+          return;
+        }
+
+        this.typeChart = new Chart(this.callTypeChart.nativeElement, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: counts,
+              backgroundColor: colors.slice(0, labels.length),
+              borderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+              legend: {
+                display: true,
+                position: 'right',
+                labels: {
+                  color: '#fff'
+                }
+              },
+              title: {
+                display: true,
+                text: "Today's Call Outcomes",
+                color: '#fff'
+              }
+            }
+          }
+        });
+      },
+      error: (err) => console.error('Failed to load call outcomes chart', err)
     });
   }
 

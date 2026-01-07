@@ -66,4 +66,29 @@ export class ReportService {
       responseType: 'blob'
     });
   }
+
+  getFollowupReportExportUrl(from?: string, to?: string, agentId?: number): string {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    if (agentId) params = params.set('agentId', agentId.toString());
+
+    return `${this.apiUrl}/followups/export?${params.toString()}`;
+  }
+
+  getTopAgents(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/top-agents`);
+  }
+
+  getActiveUsers(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/active-users`);
+  }
+
+  getWeeklyOrderStats(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/weekly-orders`);
+  }
+
+  getCallOutcomeStats(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/call-outcomes`);
+  }
 }

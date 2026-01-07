@@ -50,22 +50,25 @@ IF COL_LENGTH('dbo.Calls', 'orderDetails') IS NULL
 
 IF COL_LENGTH('dbo.Calls', 'refundDetails') IS NULL
   ALTER TABLE dbo.Calls ADD refundDetails NVARCHAR(MAX) NULL;
-
-IF COL_LENGTH('dbo.Calls', 'followUpRequired') IS NULL
-BEGIN
-  ALTER TABLE dbo.Calls ADD followUpRequired BIT NULL;
-  UPDATE dbo.Calls SET followUpRequired = 0 WHERE followUpRequired IS NULL;
-  ALTER TABLE dbo.Calls ALTER COLUMN followUpRequired BIT NOT NULL;
-END
-
-IF COL_LENGTH('dbo.Calls', 'followUpDate') IS NULL
-  ALTER TABLE dbo.Calls ADD followUpDate DATETIME NULL;
 `;
   try {
     await sequelize.query(sql);
     console.log('Ensured Calls columns exist');
   } catch (e) {
     console.error('Failed ensuring Calls columns:', e);
+  }
+};
+
+const ensureUserColumns = async () => {
+  const sql = `
+IF COL_LENGTH('dbo.Users', 'lastLogin') IS NULL
+  ALTER TABLE dbo.Users ADD lastLogin DATETIME2 NULL;
+`;
+  try {
+    await sequelize.query(sql);
+    console.log('Ensured Users columns exist');
+  } catch (e) {
+    console.error('Failed ensuring Users columns:', e);
   }
 };
 
@@ -205,6 +208,7 @@ END
 const syncDatabase = async () => {
   try {
     await ensureCallColumns();
+    await ensureUserColumns();
     await ensureSeedRoles();
     await ensureCustomerIndexes();
     await ensureCallIndexes();
@@ -226,4 +230,4 @@ module.exports = {
   Session,
   sequelize,
   syncDatabase
-};
+};

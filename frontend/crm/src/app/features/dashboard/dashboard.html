@@ -53,6 +53,28 @@
         <h2>Hello, {{userName.split(' ')[0]}}</h2>
       </div>
 
+      <!-- Follow-up Notifications -->
+      <div class="container-fluid px-0 mb-3" *ngIf="dueFollowUps.length > 0">
+        <div class="alert alert-warning shadow-sm border-0 d-flex align-items-center" role="alert">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-circle-fill flex-shrink-0 me-3" viewBox="0 0 16 16">
+            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0 .9.995h.2a.905.905 0 0 0 .9-.995V3.995a.905.905 0 0 0-.9-.995h-.2a.905.905 0 0 0-.9.995V4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+          </svg>
+          <div class="flex-grow-1">
+            <h5 class="alert-heading mb-1">Due Follow-ups</h5>
+            <div *ngFor="let follow of dueFollowUps.slice(0, 3)" class="mb-1">
+              <strong>{{follow.Customer?.name || 'Customer'}}</strong> ({{follow.Customer?.mobile}}) - {{follow.followUpDate | date:'medium'}}
+              <span class="badge bg-secondary ms-2">{{follow.outcome}}</span>
+            </div>
+            <div *ngIf="dueFollowUps.length > 3">
+              <small>+{{dueFollowUps.length - 3}} more pending...</small>
+            </div>
+          </div>
+          <div>
+            <a routerLink="/analytics" class="btn btn-sm btn-outline-dark">View All</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Full-width Customer Medicine Detail unique list with search/pagination -->
       <div class="container-fluid px-0 mb-3">
         <div class="row g-3 align-items-stretch">
@@ -116,6 +138,78 @@
                 </ng-template>
               </div>
             </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 10 Daily Agents Report -->
+      <div class="container-fluid px-0 mb-3">
+        <div class="row g-3">
+          <div class="col-lg-12">
+            <div class="card glass-card h-100 shadow-sm">
+              <div class="card-header">
+                <h5 class="mb-0">Top 10 Daily Agents (By Orders)</h5>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover align-middle mb-0" [ngClass]="{'table-dark': isDarkTheme}">
+                    <thead [ngClass]="isDarkTheme ? 'table-dark' : 'table-light'">
+                      <tr>
+                        <th scope="col">Rank</th>
+                        <th scope="col">Agent Name</th>
+                        <th scope="col">Orders Today</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let agent of topAgentsByOrder; let i = index">
+                        <td><span class="badge rounded-pill bg-warning text-dark">{{i + 1}}</span></td>
+                        <td>{{agent.agentName}}</td>
+                        <td>{{agent.orderCount}}</td>
+                      </tr>
+                      <tr *ngIf="topAgentsByOrder.length === 0">
+                        <td colspan="3" class="text-center p-3 text-muted">No orders found for today.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active User Report -->
+      <div class="container-fluid px-0 mb-3" *ngIf="isAdmin || isSuperAdmin">
+        <div class="row g-3">
+          <div class="col-lg-12">
+            <div class="card glass-card h-100 shadow-sm">
+              <div class="card-header">
+                <h5 class="mb-0">Active User Report</h5>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover align-middle mb-0" [ngClass]="{'table-dark': isDarkTheme}">
+                    <thead [ngClass]="isDarkTheme ? 'table-dark' : 'table-light'">
+                      <tr>
+                        <th scope="col">User Name</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Last Login</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let user of activeUserReport">
+                        <td>{{user.firstName}} {{user.lastName}}</td>
+                        <td><span class="badge bg-info text-dark">{{user.role}}</span></td>
+                        <td>{{user.lastLogin | date:'medium'}}</td>
+                      </tr>
+                      <tr *ngIf="activeUserReport.length === 0">
+                        <td colspan="3" class="text-center p-3 text-muted">No active users found.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

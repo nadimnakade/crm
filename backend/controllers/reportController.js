@@ -1,6 +1,6 @@
 const xlsx = require('xlsx');
-const { sequelize } = require('../models');
-const { QueryTypes } = require('sequelize');
+const { sequelize, Call, User, Role } = require('../models');
+const { QueryTypes, Op } = require('sequelize');
 // IST helpers and formatting
 const IST_OFFSET_MINUTES = 5 * 60 + 30; // +05:30
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -341,3 +341,146 @@ exports.exportFollowups = async (req, res) => {
   }
 };
 
+
+// @desc    Get Top 10 Daily Agents by Orders
+// @route   GET /api/reports/top-agents
+// @access  Private
+exports.getTopAgents = async (req, res) => {
+  try {
+    const today = istTodayDateStr();
+    const { start, endExclusive } = getISTRange(today, today);
+
+    const results = await Call.findAll({
+      attributes: [
+        'agentId',
+        [sequelize.fn('COUNT', sequelize.col('orderId')), 'orderCount']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: start,
+          [Op.lt]: endExclusive
+        },
+        orderId: {
+          [Op.ne]: null
+        }
+      },
+      include: [{
+        model: User,
+        as: 'agent',
+        attributes: ['firstName', 'lastName']
+      }],
+      group: ['agentId', 'agent.id', 'agent.firstName', 'agent.lastName'],
+      order: [[sequelize.literal('orderCount'), 'DESC']],
+      limit: 10
+    });
+
+    const formattedResults = results.map(r => ({
+      agentName: r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : 'Unknown',
+      orderCount: r.dataValues.orderCount
+    }));
+
+    res.json(formattedResults);
+  } catch (error) {
+    console.error('Error in getTopAgents:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get Active User Report (Last Login)
+// @route   GET /api/reports/active-users
+// @access  Private
+exports.getActiveUsers = async (req, res) => {
+  try {
+    // Admin sees all (currently implemented for all roles as requested "Hierarchy wise admin wil see all", assuming other roles might be restricted later but for now open)
+    // If restriction is needed, check req.user.role
+    
+    const users = await User.findAll({
+      attributes: ['id', 'firstName', 'lastName', 'lastLogin'],
+      include: [{
+        model: Role,
+        attributes: ['name']
+      }],
+      where: {
+        isActive: true
+      },
+      order: [['lastLogin', 'DESC']]
+    });
+    
+    const formattedUsers = users.map(u => ({
+      firstName: u.firstName,
+      lastName: u.lastName,
+      role: u.Role ? u.Role.name : 'Unknown',
+      lastLogin: u.lastLogin
+    }));
+    
+    // Format dates for response if needed, but frontend can handle ISO strings
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error in getActiveUsers:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get Weekly Order Stats (Last 7 Days)
+// @route   GET /api/reports/weekly-orders
+// @access  Private
+exports.getWeeklyOrderStats = async (req, res) => {
+  try {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6); // Last 7 days including today
+    start.setHours(0, 0, 0, 0);
+
+    const results = await Call.findAll({
+      attributes: [
+        [sequelize.literal("CAST(createdAt AS DATE)"), 'date'],
+        [sequelize.fn('COUNT', sequelize.col('orderId')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: start
+        },
+        orderId: {
+          [Op.ne]: null
+        }
+      },
+      group: [sequelize.literal("CAST(createdAt AS DATE)")],
+      order: [[sequelize.literal("CAST(createdAt AS DATE)"), 'ASC']]
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error in getWeeklyOrderStats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get Call Outcome Stats (Today)
+// @route   GET /api/reports/call-outcomes
+// @access  Private
+exports.getCallOutcomeStats = async (req, res) => {
+  try {
+    const today = istTodayDateStr();
+    const { start, endExclusive } = getISTRange(today, today);
+
+    const results = await Call.findAll({
+      attributes: [
+        'outcome',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: start,
+          [Op.lt]: endExclusive
+        }
+      },
+      group: ['outcome'],
+      order: [[sequelize.literal('count'), 'DESC']]
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error in getCallOutcomeStats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

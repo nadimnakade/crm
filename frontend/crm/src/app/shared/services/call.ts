@@ -98,10 +98,11 @@ export class CallService {
     if (params?.search) q.search = params.search;
     if (params?.agentId) q.agentId = String(params.agentId);
     if (params?.date) q.date = params.date;
-    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/orders/recent`, {
-      headers: this.getHeaders(),
-      params: q
-    });
+    
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(
+      `${this.apiUrl}/orders/recent`,
+      { headers: this.getHeaders(), params: q }
+    );
   }
 
   // Recent orders count (by date, default today) — optimized count-only endpoint
@@ -131,12 +132,37 @@ export class CallService {
     });
   }
 
+  // Get due follow-ups
+  getDueFollowUps(all: boolean = false): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due`, {
+      headers: this.getHeaders(),
+      params: { all: String(all) }
+    });
+  }
+
+  // Upload medicine list
+  uploadMedicineList(id: number | string, file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('medicineList', file);
+    return this.http.post(`${this.apiUrl}/${id}/upload/medicine`, formData, {
+      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
+    });
+  }
+
+  // Upload prescription
+  uploadPrescription(id: number | string, file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('prescription', file);
+    return this.http.post(`${this.apiUrl}/${id}/upload/prescription`, formData, {
+      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
+    });
+  }
+
   // Upload a general document attachment for a call
   uploadDocument(id: number | string, file: File): Observable<any> {
     const formData = new FormData();
     formData.append('document', file);
     return this.http.post(`${this.apiUrl}/${id}/upload/document`, formData, {
-      // Authorization header is added by interceptor; do not set Content-Type for FormData
       headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
     });
   }

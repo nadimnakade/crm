@@ -23,6 +23,9 @@ router.get('/orders/recent/count', protect, require('../controllers/callControll
 // Followup report (today through next month)
 router.get('/orders/followups', protect, require('../controllers/callController').getFollowupReport);
 
+// Due follow-ups
+router.get('/follow-ups/due', protect, require('../controllers/callController').getDueFollowUps);
+
 router.route('/:id')
   .get(protect, getCallById)
   .put(protect, authorize('Admin', 'Super Admin', 'admin'), updateCall)
@@ -95,3 +98,4 @@ router.post('/:id/upload/document', protect, upload.single('document'), (req, re
 });
 
 module.exports = router;
+

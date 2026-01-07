@@ -905,3 +905,41 @@ exports.getCallHistorySource = async (req, res) => {
     res.status(500).json({ message: error.message || 'Server error' });
   }
 };
+
+// @desc    Get due follow-ups for the logged-in agent (or all for admin)
+// @route   GET /api/calls/follow-ups/due
+// @access  Private
+exports.getDueFollowUps = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Check if user is requesting all follow-ups (admin only)
+    const { all } = req.query;
+    let whereClause = {
+      followUpRequired: true,
+      followUpDate: {
+        [Op.lte]: new Date() // Due by now or in past
+      }
+    };
+
+    const isAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin' || req.user.role === 'admin';
+    if (!all || !isAdmin) {
+      whereClause.agentId = userId;
+    }
+
+    const followUps = await Call.findAll({
+      where: whereClause,
+      include: [
+        { model: Customer, attributes: ['name', 'mobile'] },
+        { model: User, as: 'agent', attributes: ['firstName', 'lastName', 'email'] }
+      ],
+      order: [['followUpDate', 'ASC']],
+      limit: 20
+    });
+
+    res.json(followUps);
+  } catch (error) {
+    console.error('Error fetching due follow-ups:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

@@ -70,6 +70,10 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Update lastLogin
+    user.lastLogin = new Date();
+    await user.save();
+
     // Invalidate all existing sessions for this user (concurrent session control)
     await Session.update(
       { isActive: false },

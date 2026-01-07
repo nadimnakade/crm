@@ -66,4 +66,9 @@ export class CallService {
   getCallHistory(id: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/${id}/history`);
   }
+
+  // Get due follow-ups
+  getDueFollowUps(all: boolean = false): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due?all=${all}`);
+  }
 }
