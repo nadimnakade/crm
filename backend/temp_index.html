@@ -1,0 +1,402 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+
+
+  <title>Ishealthy - Largest Disease Management Company</title>
+
+  <meta charset="UTF-8">
+  <meta name="description" content="Snehsakha">
+  <meta name="keywords" content="Snehsakha">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css"
+    integrity="sha512-SzlrxWUlpfuzQ+pcUCosxcglQRNAq/DZjVsC0lE40xsADsfeQoEypE+enwcOiGjk/bSuGGKHEyjSoQ1zVisanQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+  <link href="css/style.css" rel="stylesheet" type="text/css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@200;400&display=swap" rel="stylesheet">
+  <link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon">
+
+  <style type="text/css">
+    .nav-item {
+      font-weight: 600 !important;
+      font-family: 'Rubik', sans-serif;
+    }
+
+    .nav-link {
+      height: 100%;
+      align-content: center;
+    }
+
+    .sub-nav-item {
+      font-size: 14px;
+      color: #647589;
+    }
+
+    .banner-text {
+      font-family: 'Roboto Slab', serif;
+    }
+    .banner h1 {
+      font-size: 4rem;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #10a3d5 0%, #87c870 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      text-transform: uppercase;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(16, 163, 213, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .user-avatar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(16, 163, 213, 0.4);
+    }
+
+    .dropdown-menu {
+      border: none;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+      border-radius: 0.5rem;
+    }
+
+    .dropdown-item:hover {
+      background-color: #f8f9fa;
+    }
+  </style>
+
+  
+
+  </head>
+<body>
+  <div class="page">
+  <header>
+    <div class="top-bar">
+      <div class="container">
+        <div class="row">
+          <div class="col">
+            <div class="header-strip">
+              <span><i class="fa-solid fa-phone-flip"></i> +91 9987878782</span>
+              <span><i class="fa-solid fa-envelope"></i> care@ishealthy.in</span>
+              <span><i class="fa-regular fa-clock"></i> Operational 365 days: 9.00am - 11.00pm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <nav id="navbar_top" class="navbar navbar-expand-lg">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <img src="images/Is-logo.png" alt="ishealthy">
+        </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"  aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"><i class="fa-solid fa-bars"></i></span>
+      </button>
+      <div class="collapse navbar-collapse" id="main_nav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"> <a class="nav-link active" href="/about">About</a> </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Serives</a>
+            <!-- Dropdown -->
+            <ul class="dropdown-menu">
+              <li class="nav-item sub-nav-item"><a class="dropdown-item" href="/medicines"><b>Medicines</b> </a></li>
+              <!-- Dropdown Megasubmenu -->
+              <li class="sub-nav-item">
+                <a class="dropdown-item" href="/pathology"><b>Pathology +</b></a>
+                <div class="submenu dropdown-menu mega-submenu p-3 nav-item sub-nav-item">
+                  <span><a href="/tata-1mg">Service Silver Package</a></span>
+                </div>
+              </li>
+              <li class="nav-item sub-nav-item"><a class="dropdown-item" href="#"><b>Doctor Consultant </b></a></li>
+              <li class="nav-item sub-nav-item"><a class="dropdown-item" href="#"><b>Insurance </b></a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/customer-support">Customer Support </a>
+          </li>
+                      <li class="nav-item">
+              <a class="nav-link" href="https://ishealthy.in/login">Login</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="https://ishealthy.in/register">Register</a>
+            </li>
+                  </ul>
+      </div>
+    </div>
+    </nav>
+  </header>
+  <div class="mainWrap">
+        <section class="banner">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6 banner-text">
+                    <p>We are here for your care.</p>
+                    <h1>Health worries? We'll help you to manage!</h1>
+                </div>
+                <div class="col-sm-6"></div>
+            </div>
+        </div>
+    </section>
+    <section class="about-us padding">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6">
+                    <img src="images/abo.jpg" alt="Ishealthy">
+                </div>
+                <div class="col-sm-6 p-5">
+                    <div class="about pt-4 pb-4">
+                        <p class="heading">About Us</p>
+                        <h3 class="title">Short Story About Is Healthy</h3>
+                        <p class="pt-4">
+                            IS Healthy is a health-tech company providing services of doctor consultation, insurance,
+                            medicines, pathology to patients .our journey was started in 2018 to make high-quality
+                            healthcare accessible to a billion people. We started from zero to reach multimillion
+                            healthcare giver . Our motive is to serve human being with honesty and sincerity
+                        </p>
+                    </div>
+                    <div class="mission pt-4 pb-4">
+                        <h3>Our Mission</h3>
+                        <p>To make high-quality healthcare accessible to a billion people.</p>
+                    </div>
+                    <div class="vision pt-4 pb-4">
+                        <h3>Our Vision</h3>
+                        <p>To combine the healthcare domain, science, AI technology and human intervention to provide
+                            world-class preventive and therapeutic healthcare services.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="manage-services padding">
+        <div class="container">
+            <div class="heading w-50 pb-5">
+                <span class="bg-img"></span>
+                <h2>Managed Your Heathcare Services</h2>
+            </div>
+
+            <div class="services-wrap">
+                <div class="row">
+                    <div class="col-sm-3 column">
+                        <div class="card">
+                            <div class="icon-wrapper">
+                                <img src="images/medicines.png" alt="IShealthy">
+                            </div>
+                            <h3>Medicines</h3>
+                            <p>
+                                All your essential medicines, delivered with a personalized care.
+                            </p>
+                            <a href="#" class="readMore">Read More &rarr;</a>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 column">
+                        <div class="card">
+                            <div class="icon-wrapper">
+                                <img src="images/path.png" alt="IShealthy">
+                            </div>
+                            <h3>Pathology</h3>
+                            <p>
+                                Here’s Your First Step To Better Health.
+                                Stay on top of your health with Full
+                            </p>
+                            <a href="#" class="readMore">Read More &rarr;</a>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 column">
+                        <div class="card">
+                            <div class="icon-wrapper">
+                                <img src="images/consulation.png" alt="IShealthy">
+                            </div>
+                            <h3>Consultation</h3>
+                            <p>
+                                Stay on top of your health with Ishealthy. Consult an experienced doctor online.
+                            </p>
+                            <a href="#" class="readMore">Read More &rarr;</a>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 column">
+                        <div class="card">
+                            <div class="icon-wrapper">
+                                <img src="images/Health-care.png" alt="IShealthy">
+                            </div>
+                            <h3>Insurance</h3>
+                            <p>
+                                Choose more than just health insurance. Get a complete health package.
+                            </p>
+                            <a href="#" class="readMore">Read More &rarr;</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="elementor-widget padding">
+        <div class="container">
+            <div class="row">
+                <div class="col-xl-6 col-lg-6 col-md-10">
+                    <div class="section-title">
+                        <div class="section-text">
+                            <h5>We are available 24/7</h5>
+                            <h2 class="sec-title">
+                                Explore smart care with our exclusive community.
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-lg-6 col-md-8">
+                    <div class="cta-satisfied">
+                        <div class="single-satisfied">
+                            <h2 class="counter-title">1M+</h2>
+                            <h5><i class="fas fa-user"></i> Live Impacted</h5>
+                        </div>
+                        <div class="single-satisfied">
+                            <h2 class="counter-title">5M+</h2>
+                            <h5><i class="fas fa-heartbeat"></i> Health Tips Shared</h5>
+                        </div>
+                        <div class="single-satisfied">
+                            <h2 class="counter-title">100M+</h2>
+                            <h5><i class="fas fa-user"></i> Patient Vitals Tracked</h5>
+                        </div>
+                        <div class="single-satisfied">
+                            <h2 class="counter-title">10k+</h2>
+                            <h5><i class="fas fa-user"></i> Doctors Onboarded</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+  </div>
+
+  <div class="floating-wrap">
+    <a class="whatsp" href="https://api.whatsapp.com/send/?phone=917710005050&text&type=phone_number&app_absent=0">
+      <svg style="pointer-events:none; display:block; height:50px; width:50px;" width="50px" height="50px" viewBox="0 0 1024 1024">
+        <defs>
+        <path id="htwasqicona-chat" d="M1023.941 765.153c0 5.606-.171 17.766-.508 27.159-.824 22.982-2.646 52.639-5.401 66.151-4.141 20.306-10.392 39.472-18.542 55.425-9.643 18.871-21.943 35.775-36.559 50.364-14.584 14.56-31.472 26.812-50.315 36.416-16.036 8.172-35.322 14.426-55.744 18.549-13.378 2.701-42.812 4.488-65.648 5.3-9.402.336-21.564.505-27.15.505l-504.226-.081c-5.607 0-17.765-.172-27.158-.509-22.983-.824-52.639-2.646-66.152-5.4-20.306-4.142-39.473-10.392-55.425-18.542-18.872-9.644-35.775-21.944-50.364-36.56-14.56-14.584-26.812-31.471-36.415-50.314-8.174-16.037-14.428-35.323-18.551-55.744-2.7-13.378-4.487-42.812-5.3-65.649-.334-9.401-.503-21.563-.503-27.148l.08-504.228c0-5.607.171-17.766.508-27.159.825-22.983 2.646-52.639 5.401-66.151 4.141-20.306 10.391-39.473 18.542-55.426C34.154 93.24 46.455 76.336 61.07 61.747c14.584-14.559 31.472-26.812 50.315-36.416 16.037-8.172 35.324-14.426 55.745-18.549 13.377-2.701 42.812-4.488 65.648-5.3 9.402-.335 21.565-.504 27.149-.504l504.227.081c5.608 0 17.766.171 27.159.508 22.983.825 52.638 2.646 66.152 5.401 20.305 4.141 39.472 10.391 55.425 18.542 18.871 9.643 35.774 21.944 50.363 36.559 14.559 14.584 26.812 31.471 36.415 50.315 8.174 16.037 14.428 35.323 18.551 55.744 2.7 13.378 4.486 42.812 5.3 65.649.335 9.402.504 21.564.504 27.15l-.082 504.226z"></path>
+        </defs>
+        <linearGradient id="htwasqiconb-chat" gradientUnits="userSpaceOnUse" x1="512.001" y1=".978" x2="512.001" y2="1025.023">
+          <stop offset="0" stop-color="#61fd7d"></stop>
+          <stop offset="1" stop-color="#2bb826"></stop>
+        </linearGradient>
+        <use xlink:href="#htwasqicona-chat" overflow="visible" fill="url(#htwasqiconb-chat)"></use>
+        <g>
+          <path fill="#FFF" d="M783.302 243.246c-69.329-69.387-161.529-107.619-259.763-107.658-202.402 0-367.133 164.668-367.214 367.072-.026 64.699 16.883 127.854 49.017 183.522l-52.096 190.229 194.665-51.047c53.636 29.244 114.022 44.656 175.482 44.682h.151c202.382 0 367.128-164.688 367.21-367.094.039-98.087-38.121-190.319-107.452-259.706zM523.544 808.047h-.125c-54.767-.021-108.483-14.729-155.344-42.529l-11.146-6.612-115.517 30.293 30.834-112.592-7.259-11.544c-30.552-48.579-46.688-104.729-46.664-162.379.066-168.229 136.985-305.096 305.339-305.096 81.521.031 158.154 31.811 215.779 89.482s89.342 134.332 89.312 215.859c-.066 168.243-136.984 305.118-305.209 305.118zm167.415-228.515c-9.177-4.591-54.286-26.782-62.697-29.843-8.41-3.062-14.526-4.592-20.645 4.592-6.115 9.182-23.699 29.843-29.053 35.964-5.352 6.122-10.704 6.888-19.879 2.296-9.176-4.591-38.74-14.277-73.786-45.526-27.275-24.319-45.691-54.359-51.043-63.543-5.352-9.183-.569-14.146 4.024-18.72 4.127-4.109 9.175-10.713 13.763-16.069 4.587-5.355 6.117-9.183 9.175-15.304 3.059-6.122 1.529-11.479-.765-16.07-2.293-4.591-20.644-49.739-28.29-68.104-7.447-17.886-15.013-15.466-20.645-15.747-5.346-.266-11.469-.322-17.585-.322s-16.057 2.295-24.467 11.478-32.113 31.374-32.113 76.521c0 45.147 32.877 88.764 37.465 94.885 4.588 6.122 64.699 98.771 156.741 138.502 21.892 9.45 38.982 15.094 52.308 19.322 21.98 6.979 41.982 5.995 57.793 3.634 17.628-2.633 54.284-22.189 61.932-43.615 7.646-21.427 7.646-39.791 5.352-43.617-2.294-3.826-8.41-6.122-17.585-10.714z"></path>
+        </g>
+      </svg>
+      <p class="lable">Whatsapp Us</p>
+    </a>
+    <a href="tel:+91 9987878782" target="" class="pos-left has-on-hover contact" data-form="chaty-form-0-Phone" data-hover="Phone">
+      <svg aria-hidden="true" class="ico_d " width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(0deg);"><circle class="color-element" cx="20.4395" cy="20.4395" r="20.4395" fill="#03E78B"></circle><path d="M19.3929 14.9176C17.752 14.7684 16.2602 14.3209 14.7684 13.7242C14.0226 13.4259 13.1275 13.7242 12.8292 14.4701L11.7849 16.2602C8.65222 14.6193 6.11623 11.9341 4.47529 8.95057L6.41458 7.90634C7.16046 7.60799 7.45881 6.71293 7.16046 5.96705C6.56375 4.47529 6.11623 2.83435 5.96705 1.34259C5.96705 0.596704 5.22117 0 4.47529 0H0.745882C0.298353 0 5.69062e-07 0.298352 5.69062e-07 0.745881C5.69062e-07 3.72941 0.596704 6.71293 1.93929 9.3981C3.87858 13.575 7.30964 16.8569 11.3374 18.7962C14.0226 20.1388 17.0061 20.7355 19.9896 20.7355C20.4371 20.7355 20.7355 20.4371 20.7355 19.9896V16.4094C20.7355 15.5143 20.1388 14.9176 19.3929 14.9176Z" transform="translate(9.07179 9.07178)" fill="white"></path></svg>
+      <p class="lable">Contact Us</p>
+    </a>
+  </div>
+
+  <!--footer-->
+  <footer class="footer-section">
+
+    <div class="footer-top padding">
+    <div class="container">
+      <div class="row">
+      <div class="col-lg-3 col-md-6 col-sm-6">
+        <div class="widget company-intro-widget">
+        <a href="index.html" class="site-logo">
+          <img src="images/Is-logo.png" alt="Ishealthy">
+        </a>
+        <p>Ishealthy is India’s Largest Chronic Disease Management company. We are an innovative health assistant on a mission to impact the next 1.6 billion lives.</p>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6 col-sm-6">
+        <div class="widget links-widget">
+        <h5 class="widget-title">Quick Links</h5>
+        <ul class="link-list">
+          <li><a href="#">Home</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Customer Support</a></li>
+        </ul>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6 col-sm-6">
+        <div class="widget service-widget">
+        <h5 class="widget-title">Services</h5>
+        <ul class="link-list">
+          <li><a href="#">Medicines</a></li>
+          <li><a href="#">Pathology</a></li>
+          <li><a href="#">Doctor Consultant</a></li>
+        </ul>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6 col-sm-6">
+        <div class="widget Address-widget">
+        <h5 class="widget-title">Address</h5>
+        <div class="Address">
+          <p>Tandice 69, unit no 401, Prakashwadi, near Western express Highway metro station, Gundivali, Andheri East 400093.</p>
+          <div><i class="fa-solid fa-envelope"></i> care@ishealthy.in</div><br>
+          <div><i class="fa-solid fa-phone-flip"></i> +91 9987878782</div>
+        </div>
+        </div>
+      </div>
+      </div>
+    </div>
+    </div>
+    <div class="footer-bottom">
+      <p>Copyright ©2022 Ishealthy. All Rights Reserved Copyright</p>
+    </div>
+
+
+      </footer>
+  </div>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"  crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- navbar -->
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function(){
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 200) {
+                    document.getElementById('navbar_top').classList.add('fixed-top');
+                    // add padding top to show content behind navbar
+                    navbar_height = document.querySelector('.navbar').offsetHeight;
+                    document.body.style.paddingTop = navbar_height + 'px';
+                } else {
+                     document.getElementById('navbar_top').classList.remove('fixed-top');
+                     // remove padding top from body
+                    document.body.style.paddingTop = '0';
+                }
+            });
+        });
+        // DOMContentLoaded  end
+    </script>
+    <script>
+        $(document).ready(function(){
+        $(window).scroll(function(){
+            if ($(this).scrollTop() > 100) {
+                $('#scroll').fadeIn();
+            } else {
+                $('#scroll').fadeOut();
+            }
+        });
+        $('#scroll').click(function(){
+            $("html, body").animate({ scrollTop: 0 }, 600);
+            return false;
+        });
+    });
+    </script>
+
+    </body>
+</html>
+

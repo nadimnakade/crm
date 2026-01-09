@@ -77,6 +77,8 @@ app.use('/api/customer-medicine-details', require('./routes/customerMedicineDeta
  // Import customers route removed per user instruction
 app.use('/api/reports', reportRoutes);
  // Import customers route removed per user instruction
+// Medicine availability API
+app.use('/api/medicine', require('./routes/medicineRoutes'));
 
 // Serve frontend static files after API routes
 const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm');
@@ -84,6 +86,8 @@ const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Also expose uploads under /api for dev proxy compatibility
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve cloned_ishealthy static site at /cloned_ishealthy
+app.use('/cloned_ishealthy', express.static(path.join(__dirname, '../cloned_ishealthy')));
 app.use(express.static(frontendDir));
 
 // SPA fallback for non-API routes

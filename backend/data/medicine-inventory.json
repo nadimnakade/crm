@@ -1,0 +1,18 @@
+[
+  { "name": "Paracetamol", "category": "Analgesic", "available": true },
+  { "name": "Acetaminophen", "category": "Analgesic", "available": true },
+  { "name": "Ibuprofen", "category": "Analgesic", "available": true },
+  { "name": "Diclofenac", "category": "Analgesic", "available": false },
+  { "name": "Amoxicillin", "category": "Antibiotic", "available": false },
+  { "name": "Azithromycin", "category": "Antibiotic", "available": false },
+  { "name": "Ciprofloxacin", "category": "Antibiotic", "available": true },
+  { "name": "Doxycycline", "category": "Antibiotic", "available": true },
+  { "name": "Cetirizine", "category": "Antihistamine", "available": true },
+  { "name": "Loratadine", "category": "Antihistamine", "available": true },
+  { "name": "Fexofenadine", "category": "Antihistamine", "available": false },
+  { "name": "Metformin", "category": "Antidiabetic", "available": true },
+  { "name": "Gliclazide", "category": "Antidiabetic", "available": false },
+  { "name": "Omeprazole", "category": "Antacid", "available": true },
+  { "name": "Pantoprazole", "category": "Antacid", "available": true },
+  { "name": "Ranitidine", "category": "Antacid", "available": false }
+]
