@@ -53,6 +53,10 @@ const Call = sequelize.define('Call', {
   followUpDate: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  reason: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   timestamps: true,

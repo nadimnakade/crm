@@ -1,12 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly } = require('../controllers/callController');
+const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly, getFollowUps, updateFollowUpStatus } = require('../controllers/callController');
 const { getCallFiles, getCallHistory, getCallFilesSource, getCallHistorySource } = require('../controllers/callController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../utils/fileUpload');
 const { CallAttachment } = require('../models');
 
 // Call routes
+router.get('/followups', protect, getFollowUps);
+router.put('/:id/followup-status', protect, updateFollowUpStatus);
+
 router.route('/')
   .get(protect, getCalls)
   .post(protect, createCall);
@@ -98,4 +101,4 @@ router.post('/:id/upload/document', protect, upload.single('document'), (req, re
 });
 
 module.exports = router;
-
+

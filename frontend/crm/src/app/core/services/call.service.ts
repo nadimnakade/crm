@@ -12,8 +12,8 @@ export class CallService {
   constructor(private http: HttpClient) { }
 
   // Get all calls
-  getCalls(): Observable<any> {
-    return this.http.get(this.apiUrl);
+  getCalls(params?: any): Observable<any> {
+    return this.http.get(this.apiUrl, { params });
   }
 
   // Get call by ID
@@ -34,6 +34,16 @@ export class CallService {
   // Delete call
   deleteCall(id: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${id}`);
+  }
+
+  // Get active follow-ups
+  getFollowUps(params: any): Observable<any> {
+    return this.http.get(`${this.apiUrl}/followups`, { params });
+  }
+
+  // Update follow-up status
+  updateFollowUpStatus(id: string, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${id}/followup-status`, data);
   }
 
   // Upload medicine list

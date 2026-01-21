@@ -114,6 +114,119 @@ exports.getCalls = async (req, res) => {
   }
 };
 
+// @desc    Get active follow-ups
+// @route   GET /api/calls/followups
+// @access  Private
+exports.getFollowUps = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 20;
+    const offset = (page - 1) * pageSize;
+    const visibility = await getVisibility(req.user);
+
+    const where = {
+      followUpRequired: true,
+      outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+    };
+
+    // Role-based filtering
+    if (visibility.scope === 'agent') {
+      where.agentId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+       where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    }
+
+    const { rows, count } = await Call.findAndCountAll({
+      where,
+      include: [
+        { model: Customer },
+        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+      ],
+      order: [['followUpDate', 'ASC']],
+      limit: pageSize,
+      offset
+    });
+
+    res.json({ data: rows, total: count, page, pageSize });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    Update follow-up status (First Order Wins logic)
+// @route   PUT /api/calls/:id/followup-status
+// @access  Private
+exports.updateFollowUpStatus = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { status, reason, comments } = req.body;
+    const agentId = req.user.id;
+
+    const call = await Call.findByPk(id, { include: [Customer], transaction });
+    if (!call) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Call not found' });
+    }
+
+    // Update current call
+    call.outcome = status;
+    call.reason = reason;
+    if (comments) {
+      call.notes = (call.notes ? call.notes + '\n' : '') + `[${new Date().toISOString()}] ${comments}`;
+    }
+    // If handled, maybe set followUpRequired to false? 
+    // User didn't specify, but usually "Order", "Not Interested" etc means follow-up is done.
+    if (['Order', 'Order Already Placed', 'Not Interested', 'Not Required'].includes(status)) {
+        call.followUpRequired = false;
+    }
+    
+    await call.save({ transaction });
+
+    // Critical Logic: First Order Wins
+    if (status === 'Order') {
+      const customerPhone = call.Customer.phone;
+      
+      // Find other active follow-ups for this phone number
+      // We need to find calls linked to ANY customer with this phone number (in case of duplicates)
+      // But simpler is to find calls linked to customers with same phone
+      const customersWithSamePhone = await Customer.findAll({
+        where: { phone: customerPhone },
+        attributes: ['id'],
+        transaction
+      });
+      const customerIds = customersWithSamePhone.map(c => c.id);
+
+      // Update other follow-ups
+      await Call.update(
+        { 
+          outcome: 'Order Already Placed',
+          reason: 'Order placed by another agent',
+          followUpRequired: false
+        },
+        {
+          where: {
+            customerId: { [Op.in]: customerIds },
+            id: { [Op.ne]: id }, // Exclude current call
+            followUpRequired: true,
+            outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+          },
+          transaction
+        }
+      );
+    }
+
+    await transaction.commit();
+    res.json({ message: 'Follow-up updated successfully', call });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error(error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
 // @desc    Get call by ID
 // @route   GET /api/calls/:id
 // @access  Private
