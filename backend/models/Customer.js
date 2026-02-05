@@ -8,7 +8,7 @@ const Customer = sequelize.define('Customer', {
   },
   lastName: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   phone: {
     type: DataTypes.STRING,

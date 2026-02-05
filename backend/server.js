@@ -72,6 +72,7 @@ app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/calls', require('./routes/callRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/portfolio', require('./routes/portfolioRoutes'));
 app.use('/api/customer-medicine-details', require('./routes/customerMedicineDetailRoutes'));
  // Import customers route removed per user instruction
@@ -79,7 +80,7 @@ app.use('/api/reports', reportRoutes);
  // Import customers route removed per user instruction
 
 // Serve frontend static files after API routes
-const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm');
+const frontendDir = path.join(__dirname, '../frontend/crm/dist/crm/browser');
 // Serve uploaded files statically for direct access
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Also expose uploads under /api for dev proxy compatibility
@@ -130,7 +131,7 @@ async function seedDefaults() {
 })();
 
 // Connect to MySQL and start server
-const PORT = process.env.PORT || 5000;
+const PORT = 5001;//process.env.PORT || 5000;
 
 // Connect to database and start server
 const startServer = async () => {

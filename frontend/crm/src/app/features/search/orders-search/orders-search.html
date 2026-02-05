@@ -2,6 +2,11 @@
 
   <div class="card-header d-flex justify-content-between align-items-center">
     <h5 class="mb-0">Orders Details</h5>
+    <div>
+      <button class="btn btn-sm btn-success me-2" (click)="downloadTemplate()">Download Template</button>
+      <button class="btn btn-sm btn-primary" (click)="fileInput.click()">Upload Orders</button>
+      <input #fileInput type="file" (change)="onFileSelected($event)" style="display: none" accept=".xlsx,.xls,.csv" />
+    </div>
   </div>
 
   <div class="card-body p-2">

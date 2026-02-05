@@ -12,7 +12,7 @@ router.get('/followups/export', protect, authorize('Admin', 'Super Admin', 'admi
 
 // Dashboard Reports
 // Top 10 Daily Agents (by Orders)
-router.get('/top-agents', protect, getTopAgents);
+router.get('/top-agents', protect, authorize('Admin', 'Super Admin', 'admin'), getTopAgents);
 // Active User Report
 router.get('/active-users', protect, authorize('Admin', 'Super Admin', 'admin'), getActiveUsers);
 

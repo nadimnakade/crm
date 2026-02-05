@@ -31,6 +31,7 @@ export const routes: Routes = [
       { path: 'search/orders', loadComponent: () => import('./features/search/orders-search/orders-search').then(m => m.OrdersSearchComponent) },
       { path: 'search/refunds', loadComponent: () => import('./features/search/refunds-search/refunds-search').then(m => m.RefundsSearchComponent) },
       { path: 'orders/recent', loadComponent: () => import('./features/orders/recent-orders/recent-orders').then(m => m.RecentOrdersComponent) },
+      { path: 'orders/reorder-list', loadComponent: () => import('./features/orders/reorder-list/reorder-list').then(m => m.ReorderListComponent) },
       { path: 'reports', loadComponent: () => import('./features/reports/reports-menu/reports-menu').then(m => m.ReportsMenuComponent), canActivate: [AuthGuard] },
       { path: 'reports/followups', loadComponent: () => import('./features/reports/followup-report/followup-report').then(m => m.FollowupReportComponent), canActivate: [AuthGuard] },
       { path: 'followups', loadComponent: () => import('./features/followups/followup-list/followup-list').then(m => m.FollowupListComponent), canActivate: [AuthGuard] },
@@ -46,3 +47,4 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '/login' }
 ];
+

@@ -46,10 +46,22 @@
           <i class="fa-solid fa-rotate-left nav-icon"></i>
           <span class="nav-label">Refunds</span>
         </a>
+        <a routerLink="/orders/reorder-list" routerLinkActive="active" class="nav-item" title="Re-orders">
+          <i class="fa-solid fa-repeat nav-icon"></i>
+          <span class="nav-label">Re-orders</span>
+        </a>
       </div>
       <a *ngIf="!isOrdersOnlyRole" routerLink="/search/orders" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-magnifying-glass nav-icon"></i>
         <span class="nav-label">Orders Search</span>
+      </a>
+      <a *ngIf="!isOrdersOnlyRole" routerLink="/search/orders" routerLinkActive="active" class="nav-item">
+        <i class="fa-solid fa-file-arrow-up nav-icon"></i>
+        <span class="nav-label">Upload Orders</span>
+      </a>
+      <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/reorder-list" routerLinkActive="active" class="nav-item">
+        <i class="fa-solid fa-repeat nav-icon"></i>
+        <span class="nav-label">Re-orders</span>
       </a>
       <a *ngIf="!isOrdersOnlyRole" routerLink="/search/refunds" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-magnifying-glass-dollar nav-icon"></i>
@@ -128,3 +140,4 @@
     </div>
   </main>
 </div>
+

@@ -748,9 +748,8 @@ exports.getFollowupReport = async (req, res) => {
     // regardless of whether an orderId or orderDetails exist.
     // Date logic:
     // - With orderId: filter by followUpDate within range
-    // - Without orderId: filter by createdAt within range
-    const dateFilterOrderId = applyDateFilter ? { followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } } : {};
-    const dateFilterNoOrderId = applyDateFilter ? { createdAt: { [Op.gte]: start, [Op.lt]: endExclusive } } : {};
+    // - Without orderId: filter by followUpDate within range (per user request)
+    const dateFilter = applyDateFilter ? { followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive } } : {};
 
     // Strict scenarios allowed:
     // 1) Inbound > New order related > follow-up-scheduled
@@ -771,9 +770,9 @@ exports.getFollowupReport = async (req, res) => {
         {
           [Op.or]: [
             // With order id: use followUpDate range and match ONLY inbound scheduled scenario
-            { [Op.and]: [ { orderId: { [Op.ne]: null } }, dateFilterOrderId, ...inboundFollowScheduled ] },
-            // Without order id: use createdAt range and match ONLY outbound followup scenario
-            { [Op.and]: [ { orderId: { [Op.eq]: null } }, dateFilterNoOrderId, ...outboundSalesFollowup ] }
+            { [Op.and]: [ { orderId: { [Op.ne]: null } }, dateFilter, ...inboundFollowScheduled ] },
+            // Without order id: use followUpDate range and match ONLY outbound followup scenario
+            { [Op.and]: [ { orderId: { [Op.eq]: null } }, dateFilter, ...outboundSalesFollowup ] }
           ]
         }
       ]

@@ -7,6 +7,7 @@ import { CallService } from '../../shared/services/call';
 import { PortfolioService } from '../../shared/services/portfolio';
 import { CustomerMedicineDetailService } from '../../shared/services/customer-medicine-detail';
 import { ReportService } from '../../core/services/report.service';
+import { OrderService } from '../../core/services/order.service';
 import { Chart, registerables } from 'chart.js';
 import { Title } from '@angular/platform-browser';
 
@@ -76,13 +77,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Orders today count
   ordersTodayCount: number = 0;
+  reordersTodayCount: number = 0;
 
   constructor(
     private authService: AuthService,
     private callService: CallService,
     private portfolioService: PortfolioService,
     private cmdService: CustomerMedicineDetailService,
-    private reportService: ReportService
+    private reportService: ReportService,
+    private orderService: OrderService
   ) { }
 
   ngOnInit(): void {
@@ -164,9 +167,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private loadDashboardData(): void {
     // Orders count (today)
     this.loadOrdersTodayCount();
-    // New Reports
-    this.loadTopAgentsByOrder();
-    this.loadActiveUserReport();
+    // Reorders count (today)
+    this.loadReordersTodayCount();
+    // New Reports - Admin Only
+    if (this.isAdmin || this.isSuperAdmin) {
+      this.loadTopAgentsByOrder();
+      this.loadActiveUserReport();
+    }
   }
 
   loadTopAgentsByOrder() {
@@ -191,6 +198,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.callService.getRecentOrderCount().subscribe({
       next: (res) => { this.ordersTodayCount = Number(res?.total || 0); },
       error: () => { this.ordersTodayCount = 0; }
+    });
+  }
+
+  private loadReordersTodayCount(): void {
+    this.orderService.getReordersCount().subscribe({
+      next: (res) => { this.reordersTodayCount = Number(res?.count || 0); },
+      error: () => { this.reordersTodayCount = 0; }
     });
   }
 

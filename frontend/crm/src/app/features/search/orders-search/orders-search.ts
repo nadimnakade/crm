@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { CallService } from '../../../shared/services/call';
 import { UserService } from '../../../shared/services/user';
 import { AuthService } from '../../../shared/auth/auth';
+import { OrderService } from '../../../core/services/order.service';
 
 @Component({
   selector: 'app-orders-search',
@@ -32,7 +33,8 @@ export class OrdersSearchComponent implements OnInit {
     private userService: UserService,
     private auth: AuthService,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private orderService: OrderService
   ) {}
 
   ngOnInit(): void {
@@ -63,6 +65,51 @@ export class OrdersSearchComponent implements OnInit {
     if (auto || mobile || orderId) {
       // Auto-run search and open detail if single match
       this.search(true);
+    }
+  }
+
+  downloadTemplate(): void {
+    this.orderService.downloadTemplate().subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Order_Upload_Template.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        console.error('Template download failed', err);
+        alert('Failed to download template');
+      }
+    });
+  }
+
+  onFileSelected(event: any): void {
+    const file = event.target.files[0];
+    if (file) {
+      if (!confirm(`Upload ${file.name}?`)) return;
+      
+      this.isLoading = true;
+      this.orderService.uploadOrders(file).subscribe({
+        next: (res) => {
+          this.isLoading = false;
+          let msg = `Upload processed.\nInserted: ${res.inserted}\nSkipped: ${res.skipped}`;
+          if (res.errors && res.errors.length > 0) {
+            msg += `\n\n${res.errors.length} errors occurred. First error: ${res.errors[0].message}`;
+            console.warn('Upload errors:', res.errors);
+          }
+          alert(msg);
+          // Reset file input
+          event.target.value = '';
+        },
+        error: (err) => {
+          this.isLoading = false;
+          console.error('Upload failed', err);
+          alert('Upload failed: ' + (err.error?.message || err.message));
+          event.target.value = '';
+        }
+      });
     }
   }
 
@@ -185,3 +232,4 @@ export class OrdersSearchComponent implements OnInit {
     }
   }
 }
+
