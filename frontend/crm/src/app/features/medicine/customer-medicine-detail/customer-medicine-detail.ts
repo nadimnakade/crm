@@ -1,9 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CustomerMedicineDetailService } from '../../../shared/services/customer-medicine-detail';
+import { AuthService } from '../../../shared/auth/auth';
 
- 
 @Component({
   selector: 'app-customer-medicine-detail',
   standalone: true,
@@ -11,7 +11,7 @@ import { CustomerMedicineDetailService } from '../../../shared/services/customer
   templateUrl: './customer-medicine-detail.html',
   styleUrls: ['./customer-micine-detail.scss']
 })
-export class CustomerMedicineDetailComponent {
+export class CustomerMedicineDetailComponent implements OnInit {
   Math = Math;
   // List state
   items: Array<{ name: string; mobile: string; address: string }> = [];
@@ -23,6 +23,7 @@ export class CustomerMedicineDetailComponent {
   sortBy: 'name' | 'mobile' | 'address' = 'name';
   sortOrder: 'asc' | 'desc' = 'asc';
   searchText = '';
+  canUpload = false;
 
   // Modal state
   showUpload = false;
@@ -41,7 +42,13 @@ export class CustomerMedicineDetailComponent {
   detailHasMore: boolean = false;
 
 
-  constructor(private svc: CustomerMedicineDetailService) {}
+  constructor(private svc: CustomerMedicineDetailService, private authService: AuthService) {}
+
+  ngOnInit(): void {
+    const user = this.authService.getUser();
+    const role = (user?.role || '').toLowerCase();
+    this.canUpload = role === 'admin' || role === 'superadmin';
+  }
 
   loadList(): void {
     const digits = (this.searchText || '').replace(/[^0-9]/g, '');

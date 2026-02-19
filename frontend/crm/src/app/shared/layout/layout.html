@@ -16,73 +16,130 @@
         <i class="fa-solid fa-phone nav-icon"></i>
         <span class="nav-label">Calls</span>
       </a> -->
-      <a routerLink="/customers" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-users nav-icon"></i>
-        <span class="nav-label">Customers</span>
-      </a>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/portfolio" routerLinkActive="active d-none" class="nav-item">
-        <i class="fa-solid fa-folder-open nav-icon"></i>
-        <span class="nav-label">Portfolio</span>
-      </a>
-      <!-- Reports parent menu -->
-      <a routerLink="/reports" routerLinkActive="active" class="nav-item" (click)="toggleReports()">
-        <i class="fa-solid fa-chart-line nav-icon"></i>
-        <span class="nav-label">Reports</span>
-      </a>
-      <div class="nav-submenu" *ngIf="reportsOpen" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <a routerLink="/orders/recent" routerLinkActive="active" class="nav-item" title="Recent Orders">
-          <i class="fa-solid fa-clock nav-icon"></i>
-          <span class="nav-label">Recent</span>
+      <!-- Customers group -->
+      <div *ngIf="!isOrdersOnlyRole" class="nav-item-row" (click)="toggleCustomers()">
+        <div class="left">
+          <i class="fa-solid fa-users nav-icon"></i>
+          <span class="label">Customers</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="customersOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="!isOrdersOnlyRole && customersOpen">
+        <a routerLink="/customers" routerLinkActive="active" class="submenu-item" title="Customer List">
+          <i class="fa-solid fa-table nav-icon"></i>
+          <span class="label">Customer List</span>
         </a>
-        <a routerLink="/reports/followups" routerLinkActive="active" class="nav-item" title="Followups Report">
-          <i class="fa-solid fa-clipboard-check nav-icon"></i>
-          <span class="nav-label">Followups</span>
+        <a routerLink="/portfolio" routerLinkActive="active" class="submenu-item" title="Customer Portfolio">
+          <i class="fa-solid fa-folder-open nav-icon"></i>
+          <span class="label">Portfolio</span>
         </a>
-        <a routerLink="/search/orders" routerLinkActive="active" class="nav-item" title="Orders Search">
-          <i class="fa-solid fa-magnifying-glass nav-icon"></i>
-          <span class="nav-label">Orders</span> 
-        </a>
-        <a routerLink="/search/refunds" routerLinkActive="active" class="nav-item" title="Refunds Search">
-          <i class="fa-solid fa-rotate-left nav-icon"></i>
-          <span class="nav-label">Refunds</span>
-        </a>
-        <a routerLink="/orders/reorder-list" routerLinkActive="active" class="nav-item" title="Re-orders">
-          <i class="fa-solid fa-repeat nav-icon"></i>
-          <span class="nav-label">Re-orders</span>
+        <a routerLink="/customer-medicine-detail" routerLinkActive="active" class="submenu-item" title="Medicine Detail">
+          <i class="fa-solid fa-pills nav-icon"></i>
+          <span class="label">Medicine Detail</span>
         </a>
       </div>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/search/orders" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-magnifying-glass nav-icon"></i>
-        <span class="nav-label">Orders Search</span>
-      </a>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/search/orders" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-file-arrow-up nav-icon"></i>
-        <span class="nav-label">Upload Orders</span>
-      </a>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/reorder-list" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-repeat nav-icon"></i>
-        <span class="nav-label">Re-orders</span>
-      </a>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/search/refunds" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-magnifying-glass-dollar nav-icon"></i>
-        <span class="nav-label">Refunds</span>
-      </a>
-      <a *ngIf="canManageUsersAndRoles || isOrdersOnlyRole" routerLink="/reports" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-file-export nav-icon"></i>
-        <span class="nav-label">Reports</span>
-      </a>
-      <a routerLink="/followups" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-list-check nav-icon"></i>
-        <span class="nav-label">Follow-ups</span>
-      </a>
-      <a routerLink="/reports/followups" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-calendar-check nav-icon"></i>
-        <span class="nav-label">Followup Report</span>
-      </a>
-      <a *ngIf="!isOrdersOnlyRole" routerLink="/customer-medicine-detail" routerLinkActive="active" class="nav-item">
-        <i class="fa-solid fa-pills nav-icon"></i>
-        <span class="nav-label">Customer Medicine Detail</span>
-      </a>
+      <!-- Reports group -->
+      <div class="nav-item-row" (click)="toggleReports()">
+        <div class="left">
+          <i class="fa-solid fa-chart-line nav-icon"></i>
+          <span class="label">Reports</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="reportsOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="reportsOpen">
+        <a routerLink="/orders/recent" routerLinkActive="active" class="submenu-item" title="Recent Orders">
+          <i class="fa-solid fa-clock nav-icon"></i>
+          <span class="label">Recent</span>
+        </a>
+        <a *ngIf="canManageUsersAndRoles || isOrdersOnlyRole"
+           routerLink="/reports"
+           routerLinkActive="active"
+           class="submenu-item"
+           title="All Reports">
+          <i class="fa-solid fa-file-export nav-icon"></i>
+          <span class="label">All Reports</span>
+        </a>
+      </div>
+      <!-- Orders group -->
+      <div class="nav-item-row" (click)="toggleOrders()">
+        <div class="left">
+          <i class="fa-solid fa-boxes-stacked nav-icon"></i>
+          <span class="label">Orders</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="ordersOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="ordersOpen">
+        <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/uploaded" routerLinkActive="active" class="submenu-item" title="Order List">
+          <i class="fa-solid fa-table-list nav-icon"></i>
+          <span class="label">Order List</span>
+        </a>
+        <!-- <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/reorder-list" routerLinkActive="active" class="submenu-item" title="Re-orders">
+          <i class="fa-solid fa-repeat nav-icon"></i>
+          <span class="label">Re-orders</span>
+        </a> -->
+      </div>
+      <!-- Uploads group (admin only) -->
+      <div *ngIf="canUpload" class="nav-item-row" (click)="toggleUploads()">
+        <div class="left">
+          <i class="fa-solid fa-file-arrow-up nav-icon"></i>
+          <span class="label">Uploads</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="uploadsOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="canUpload && uploadsOpen">
+        <a routerLink="/orders/upload" routerLinkActive="active" class="submenu-item" title="Upload Orders">
+          <i class="fa-solid fa-file-circle-plus nav-icon"></i>
+          <span class="label">Upload Orders</span>
+        </a>
+        <a routerLink="/followups/upload" routerLinkActive="active" class="submenu-item" title="Upload Follow-ups">
+          <i class="fa-solid fa-file-circle-plus nav-icon"></i>
+          <span class="label">Upload Follow-ups</span>
+        </a>
+      </div>
+      <!-- Search group -->
+      <div class="nav-item-row" (click)="toggleSearch()">
+        <div class="left">
+          <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+          <span class="label">Search</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="searchOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="searchOpen">
+        <a routerLink="/search/orders" routerLinkActive="active" class="submenu-item" title="Orders Search">
+          <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+          <span class="label">Orders</span> 
+        </a>
+        <a routerLink="/search/refunds" routerLinkActive="active" class="submenu-item" title="Refunds Search">
+          <i class="fa-solid fa-rotate-left nav-icon"></i>
+          <span class="label">Refunds</span>
+        </a>
+      </div>
+
+      <!-- Follow-ups group -->
+      <div class="nav-item-row" (click)="toggleFollowups()">
+        <div class="left">
+          <i class="fa-solid fa-list-check nav-icon"></i>
+          <span class="label">Follow-ups</span>
+        </div>
+        <i class="fa-solid fa-chevron-down chevron" [style.transform]="followupsOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
+      </div>
+      <div class="nav-submenu" *ngIf="followupsOpen">
+        <a routerLink="/followups" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-list-check nav-icon"></i>
+          <span class="label">List</span>
+        </a>
+        <a routerLink="/followups/uploaded" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-file-lines nav-icon"></i>
+          <span class="label">Uploaded List</span>
+        </a>
+        <a routerLink="/reports/followups" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-calendar-check nav-icon"></i>
+          <span class="label">Report</span>
+        </a>
+      </div>
+      
+      <!-- Remove duplicate standalone items to keep groups consistent -->
+      <!-- Standalone items summarized above in groups; keep Users and Profile below -->
       <a *ngIf="canManageUsersAndRoles" routerLink="/users" routerLinkActive="active" class="nav-item">
         <i class="fa-solid fa-table-list nav-icon"></i>
         <span class="nav-label">Users</span>
@@ -140,4 +197,5 @@
     </div>
   </main>
 </div>
+
 

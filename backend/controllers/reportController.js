@@ -1,6 +1,20 @@
 const xlsx = require('xlsx');
 const { sequelize, Call, User, Role } = require('../models');
 const { QueryTypes, Op } = require('sequelize');
+const cacheStore = new Map();
+function getCache(key) {
+  const item = cacheStore.get(key);
+  if (!item) return null;
+  if (item.expireAt && Date.now() > item.expireAt) {
+    cacheStore.delete(key);
+    return null;
+  }
+  return item.value;
+}
+function setCache(key, value, ttlMs = 60000) {
+  cacheStore.set(key, { value, expireAt: Date.now() + ttlMs });
+}
+
 // IST helpers and formatting
 const IST_OFFSET_MINUTES = 5 * 60 + 30; // +05:30
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -426,10 +440,16 @@ exports.getActiveUsers = async (req, res) => {
 // @access  Private
 exports.getWeeklyOrderStats = async (req, res) => {
   try {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 6); // Last 7 days including today
-    start.setHours(0, 0, 0, 0);
+    const endExclusive = new Date();
+    endExclusive.setHours(24, 0, 0, 0);
+    const start = new Date(endExclusive);
+    start.setDate(endExclusive.getDate() - 7);
+    const cacheKey = `weekly-orders:${start.toISOString()}_${endExclusive.toISOString()}`;
+    const hit = getCache(cacheKey);
+    if (hit) {
+      res.set('Cache-Control', 'private, max-age=60');
+      return res.json(hit);
+    }
 
     const results = await Call.findAll({
       attributes: [
@@ -438,16 +458,19 @@ exports.getWeeklyOrderStats = async (req, res) => {
       ],
       where: {
         createdAt: {
-          [Op.gte]: start
+          [Op.gte]: start,
+          [Op.lt]: endExclusive
         },
-        orderId: {
-          [Op.ne]: null
-        }
+        [Op.and]: [
+          sequelize.where(sequelize.col('HasOrder'), 1)
+        ]
       },
       group: [sequelize.literal("CAST(createdAt AS DATE)")],
       order: [[sequelize.literal("CAST(createdAt AS DATE)"), 'ASC']]
     });
 
+    setCache(cacheKey, results, 60000);
+    res.set('Cache-Control', 'private, max-age=60');
     res.json(results);
   } catch (error) {
     console.error('Error in getWeeklyOrderStats:', error);
@@ -462,6 +485,12 @@ exports.getCallOutcomeStats = async (req, res) => {
   try {
     const today = istTodayDateStr();
     const { start, endExclusive } = getISTRange(today, today);
+    const cacheKey = `call-outcomes:${start.toISOString()}_${endExclusive.toISOString()}`;
+    const hit = getCache(cacheKey);
+    if (hit) {
+      res.set('Cache-Control', 'private, max-age=60');
+      return res.json(hit);
+    }
 
     const results = await Call.findAll({
       attributes: [
@@ -478,6 +507,8 @@ exports.getCallOutcomeStats = async (req, res) => {
       order: [[sequelize.literal('count'), 'DESC']]
     });
 
+    setCache(cacheKey, results, 60000);
+    res.set('Cache-Control', 'private, max-age=60');
     res.json(results);
   } catch (error) {
     console.error('Error in getCallOutcomeStats:', error);

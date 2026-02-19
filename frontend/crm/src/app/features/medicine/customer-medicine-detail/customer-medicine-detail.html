@@ -4,7 +4,7 @@
     <div class="d-flex align-items-center gap-2">
       <input type="text" class="form-control" [(ngModel)]="searchText" (input)="onSearchTextInput($event)" inputmode="numeric" maxlength="10" placeholder="Enter 10-digit mobile number" style="max-width:300px;">
        <button class="btn btn-outline-secondary" (click)="search()" [disabled]="!isTenDigits(searchText)">Search</button>
-      <button class="btn btn-primary" (click)="openUpload()">Add</button>
+      <button class="btn btn-primary" (click)="openUpload()" *ngIf="canUpload">Add</button>
     </div>
   </div>
 

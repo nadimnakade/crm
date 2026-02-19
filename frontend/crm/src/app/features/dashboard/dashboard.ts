@@ -78,6 +78,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Orders today count
   ordersTodayCount: number = 0;
   reordersTodayCount: number = 0;
+  // Section loaders
+  loadingOrdersCount: boolean = false;
+  loadingReordersCount: boolean = false;
+  loadingTopAgents: boolean = false;
+  loadingActiveUsers: boolean = false;
+  loadingDueFollowups: boolean = false;
 
   constructor(
     private authService: AuthService,
@@ -120,6 +126,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadDueFollowUps(): void {
+    this.loadingDueFollowups = true;
     // Admins can see all due follow-ups if they want, but usually notification is for the user.
     // However, if the API supports an 'all' flag for admins, we can pass it if we want to show global due items.
     // For now, let's just show what the API returns (agent's own or filtered).
@@ -128,11 +135,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // If admin wants to see all, we might need a toggle or just default to all.
     // Let's pass true for admins so they can oversee pending work.
     const showAll = this.isAdmin || this.isSuperAdmin;
-    this.callService.getDueFollowUps(showAll).subscribe({
+    this.callService.getDueFollowUps(showAll, { skipLoader: true }).subscribe({
       next: (data: any[]) => {
         this.dueFollowUps = data;
+        this.loadingDueFollowups = false;
       },
-      error: (err: any) => console.error('Error loading due follow-ups', err)
+      error: (err: any) => { 
+        console.error('Error loading due follow-ups', err);
+        this.loadingDueFollowups = false;
+      }
     });
   }
 
@@ -177,39 +188,63 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopAgentsByOrder() {
-    this.reportService.getTopAgents().subscribe({
+    this.loadingTopAgents = true;
+    this.reportService.getTopAgents({ skipLoader: true }).subscribe({
       next: (data) => {
         this.topAgentsByOrder = data;
+        this.loadingTopAgents = false;
       },
-      error: (err) => console.error('Failed to load top agents by order', err)
+      error: (err) => { 
+        console.error('Failed to load top agents by order', err);
+        this.loadingTopAgents = false;
+      }
     });
   }
 
   loadActiveUserReport() {
-    this.reportService.getActiveUsers().subscribe({
+    this.loadingActiveUsers = true;
+    this.reportService.getActiveUsers({ skipLoader: true }).subscribe({
       next: (data) => {
         this.activeUserReport = data;
+        this.loadingActiveUsers = false;
       },
-      error: (err) => console.error('Failed to load active user report', err)
+      error: (err) => { 
+        console.error('Failed to load active user report', err);
+        this.loadingActiveUsers = false;
+      }
     });
   }
 
   private loadOrdersTodayCount(): void {
-    this.callService.getRecentOrderCount().subscribe({
-      next: (res) => { this.ordersTodayCount = Number(res?.total || 0); },
-      error: () => { this.ordersTodayCount = 0; }
+    this.loadingOrdersCount = true;
+    this.callService.getRecentOrderCount(undefined, undefined, { skipLoader: true }).subscribe({
+      next: (res) => { 
+        this.ordersTodayCount = Number(res?.total || 0); 
+        this.loadingOrdersCount = false;
+      },
+      error: () => { 
+        this.ordersTodayCount = 0; 
+        this.loadingOrdersCount = false;
+      }
     });
   }
 
   private loadReordersTodayCount(): void {
-    this.orderService.getReordersCount().subscribe({
-      next: (res) => { this.reordersTodayCount = Number(res?.count || 0); },
-      error: () => { this.reordersTodayCount = 0; }
+    this.loadingReordersCount = true;
+    this.orderService.getReordersCount({ skipLoader: true }).subscribe({
+      next: (res) => { 
+        this.reordersTodayCount = Number(res?.count || 0); 
+        this.loadingReordersCount = false;
+      },
+      error: () => { 
+        this.reordersTodayCount = 0; 
+        this.loadingReordersCount = false;
+      }
     });
   }
 
   loadWeeklyOrdersChart() {
-    this.reportService.getWeeklyOrderStats().subscribe({
+    this.reportService.getWeeklyOrderStats({ skipLoader: true }).subscribe({
       next: (data) => {
         if (!this.callsByAgentChart) return;
 
@@ -287,7 +322,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadCallOutcomesChart() {
-    this.reportService.getCallOutcomeStats().subscribe({
+    this.reportService.getCallOutcomeStats({ skipLoader: true }).subscribe({
       next: (data) => {
         if (!this.callTypeChart) return;
 
@@ -428,7 +463,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       cursorId: this.cmdCursor,
       mobile: digits
     };
-    this.cmdService.list(params).subscribe({
+    this.cmdService.list(params, { skipLoader: true }).subscribe({
       next: (res) => {
         this.cmdItems = res?.items || [];
         this.cmdHasMore = !!res?.hasMore;
@@ -502,7 +537,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       pageSize: this.cmdDetailPageSize,
       mobile: this.cmdDetailMobile,
       cursorId: this.cmdDetailCursor
-    }).subscribe({
+    }, { skipLoader: true }).subscribe({
       next: (res) => {
         this.cmdDetailItems = res?.items || [];
         this.cmdDetailHasMore = !!res?.hasMore;

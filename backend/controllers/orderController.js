@@ -1,17 +1,21 @@
 const path = require('path');
 const xlsx = require('xlsx');
 const fs = require('fs');
-const { Call, Customer, User, Role } = require('../models');
+const { Call, Customer, User, Role, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // Expected headers for bulk upload (case-insensitive match)
-// User requirements: moible no, name, orderid, MRP, Pay
+// User requirements: Date, Customer, Phone, Alternate, Order ID, Order Type, Amount, Status, Agent
 const REQUIRED_HEADERS = [
-  'Mobile No',
-  'Name',
-  'OrderId',
-  'MRP',
-  'Pay'
+  'Date',
+  'Customer',
+  'Phone',
+  'Alternate',
+  'Order ID',
+  'Order Type',
+  'Amount',
+  'Status',
+  'Agent'
 ];
 
 // Helper: build case-insensitive index map from header row
@@ -29,6 +33,13 @@ function buildHeaderIndex(headerRow) {
 // @route POST /api/orders/upload
 exports.uploadOrders = async (req, res) => {
   try {
+    const userWithRole = await User.findByPk(req.user.id, {
+      include: [{ model: Role }]
+    });
+    const userRole = userWithRole && userWithRole.Role ? (userWithRole.Role.name || '').toLowerCase() : '';
+    if (userRole !== 'admin' && userRole !== 'super admin') {
+      return res.status(403).json({ message: 'Access denied: Only admins can upload orders' });
+    }
     const userId = req.user ? req.user.id : 1; // Default to admin if no user
     const file = req.file;
     if (!file) return res.status(400).json({ message: 'No file uploaded' });
@@ -47,7 +58,10 @@ exports.uploadOrders = async (req, res) => {
     const idxMap = buildHeaderIndex(headerRow);
 
     // Validate required headers
+    // Note: 'Order ID' and 'Order Type' columns are expected, but values can be optional depending on logic below
     const missing = REQUIRED_HEADERS.filter(h => idxMap[h.toLowerCase()] === undefined);
+    // Relax validation if only 'Order Type' is missing (for backward compatibility if needed, but user asked for it)
+    // However, user said "will have... order type", so we enforce column presence but maybe not value.
     if (missing.length) {
       return res.status(422).json({ message: 'Invalid or missing headers', missing, required: REQUIRED_HEADERS });
     }
@@ -58,87 +72,122 @@ exports.uploadOrders = async (req, res) => {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       // Extract values
-      const mobileRaw = String(row[idxMap['mobile no']] || '').trim();
+      const dateRaw = row[idxMap['date']];
+      const customerName = String(row[idxMap['customer']] || '').trim();
+      const mobileRaw = String(row[idxMap['phone']] || '').trim();
       const mobile = mobileRaw.replace(/[^0-9]/g, ''); // Basic sanitization
-      const name = String(row[idxMap['name']] || '').trim();
-      const orderId = String(row[idxMap['orderid']] || '').trim();
-      const mrp = row[idxMap['mrp']];
-      const pay = row[idxMap['pay']];
-      // Alternate is Yes/No flag
-      const alternateRaw = String(row[idxMap['alternate']] || row[idxMap['alternate required']] || '').trim();
-      const altLower = alternateRaw.toLowerCase();
-      const alternate = (['yes', 'y', 'true', '1'].includes(altLower)) ? 'Yes' : (alternateRaw ? 'No' : '');
+      const alternateRaw = String(row[idxMap['alternate']] || '').trim();
+      const alternate = (['yes', 'y', 'true', '1'].includes(alternateRaw.toLowerCase())) ? 'Yes' : (alternateRaw ? 'No' : '');
+      const orderId = String(row[idxMap['order id']] || '').trim();
+      const fileOrderType = String(row[idxMap['order type']] || '').trim(); 
+      const orderType = req.body.orderType || fileOrderType; // IVR, MissCall, Custom
+      const amount = row[idxMap['amount']];
+      const status = String(row[idxMap['status']] || '').trim();
+      const agentName = String(row[idxMap['agent']] || '').trim();
       
       // Validate Mandatory Fields
       if (!mobile || mobile.length < 10) {
         errors.push({ row: i + 1, message: 'Invalid Mobile Number' });
         continue;
       }
-      if (!name) {
-        errors.push({ row: i + 1, message: 'Missing Name' });
+      if (!customerName) {
+        errors.push({ row: i + 1, message: 'Missing Customer Name' });
         continue;
       }
-      if (!orderId) {
-        errors.push({ row: i + 1, message: 'Missing OrderId' });
-        continue;
-      }
-      if (mrp === undefined || mrp === '' || pay === undefined || pay === '') {
-        errors.push({ row: i + 1, message: 'Missing MRP or Pay' });
-        continue;
-      }
-
+      // Order ID is now optional as per user request
+      
       try {
         // 1. Find or Create Customer
-        // Map mobile to phone, name to firstName/lastName
-        let customer = await Customer.findOne({ where: { phone: mobile } });
+        // Use loose matching for phone (last 10 digits) to handle +91 prefix differences
+        const last10 = mobile.slice(-10);
+        let customer = await Customer.findOne({ 
+            where: { 
+                phone: { [Op.like]: `%${last10}` } 
+            } 
+        });
+
         if (!customer) {
           // Split name into first and last
-          const nameParts = name.split(' ');
+          const nameParts = customerName.split(' ');
           const firstName = nameParts[0] || 'Unknown';
           const lastName = nameParts.slice(1).join(' ') || '.';
           
           customer = await Customer.create({
             phone: mobile,
-            // alternatePhone removed as it is not a phone number
             firstName: firstName,
             lastName: lastName,
             status: 'Active'
           });
         }
-        // Removed alternatePhone update logic
 
         // 2. Create Call Record (Order)
-        // Check if order already exists? Maybe skip duplicate OrderIds?
-        // For now, let's assume we allow multiple entries or user manages dupes.
-        // But usually OrderId should be unique. 
-        // Let's check if a call with this orderId exists.
-        const existingCall = await Call.findOne({ 
-            where: { 
-                orderId: orderId 
-            } 
-        });
+        // Check if a call with this orderId exists (only if orderId is present)
+        if (orderId) {
+            const existingCall = await Call.findOne({ 
+                where: { 
+                    orderId: orderId 
+                } 
+            });
 
-        if (existingCall) {
-            errors.push({ row: i + 1, message: `Order ID ${orderId} already exists` });
-            continue;
+            if (existingCall) {
+                errors.push({ row: i + 1, message: `Order ID ${orderId} already exists` });
+                continue;
+            }
+        }
+
+        // Find Agent by name or use current user
+        // Note: Ideally we should map agent name to ID. For now, we'll try to find a user by name, else fallback to current user.
+        let assignedAgentId = userId;
+        if (agentName) {
+            const agentUser = await User.findOne({ 
+                where: sequelize.where(
+                    sequelize.fn('concat', sequelize.col('firstName'), ' ', sequelize.col('lastName')), 
+                    { [Op.like]: `%${agentName}%` }
+                )
+            });
+            if (agentUser) assignedAgentId = agentUser.id;
+        }
+
+        // Parse Date
+        let orderDate = new Date();
+        if (dateRaw) {
+             // Handle Excel date serial or string
+             if (typeof dateRaw === 'number') {
+                 // xlsx cellDates: true handles this, but if not:
+                 // orderDate = new Date(Math.round((dateRaw - 25569)*86400*1000));
+                 orderDate = new Date(dateRaw); // if cellDates:true, this is likely already a Date object or parsable
+             } else if (typeof dateRaw === 'string') {
+                 // Handle "DD-MMM" format (e.g. "5-Jan") by appending current year
+                 if (/^\d{1,2}-[A-Za-z]{3}$/.test(dateRaw.trim())) {
+                     const currentYear = new Date().getFullYear();
+                     orderDate = new Date(`${dateRaw.trim()}-${currentYear}`);
+                 } else {
+                     orderDate = new Date(dateRaw);
+                 }
+             } else {
+                 orderDate = new Date(dateRaw);
+             }
+             if (isNaN(orderDate.getTime())) orderDate = new Date(); // Fallback
         }
 
         await Call.create({
           customerId: customer.id,
-          agentId: userId,
-          orderId: orderId,
-          date: new Date(),
+          agentId: assignedAgentId,
+          orderId: orderId || null,
+          date: orderDate,
           callType: 'Order Upload',
-          category: 'System Import',
+          category: orderType || 'System Import',
           outcome: 'Completed',
-          notes: `Imported via Bulk Upload. File: ${file.originalname}`,
+          notes: `Imported via Bulk Upload. Type: ${orderType}. Status: ${status}. Agent: ${agentName}. File: ${file.originalname}`,
           orderDetails: {
             orderId: orderId,
-            customerName: name,
+            orderType: orderType,
+            customerName: customerName,
             customerMobileNo: mobile,
-            alternate: alternate, // Store Yes/No
-            mrp: mrp,
-            pay: pay
+            alternate: alternate,
+            amount: amount,
+            status: status,
+            agentName: agentName
           }
         });
 
@@ -169,8 +218,8 @@ exports.uploadOrders = async (req, res) => {
      const wb = xlsx.utils.book_new();
      // Headers matching user requirements
      const wsData = [
-       ['Mobile No', 'Name', 'OrderId', 'MRP', 'Pay', 'Alternate'],
-       ['9876543210', 'John Doe', 'ORD-001', 1000, 900, 'Yes'] // Example row
+       ['Date', 'Customer', 'Phone', 'Alternate', 'Order ID', 'Order Type', 'Amount', 'Status', 'Agent'],
+       ['5-Jan', 'Umar', '9082772947', 'Yes', 'PO90909090909090', 'IVR', 2000, 'Completed', 'Mantasha Ansari']
      ];
      const ws = xlsx.utils.aoa_to_sheet(wsData);
      xlsx.utils.book_append_sheet(wb, ws, 'Template');
@@ -191,10 +240,10 @@ exports.getReorders = async (req, res) => {
   try {
     // Check user role for permission
     const user = await User.findByPk(req.user.id, {
-      include: [{ model: Role, as: 'role' }]
+      include: [{ model: Role }]
     });
 
-    const isAdmin = user.role && (user.role.name === 'Super Admin' || user.role.name === 'Admin');
+    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
 
     const today = new Date();
     // Calculate date 1 month ago
@@ -205,15 +254,32 @@ exports.getReorders = async (req, res) => {
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     // Determine query conditions
     const where = {
-      date: {
-        [Op.between]: [startOfDay, endOfDay]
-      },
-      [Op.or]: [
-        { category: 'Order' },
-        { category: 'System Import' }, // Matches uploadOrders
-        { orderId: { [Op.ne]: null } }
+      [Op.and]: [
+        { date: { [Op.between]: [startOfDay, endOfDay] } },
+        {
+          [Op.or]: [
+            { category: 'Order' },
+            { category: 'System Import' },
+            { callType: 'Order Upload' },
+            { orderId: { [Op.ne]: null } }
+          ]
+        },
+        {
+          [Op.or]: [
+            { updatedAt: { [Op.lt]: todayStart } },
+            {
+              [Op.and]: [
+                { updatedAt: { [Op.gte]: todayStart } },
+                { outcome: { [Op.in]: ['Ringing', 'Follow-up'] } }
+              ]
+            }
+          ]
+        }
       ]
     };
 
@@ -223,16 +289,25 @@ exports.getReorders = async (req, res) => {
     }
     
     // Include Customer and Agent info
-    const calls = await Call.findAll({
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const offset = (page - 1) * pageSize;
+
+    const { count, rows } = await Call.findAndCountAll({
       where,
       include: [
-        { model: Customer, as: 'customer' },
+        { model: Customer },
         { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
       ],
-      order: [['date', 'DESC']]
+      order: [
+        [sequelize.literal(`CASE WHEN "Call"."updatedAt" >= '${todayStart.toISOString()}' THEN 1 ELSE 0 END`), 'ASC'],
+        ['date', 'DESC']
+      ],
+      limit: pageSize,
+      offset
     });
 
-    res.json(calls);
+    res.json({ rows, count, page, pageSize });
   } catch (error) {
     console.error('Get re-orders failed:', error);
     res.status(500).json({ message: 'Failed to fetch re-orders', error: error.message });
@@ -244,10 +319,10 @@ exports.getReordersCount = async (req, res) => {
   try {
     // Check user role for permission
     const user = await User.findByPk(req.user.id, {
-      include: [{ model: Role, as: 'role' }]
+      include: [{ model: Role }]
     });
 
-    const isAdmin = user.role && (user.role.name === 'Super Admin' || user.role.name === 'Admin');
+    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
 
     const today = new Date();
     // Calculate date 1 month ago
@@ -258,15 +333,32 @@ exports.getReordersCount = async (req, res) => {
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     // Determine query conditions
     const where = {
-      date: {
-        [Op.between]: [startOfDay, endOfDay]
-      },
-      [Op.or]: [
-        { category: 'Order' },
-        { category: 'System Import' }, 
-        { orderId: { [Op.ne]: null } }
+      [Op.and]: [
+        { date: { [Op.between]: [startOfDay, endOfDay] } },
+        {
+          [Op.or]: [
+            { category: 'Order' },
+            { category: 'System Import' },
+            { callType: 'Order Upload' },
+            { orderId: { [Op.ne]: null } }
+          ]
+        },
+        {
+          [Op.or]: [
+            { updatedAt: { [Op.lt]: todayStart } },
+            {
+              [Op.and]: [
+                { updatedAt: { [Op.gte]: todayStart } },
+                { outcome: { [Op.in]: ['Ringing', 'Not Interested', 'Follow-up'] } }
+              ]
+            }
+          ]
+        }
       ]
     };
 
@@ -281,5 +373,101 @@ exports.getReordersCount = async (req, res) => {
   } catch (error) {
     console.error('Get re-orders count failed:', error);
     res.status(500).json({ message: 'Failed to fetch re-orders count', error: error.message });
+  }
+};
+
+// Get Uploaded Orders (filtered by date)
+exports.getUploadedOrders = async (req, res) => {
+  try {
+    // Check user role for permission
+    const user = await User.findByPk(req.user.id, {
+      include: [{ model: Role }]
+    });
+
+    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const { date } = req.query;
+
+    const where = {
+      callType: 'Order Upload'
+    };
+
+    if (date) {
+      const targetDate = new Date(date);
+      // Validate date
+      if (!isNaN(targetDate.getTime())) {
+        const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+        where.date = {
+          [Op.between]: [startOfDay, endOfDay]
+        };
+      }
+    }
+
+    // If not admin, restrict to own uploads/assigned orders
+    if (!isAdmin) {
+       where.agentId = req.user.id; 
+    }
+
+    const calls = await Call.findAll({
+      where,
+      include: [
+        { model: Customer },
+        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json(calls);
+  } catch (error) {
+    console.error('Get uploaded orders failed:', error);
+    res.status(500).json({ message: 'Failed to fetch uploaded orders', error: error.message });
+  }
+};
+
+// Update Order Status
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { caseStatus, subStatus, followUpDate, closeReason } = req.body;
+    
+    const call = await Call.findByPk(id);
+    if (!call) {
+      return res.status(404).json({ message: 'Order record not found' });
+    }
+
+    // Determine new outcome and follow-up details
+    let newOutcome = '';
+    let newFollowUpDate = null;
+    let newFollowUpRequired = false;
+
+    if (caseStatus === 'Open') {
+      newOutcome = subStatus; // Ringing, Follow-up
+      if (subStatus === 'Follow-up') {
+        if (!followUpDate) {
+          return res.status(400).json({ message: 'Follow-up date is required' });
+        }
+        newFollowUpDate = new Date(followUpDate);
+        newFollowUpRequired = true;
+      }
+    } else if (caseStatus === 'Close') {
+      newOutcome = closeReason; // Order Created, Reorder, Not Interested
+    } else {
+      return res.status(400).json({ message: 'Invalid Case Status' });
+    }
+
+    // Update the call record
+    await call.update({
+      outcome: newOutcome,
+      followUpDate: newFollowUpDate,
+      followUpRequired: newFollowUpRequired,
+      // Update orderDetails status if needed, or keep history in notes?
+      // Let's append to notes for history
+      notes: (call.notes || '') + `\n[${new Date().toLocaleString()}] Status updated to: ${newOutcome}`
+    });
+
+    res.json({ message: 'Status updated successfully', call });
+  } catch (error) {
+    console.error('Update order status failed:', error);
+    res.status(500).json({ message: 'Failed to update status', error: error.message });
   }
 };

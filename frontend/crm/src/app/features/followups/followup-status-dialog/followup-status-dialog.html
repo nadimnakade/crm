@@ -23,6 +23,11 @@
           <input type="text" class="form-control" [(ngModel)]="reason" placeholder="Enter reason">
         </div>
 
+        <div class="form-group" *ngIf="status === 'Re-Follow-up'">
+          <label>Follow-up Date <span class="text-danger">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="followUpDate">
+        </div>
+
         <div class="form-group">
           <label>Comments / Remarks</label>
           <textarea class="form-control" [(ngModel)]="notes" rows="3" placeholder="Add comments"></textarea>

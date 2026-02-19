@@ -1,5 +1,4 @@
-<!-- Global centered blocking loading overlay -->
-<div class="loading-backdrop" *ngIf="loading$ | async" aria-hidden="true">
+<div class="loading-backdrop" *ngIf="(loading$ | async) && !suppressGlobalLoader" aria-hidden="true">
   <div class="loading-modal" role="dialog" aria-label="Loading">
     <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
     <div>

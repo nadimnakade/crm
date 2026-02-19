@@ -1,0 +1,117 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Followup Uploaded List</h2>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body pb-0">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search by name or phone"
+            [(ngModel)]="searchTerm"
+            (keyup.enter)="onSearch()"
+          />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0">From</label>
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="fromDate"
+            (change)="onDateChange()"
+          />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0">To</label>
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="toDate"
+            (change)="onDateChange()"
+          />
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-outline-primary btn-sm me-1" (click)="onSearch()">
+            <i class="fa fa-search"></i> Search
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="clearSearch()" [disabled]="!searchTerm">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th>Follow up</th>
+              <th>Name</th>
+              <th>Number</th>
+              <th>Order ID</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Agent</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="8" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="!isLoading && rows.length === 0">
+              <td colspan="8" class="text-center py-4 text-muted">
+                No uploaded follow-ups found.
+              </td>
+            </tr>
+            <tr *ngFor="let r of rows">
+              <td>{{ r.followUpDate | date:'mediumDate' }}</td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.number }}</td>
+              <td>{{ r.orderId || '-' }}</td>
+              <td>{{ r.type || '-' }}</td>
+              <td>{{ r.outcome || 'Pending' }}</td>
+              <td>{{ r.agent || '-' }}</td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary" (click)="openStatusDialog(r)">
+                  Update Status
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card-footer" *ngIf="totalPages > 1">
+      <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center mb-0">
+          <li class="page-item" [class.disabled]="currentPage === 1">
+            <button class="page-link" (click)="onPageChange(currentPage - 1)">Previous</button>
+          </li>
+          <li class="page-item" *ngFor="let p of pages" [class.active]="currentPage === p">
+            <button class="page-link" (click)="onPageChange(p)">{{ p }}</button>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage === totalPages">
+            <button class="page-link" (click)="onPageChange(currentPage + 1)">Next</button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<app-followup-status-dialog
+  *ngIf="selectedFollowup"
+  [followup]="selectedFollowup"
+  (save)="onDialogSave($event)"
+  (cancel)="onDialogCancel()">
+</app-followup-status-dialog>

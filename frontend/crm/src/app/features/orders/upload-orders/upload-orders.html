@@ -1,0 +1,38 @@
+<div class="container-fluid mt-4">
+  <h2>Upload ReOrders (Admin)</h2>
+  <p class="text-muted">Select an Excel/CSV file and optionally specify Order Type (IVR, MissCall, Custom).</p>
+
+  <div class="card p-3">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <input type="file" class="form-control" (change)="onFileChange($event)" accept=".xls,.xlsx,.csv" />
+      </div>
+      <div class="col-md-3">
+        <select class="form-select" [(ngModel)]="orderType">
+          <option value="">Order Type (optional)</option>
+          <option value="IVR">IVR</option>
+          <option value="MissCall">MissCall</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <button class="btn btn-primary me-2" [disabled]="!file || uploading" (click)="upload()">
+          <span *ngIf="uploading" class="spinner-border spinner-border-sm me-1"></span>
+          Upload
+        </button>
+        <button class="btn btn-outline-secondary" (click)="downloadTemplate()">Download Template</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-3 mt-3" *ngIf="message || errors?.length">
+    <p class="mb-1">{{ message }}</p>
+    <p class="mb-1">Inserted: {{ inserted }}, Skipped: {{ skipped }}</p>
+    <div *ngIf="errors?.length">
+      <h6 class="mt-2">Errors ({{ errors.length }})</h6>
+      <ul class="mb-0">
+        <li *ngFor="let e of errors">Row {{ e.row || '-' }}: {{ e.message }}</li>
+      </ul>
+    </div>
+  </div>
+</div>

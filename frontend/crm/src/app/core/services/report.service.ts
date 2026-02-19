@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -76,19 +76,23 @@ export class ReportService {
     return `${this.apiUrl}/followups/export?${params.toString()}`;
   }
 
-  getTopAgents(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/top-agents`);
+  getTopAgents(options?: { skipLoader?: boolean }): Observable<any[]> {
+    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
+    return this.http.get<any[]>(`${this.apiUrl}/top-agents`, { headers });
   }
 
-  getActiveUsers(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/active-users`);
+  getActiveUsers(options?: { skipLoader?: boolean }): Observable<any[]> {
+    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
+    return this.http.get<any[]>(`${this.apiUrl}/active-users`, { headers });
   }
 
-  getWeeklyOrderStats(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/weekly-orders`);
+  getWeeklyOrderStats(options?: { skipLoader?: boolean }): Observable<any[]> {
+    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
+    return this.http.get<any[]>(`${this.apiUrl}/weekly-orders`, { headers });
   }
 
-  getCallOutcomeStats(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/call-outcomes`);
+  getCallOutcomeStats(options?: { skipLoader?: boolean }): Observable<any[]> {
+    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
+    return this.http.get<any[]>(`${this.apiUrl}/call-outcomes`, { headers });
   }
 }

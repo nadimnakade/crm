@@ -1,5 +1,7 @@
 const { Call, Customer, User, Role, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const xlsx = require('xlsx');
+const path = require('path');
 
 const hasOrdersViewerAccess = async (user) => {
   if (!user) return false;
@@ -114,6 +116,276 @@ exports.getCalls = async (req, res) => {
   }
 };
 
+// @desc    Bulk upload follow-ups from Excel/CSV
+// @route   POST /api/calls/followups/upload
+// @access  Admins only
+exports.uploadFollowUps = async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const wb = xlsx.readFile(file.path);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    if (!rows || rows.length < 2) {
+      return res.status(422).json({ message: 'No data rows found' });
+    }
+
+    const header = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const idx = (name) => header.indexOf(name.toLowerCase());
+    const colFollow = idx('follow up') !== -1 ? idx('follow up') : idx('followup');
+    const colOrderId = idx('order id');
+    const colName = idx('name');
+    const colNumber = idx('number');
+    const colType = idx('type');
+    const colAgent = idx('agent');
+
+    const requiredMissing = [colFollow, colName, colNumber].some(i => i === -1);
+    if (requiredMissing) {
+      return res.status(422).json({ message: 'Missing required headers. Expected: Follow up, Name, Number, [Order ID], [Type], [Agent]' });
+    }
+
+    const results = { inserted: 0, skipped: 0, errors: [] };
+    const seenKeys = new Set();
+
+    for (let r = 1; r < rows.length; r++) {
+      try {
+        const row = rows[r];
+        const fuRaw = row[colFollow];
+        const nameRaw = String(row[colName] || '').trim();
+        const numberRaw = String(row[colNumber] || '').trim().replace(/[^0-9]/g, '');
+        const typeRaw = colType !== -1 ? String(row[colType] || '').trim() : '';
+        const agentName = colAgent !== -1 ? String(row[colAgent] || '').trim() : '';
+        const orderIdRaw = colOrderId !== -1 ? String(row[colOrderId] || '').trim() : '';
+
+        if (!nameRaw || !numberRaw || numberRaw.length < 10) {
+          results.skipped++; 
+          results.errors.push({ row: r + 1, message: 'Invalid name/number' });
+          continue;
+        }
+
+        let followDateStr = '';
+        if (fuRaw) {
+          const s = String(fuRaw).trim();
+          if (s) {
+            const m1 = /^(\d{1,2})[-\/ ]([A-Za-z]{3})[-\/ ]?(\d{2,4})?$/.exec(s);
+            if (m1) {
+              const day = parseInt(m1[1], 10) || 1;
+              const monStr = m1[2].toLowerCase();
+              const monMap = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+              const mi = monMap.indexOf(monStr);
+              let year = new Date().getFullYear();
+              if (m1[3]) {
+                const yNum = parseInt(m1[3], 10);
+                if (!isNaN(yNum)) {
+                  year = yNum < 100 ? 2000 + yNum : yNum;
+                }
+              }
+              const mm = String((mi === -1 ? 0 : mi) + 1).padStart(2, '0');
+              const dd = String(day).padStart(2, '0');
+              followDateStr = `${year}-${mm}-${dd}`;
+            } else {
+              const tryDate = new Date(s);
+              if (!isNaN(tryDate.getTime())) {
+                const y = tryDate.getFullYear();
+                const m = tryDate.getMonth();
+                const d = tryDate.getDate();
+                const mm = String(m + 1).padStart(2, '0');
+                const dd = String(d).padStart(2, '0');
+                followDateStr = `${y}-${mm}-${dd}`;
+              }
+            }
+          }
+        }
+
+        // Find or create customer by phone
+        const phone10 = numberRaw.slice(-10);
+        let customer = await Customer.findOne({ where: { phone: { [Op.like]: `%${phone10}` } } });
+        if (!customer) {
+          const parts = nameRaw.split(' ');
+          customer = await Customer.create({
+            phone: numberRaw,
+            firstName: parts[0] || 'Unknown',
+            lastName: parts.slice(1).join(' ') || '.',
+            status: 'Active'
+          });
+        }
+
+        const duplicateKey = `${phone10}|${orderIdRaw || ''}|${followDateStr}`;
+        if (seenKeys.has(duplicateKey)) {
+          results.skipped++;
+          results.errors.push({ row: r + 1, message: 'Duplicate in file for same customer/order/date' });
+          continue;
+        }
+
+        // We only dedupe within the current file using seenKeys.
+        // Existing records in the database are allowed; frontend list will show unique rows.
+
+        seenKeys.add(duplicateKey);
+
+        // Find agent
+        let assignedAgentId = req.user.id;
+        if (agentName) {
+          const trimmedAgent = agentName.trim();
+          const lowered = trimmedAgent.toLowerCase();
+          const orConditions = [
+            sequelize.where(
+              sequelize.fn(
+                'LOWER',
+                sequelize.fn('concat', sequelize.col('firstName'), ' ', sequelize.col('lastName'))
+              ),
+              { [Op.like]: `%${lowered}%` }
+            ),
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('username')),
+              { [Op.like]: `%${lowered}%` }
+            ),
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('email')),
+              { [Op.like]: `%${lowered}%` }
+            )
+          ];
+          const asNumber = parseInt(trimmedAgent, 10);
+          if (!isNaN(asNumber)) {
+            orConditions.push({ id: asNumber });
+          }
+
+          const agentUser = await User.findOne({
+            where: { [Op.or]: orConditions }
+          });
+          if (agentUser) assignedAgentId = agentUser.id;
+        }
+
+        // Treat 'Fresh' style order IDs as blank
+        const orderId = /fresh/i.test(orderIdRaw) ? null : (orderIdRaw || null);
+
+        await Call.create({
+          customerId: customer.id,
+          agentId: assignedAgentId,
+          orderId: orderId,
+          date: new Date(),
+          callType: 'Follow-up Upload',
+          category: typeRaw || 'Follow-up',
+          outcome: 'Follow-up',
+          notes: `Imported via Follow-ups upload. Type: ${typeRaw}. Agent: ${agentName}. File: ${path.basename(file.path)}`,
+          followUpRequired: true,
+          followUpDate: followDateStr || null
+        });
+
+        results.inserted++;
+      } catch (e) {
+        results.skipped++;
+        results.errors.push({ row: r + 1, message: e.message || 'Row failed' });
+      }
+    }
+
+    res.status(results.inserted > 0 ? 201 : 422).json(results);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    List follow-ups created via file upload
+// @route   GET /api/calls/followups/uploaded
+// @access  Private (role-based visibility)
+exports.getUploadedFollowUps = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 20;
+    const offset = (page - 1) * pageSize;
+    const visibility = await getVisibility(req.user);
+    const rawSearch = (req.query.search || '').toString().trim();
+    const hasSearch = rawSearch.length > 0;
+
+    const parseLocalYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0);
+    };
+    const fromStr = (req.query.from || '').toString().trim();
+    const toStr = (req.query.to || '').toString().trim();
+    const today = new Date();
+    let start = parseLocalYMD(fromStr) || new Date(today);
+    let end = parseLocalYMD(toStr) || new Date(start);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(end.getTime());
+    endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const baseWhere = {
+      callType: 'Follow-up Upload',
+      followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive }
+    };
+
+    if (visibility.scope === 'agent') {
+      baseWhere.agentId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+      baseWhere.agentId = { [Op.in]: visibility.allowedAgentIds };
+    }
+
+    let customerWhere = undefined;
+    const callSearchWhere = [];
+    if (hasSearch) {
+      callSearchWhere.push(
+        { orderId: { [Op.like]: `%${rawSearch}%` } },
+        { category: { [Op.like]: `%${rawSearch}%` } },
+        { notes: { [Op.like]: `%${rawSearch}%` } },
+        { outcome: { [Op.like]: `%${rawSearch}%` } }
+      );
+      const digitsOnly = rawSearch.replace(/[^0-9]/g, '');
+      const phoneFilter = digitsOnly.length >= 5 ? { phone: { [Op.like]: `%${digitsOnly}%` } } : undefined;
+      const ors = [
+        { firstName: { [Op.like]: `%${rawSearch}%` } },
+        { lastName: { [Op.like]: `%${rawSearch}%` } }
+      ];
+      if (phoneFilter) ors.push(phoneFilter);
+      customerWhere = { [Op.or]: ors };
+    }
+
+    const include = [
+      customerWhere
+        ? { model: Customer, where: customerWhere, required: true }
+        : { model: Customer },
+      { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+    ];
+
+    const where = hasSearch
+      ? { [Op.and]: [baseWhere, { [Op.or]: callSearchWhere }] }
+      : baseWhere;
+
+    const { rows, count } = await Call.findAndCountAll({
+      where,
+      include,
+      order: [['followUpDate', 'ASC']],
+      limit: pageSize,
+      offset
+    });
+
+    const data = rows.map(r => ({
+      id: r.id,
+      customerId: r.customerId,
+      followUpDate: r.followUpDate,
+      name: `${r.Customer?.firstName || ''} ${r.Customer?.lastName || ''}`.trim(),
+      number: r.Customer?.phone || r.Customer?.mobileNumber || '',
+      orderId: r.orderId,
+      type: r.category,
+      outcome: r.outcome,
+      reason: r.reason,
+      agent: r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : ''
+    }));
+
+    res.json({ data, total: count, page, pageSize });
+  } catch (error) {
+    console.error('getUploadedFollowUps failed:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
 // @desc    Get active follow-ups
 // @route   GET /api/calls/followups
 // @access  Private
@@ -123,6 +395,8 @@ exports.getFollowUps = async (req, res) => {
     const pageSize = parseInt(req.query.pageSize, 10) || 20;
     const offset = (page - 1) * pageSize;
     const visibility = await getVisibility(req.user);
+    const rawSearch = (req.query.search || '').toString().trim();
+    const hasSearch = rawSearch.length > 0;
 
     const where = {
       followUpRequired: true,
@@ -133,15 +407,39 @@ exports.getFollowUps = async (req, res) => {
     if (visibility.scope === 'agent') {
       where.agentId = req.user.id;
     } else if (visibility.scope === 'manager') {
-       where.agentId = { [Op.in]: visibility.allowedAgentIds };
+      where.agentId = { [Op.in]: visibility.allowedAgentIds };
+    }
+
+    const include = [
+      { model: Customer },
+      { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+    ];
+
+    if (hasSearch) {
+      const search = rawSearch.toLowerCase();
+      const like = `%${search}%`;
+      include[0] = {
+        ...include[0],
+        where: {
+          [Op.or]: [
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('Customer.firstName')),
+              { [Op.like]: like }
+            ),
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('Customer.lastName')),
+              { [Op.like]: like }
+            ),
+            { phone: { [Op.like]: `%${rawSearch}%` } },
+            { mobileNumber: { [Op.like]: `%${rawSearch}%` } }
+          ]
+        }
+      };
     }
 
     const { rows, count } = await Call.findAndCountAll({
       where,
-      include: [
-        { model: Customer },
-        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
-      ],
+      include,
       order: [['followUpDate', 'ASC']],
       limit: pageSize,
       offset
@@ -161,7 +459,7 @@ exports.updateFollowUpStatus = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { id } = req.params;
-    const { status, reason, comments } = req.body;
+    const { status, reason, notes, followUpDate } = req.body;
     const agentId = req.user.id;
 
     const call = await Call.findByPk(id, { include: [Customer], transaction });
@@ -173,13 +471,23 @@ exports.updateFollowUpStatus = async (req, res) => {
     // Update current call
     call.outcome = status;
     call.reason = reason;
-    if (comments) {
-      call.notes = (call.notes ? call.notes + '\n' : '') + `[${new Date().toISOString()}] ${comments}`;
+    if (notes) {
+      call.notes = (call.notes ? call.notes + '\n' : '') + `[${new Date().toISOString()}] ${notes}`;
     }
-    // If handled, maybe set followUpRequired to false? 
-    // User didn't specify, but usually "Order", "Not Interested" etc means follow-up is done.
-    if (['Order', 'Order Already Placed', 'Not Interested', 'Not Required'].includes(status)) {
-        call.followUpRequired = false;
+    if (status === 'Re-Follow-up') {
+      if (followUpDate) {
+        const d = new Date(followUpDate);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = d.getMonth();
+          const day = d.getDate();
+          const normalized = new Date(y, m, day, 0, 0, 0, 0);
+          call.followUpRequired = true;
+          call.followUpDate = normalized;
+        }
+      }
+    } else if (['Order', 'Order Already Placed', 'Not Interested', 'Not Required'].includes(status)) {
+      call.followUpRequired = false;
     }
     
     await call.save({ transaction });
@@ -764,6 +1072,10 @@ exports.getFollowupReport = async (req, res) => {
       sequelize.where(sequelize.fn('LOWER', sequelize.col('category')), { [Op.in]: ['sales-call','sales call','sales_call'] }),
       sequelize.where(sequelize.fn('LOWER', sequelize.col('outcome')), 'no')
     ];
+    const bulkUploadFollowups = [
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.in]: ['follow-up upload','followup upload','followups upload'] }),
+      { followUpRequired: true }
+    ];
 
     const where = {
       [Op.and]: [
@@ -772,7 +1084,9 @@ exports.getFollowupReport = async (req, res) => {
             // With order id: use followUpDate range and match ONLY inbound scheduled scenario
             { [Op.and]: [ { orderId: { [Op.ne]: null } }, dateFilter, ...inboundFollowScheduled ] },
             // Without order id: use followUpDate range and match ONLY outbound followup scenario
-            { [Op.and]: [ { orderId: { [Op.eq]: null } }, dateFilter, ...outboundSalesFollowup ] }
+            { [Op.and]: [ { orderId: { [Op.eq]: null } }, dateFilter, ...outboundSalesFollowup ] },
+            // Bulk uploaded follow-ups (may or may not have orderId)
+            { [Op.and]: [ dateFilter, ...bulkUploadFollowups ] }
           ]
         }
       ]

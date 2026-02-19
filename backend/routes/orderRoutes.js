@@ -5,7 +5,7 @@ const upload = require('../utils/orderUpload');
 const { protect } = require('../middleware/auth'); // Assuming auth middleware exists
 
 // Upload bulk orders
-router.post('/upload', protect, upload.single('file'), orderController.uploadOrders);
+router.post('/uploadOrders', protect, upload.single('file'), orderController.uploadOrders);
 
 // Download template
 router.get('/template', protect, orderController.downloadTemplate);
@@ -16,5 +16,10 @@ router.get('/reorders', protect, orderController.getReorders);
 // Get re-orders count for today
 router.get('/reorders/count', protect, orderController.getReordersCount);
 
-module.exports = router;
+// Get uploaded orders history
+router.get('/uploaded', protect, orderController.getUploadedOrders);
 
+// Update order status
+router.put('/:id/status', protect, orderController.updateOrderStatus);
+
+module.exports = router;

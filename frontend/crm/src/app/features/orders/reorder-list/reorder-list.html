@@ -39,6 +39,23 @@
           </tr>
         </tbody>
         </table>
+      
+      <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="totalReorders > pageSize">
+        <small>Showing {{ (page - 1) * pageSize + 1 }} to {{ page * pageSize > totalReorders ? totalReorders : page * pageSize }} of {{ totalReorders }} entries</small>
+        <nav aria-label="Page navigation">
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="page === 1">
+              <button class="page-link" (click)="onPageChange(page - 1)">Previous</button>
+            </li>
+            <li class="page-item disabled">
+               <span class="page-link">Page {{ page }} of {{ totalPages }}</span>
+            </li>
+            <li class="page-item" [class.disabled]="page >= totalPages">
+              <button class="page-link" (click)="onPageChange(page + 1)">Next</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </div>
 
     <div class="table-responsive card p-3" *ngIf="!loading && reorders.length > 0">
@@ -53,20 +70,103 @@
             <th>Amount</th>
             <th>Status</th>
             <th>Agent</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let order of reorders">
+          <tr *ngFor="let order of reorders; let i = index">
             <td>{{ order.date | date:'mediumDate' }}</td>
-            <td>{{ order.customer?.firstName }} {{ order.customer?.lastName }}</td>
-            <td>{{ order.customer?.phone }}</td>
+            <td>{{ order.orderDetails?.customerName || order.customer?.firstName || '-' }}</td>
+            <!-- <td>
+              <span *ngIf="i === 0">{{ order.orderDetails?.customerMobileNo || order.customer?.phone }}</span>
+              <span *ngIf="i > 0">
+                {{ ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:0:2) + 'XXXXXX' + ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:-2) }}
+              </span>
+            </td> -->
+            <td>{{ order.orderDetails?.customerMobileNo || '-' }}</td>
             <td>{{ order.orderDetails?.alternate || '-' }}</td>
-            <td>{{ order.orderId }}</td>
+            <td>{{ order.orderDetails?.orderId || order.orderId }}</td>
             <td>{{ order.orderDetails?.pay || order.orderDetails?.mrp || '-' }}</td>
             <td>{{ order.outcome }}</td>
             <td>{{ order.agent?.firstName }} {{ order.agent?.lastName }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" (click)="openStatusModal(order)">
+                Update Status
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
+      
+      <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="totalReorders > pageSize">
+        <small>Showing {{ (page - 1) * pageSize + 1 }} to {{ page * pageSize > totalReorders ? totalReorders : page * pageSize }} of {{ totalReorders }} entries</small>
+        <nav aria-label="Page navigation">
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="page === 1">
+              <button class="page-link" (click)="onPageChange(page - 1)">Previous</button>
+            </li>
+            <li class="page-item disabled">
+               <span class="page-link">Page {{ page }} of {{ totalPages }}</span>
+            </li>
+            <li class="page-item" [class.disabled]="page >= totalPages">
+              <button class="page-link" (click)="onPageChange(page + 1)">Next</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" tabindex="-1" [ngClass]="{'show': showModal}" [style.display]="showModal ? 'block' : 'none'" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Update Status</h5>
+        <button type="button" class="btn-close" (click)="closeStatusModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="mb-3">
+            <label class="form-label">Case Status</label>
+            <select class="form-select" [(ngModel)]="caseStatus" name="caseStatus">
+              <option value="Open">Open</option>
+              <option value="Close">Close</option>
+            </select>
+          </div>
+
+          <div class="mb-3" *ngIf="caseStatus === 'Open'">
+            <label class="form-label">Sub-Status</label>
+            <select class="form-select" [(ngModel)]="subStatus" name="subStatus">
+              <option value="Ringing">Ringing</option>
+              <option value="Follow-up">Follow-up</option>
+            </select>
+          </div>
+
+          <div class="mb-3" *ngIf="caseStatus === 'Open' && subStatus === 'Follow-up'">
+            <label class="form-label">Follow-up Date <span class="text-danger">*</span></label>
+            <input type="datetime-local" class="form-control" [(ngModel)]="followUpDate" name="followUpDate">
+          </div>
+
+          <div class="mb-3" *ngIf="caseStatus === 'Close'">
+            <label class="form-label">Close Reason</label>
+            <select class="form-select" [(ngModel)]="closeReason" name="closeReason">
+              <option value="Order Created">Order Created</option>
+              <option value="Reorder">Reorder</option>
+              <option value="Not Interested">Not Interested</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeStatusModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="saveStatus()" [disabled]="submitting">
+          <span *ngIf="submitting" class="spinner-border spinner-border-sm me-1"></span>
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showModal"></div>

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CallService } from '../../../shared/services/call';
@@ -11,7 +11,7 @@ import { OrderService } from '../../../core/services/order.service';
 @Component({
   selector: 'app-orders-search',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule],
   templateUrl: './orders-search.html',
   styleUrls: [],
 })
@@ -26,6 +26,10 @@ export class OrdersSearchComponent implements OnInit {
   users: any[] = [];
   hasSearched = false;
   isAgentRole = false;
+  canUpload = false;
+  
+  orderTypes = ['IVR', 'MissCall', 'Custom'];
+  selectedOrderType = '';
 
   constructor(
     private fb: FormBuilder,
@@ -49,6 +53,7 @@ export class OrdersSearchComponent implements OnInit {
     // Role-based phone masking
     const role = (this.auth.getUser()?.role || '').toLowerCase();
     this.isAgentRole = role === 'agent';
+    this.canUpload = role === 'admin' || role === 'superadmin';
 
     // Accept query params for deep-linking to order details
     const qp = this.route.snapshot.queryParamMap;
@@ -91,7 +96,7 @@ export class OrdersSearchComponent implements OnInit {
       if (!confirm(`Upload ${file.name}?`)) return;
       
       this.isLoading = true;
-      this.orderService.uploadOrders(file).subscribe({
+      this.orderService.uploadOrders(file, this.selectedOrderType).subscribe({
         next: (res) => {
           this.isLoading = false;
           let msg = `Upload processed.\nInserted: ${res.inserted}\nSkipped: ${res.skipped}`;
@@ -232,4 +237,4 @@ export class OrdersSearchComponent implements OnInit {
     }
   }
 }
-
+

@@ -8,6 +8,28 @@
   </div>
 
   <div class="card shadow-sm">
+    <div class="card-body pb-0">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-4">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search by name or phone"
+            [(ngModel)]="searchTerm"
+            (keyup.enter)="onSearch()"
+          />
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-outline-primary btn-sm me-1" (click)="onSearch()">
+            <i class="fa fa-search"></i> Search
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="clearSearch()" [disabled]="!searchTerm">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-0">
     <div class="card-body p-0">
       <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -49,12 +71,7 @@
                 </div>
               </td>
               <td>
-                <span class="badge" 
-                  [ngClass]="{
-                    'badge-warning': item.outcome === 'Follow-up',
-                    'badge-info': item.outcome === 'Lead',
-                    'badge-success': item.outcome === 'Order'
-                  }">
+                <span>
                   {{ item.outcome || 'Pending' }}
                 </span>
               </td>

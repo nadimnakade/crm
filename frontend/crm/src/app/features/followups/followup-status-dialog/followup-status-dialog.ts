@@ -18,6 +18,7 @@ export class FollowupStatusDialogComponent {
   status: string = '';
   reason: string = '';
   notes: string = '';
+  followUpDate: string = '';
   
   statusOptions = [
     'Lead',
@@ -35,6 +36,15 @@ export class FollowupStatusDialogComponent {
     if (this.followup) {
       // Initialize if needed, though usually we start fresh for a status update
       this.status = this.followup.outcome || '';
+      if (this.followup.followUpDate) {
+        const d = new Date(this.followup.followUpDate);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          this.followUpDate = `${y}-${m}-${day}`;
+        }
+      }
     }
   }
 
@@ -47,11 +57,16 @@ export class FollowupStatusDialogComponent {
       alert('Reason is mandatory');
       return;
     }
+    if (this.status === 'Re-Follow-up' && !this.followUpDate) {
+      alert('Please select a follow-up date for Re-Follow-up');
+      return;
+    }
 
     this.save.emit({
       status: this.status,
       reason: this.reason,
-      notes: this.notes
+      notes: this.notes,
+      followUpDate: this.followUpDate || null
     });
   }
 

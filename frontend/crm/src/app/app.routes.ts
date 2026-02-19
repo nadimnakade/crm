@@ -31,10 +31,14 @@ export const routes: Routes = [
       { path: 'search/orders', loadComponent: () => import('./features/search/orders-search/orders-search').then(m => m.OrdersSearchComponent) },
       { path: 'search/refunds', loadComponent: () => import('./features/search/refunds-search/refunds-search').then(m => m.RefundsSearchComponent) },
       { path: 'orders/recent', loadComponent: () => import('./features/orders/recent-orders/recent-orders').then(m => m.RecentOrdersComponent) },
+      { path: 'orders/upload', loadComponent: () => import('./features/orders/upload-orders/upload-orders').then(m => m.UploadOrdersComponent), canActivate: [AuthGuard, AdminGuard] },
       { path: 'orders/reorder-list', loadComponent: () => import('./features/orders/reorder-list/reorder-list').then(m => m.ReorderListComponent) },
+      { path: 'orders/uploaded', loadComponent: () => import('./features/orders/uploaded-orders/uploaded-orders').then(m => m.UploadedOrdersComponent) },
       { path: 'reports', loadComponent: () => import('./features/reports/reports-menu/reports-menu').then(m => m.ReportsMenuComponent), canActivate: [AuthGuard] },
       { path: 'reports/followups', loadComponent: () => import('./features/reports/followup-report/followup-report').then(m => m.FollowupReportComponent), canActivate: [AuthGuard] },
       { path: 'followups', loadComponent: () => import('./features/followups/followup-list/followup-list').then(m => m.FollowupListComponent), canActivate: [AuthGuard] },
+      { path: 'followups/upload', loadComponent: () => import('./features/followups/followup-upload/followup-upload').then(m => m.FollowupUploadComponent), canActivate: [AuthGuard, AdminGuard] },
+      { path: 'followups/uploaded', loadComponent: () => import('./features/followups/followup-uploaded-list/followup-uploaded-list').then(m => m.FollowupUploadedListComponent), canActivate: [AuthGuard, AdminGuard] },
       { path: 'customer-medicine-detail', loadComponent: () => import('./features/medicine/customer-medicine-detail/customer-medicine-detail').then(m => m.CustomerMedicineDetailComponent) },
       // Placeholder routes
       { path: 'messages', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },
@@ -47,4 +51,4 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '/login' }
 ];
-
+

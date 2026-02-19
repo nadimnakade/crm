@@ -8,6 +8,10 @@ const { sequelize } = require('../models');
 // @access  Private
 exports.uploadPortfolio = async (req, res) => {
   try {
+    const userRole = req.user ? (req.user.role || '').toLowerCase() : '';
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      return res.status(403).json({ message: 'Access denied: Only admins can upload portfolio' });
+    }
     const userId = req.user ? req.user.id : null;
     const {
       mobile = '',

@@ -70,6 +70,21 @@
 
   <hr class="my-4">
 
+  <div class="card-body">
+    <h5 class="mb-1 text-center">Follow-up report</h5>
+    <p class="text-muted text-center mb-2">
+      View and export all scheduled follow-ups by date and agent.
+    </p>
+    <div class="text-center mt-2">
+      <a class="btn btn-outline-primary" routerLink="/reports/followups">
+        <i class="fa-solid fa-calendar-check me-1"></i>
+        Open Followup Report
+      </a>
+    </div>
+  </div>
+
+  <hr class="my-4">
+
   <div class="card-body" *ngIf="!isOrdersOnly">
     <h5 class="mb-1 text-center">Interactions detail</h5>
     <div class="mb-3 row">

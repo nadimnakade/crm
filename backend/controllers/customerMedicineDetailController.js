@@ -27,6 +27,10 @@ function buildHeaderIndex(headerRow) {
 // @route POST /api/customer-medicine-details/upload
 exports.uploadDetails = async (req, res) => {
   try {
+    const userRole = req.user ? (req.user.role || '').toLowerCase() : '';
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      return res.status(403).json({ message: 'Access denied: Only admins can upload details' });
+    }
     const userId = req.user ? req.user.id : null;
     const file = req.file || (req.files && req.files[0]);
     if (!file) return res.status(400).json({ message: 'No file uploaded' });

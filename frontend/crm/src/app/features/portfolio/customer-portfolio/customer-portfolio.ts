@@ -4,6 +4,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { PortfolioService } from '../../../shared/services/portfolio';
+import { AuthService } from '../../../shared/auth/auth';
 
 @Component({
   selector: 'app-customer-portfolio',
@@ -45,10 +46,15 @@ export class CustomerPortfolioComponent implements OnInit {
   selectedFiles: File[] = [];
   uploading = false;
   uploadMessage = '';
+  canUpload = false;
 
-  constructor(private fb: FormBuilder, private portfolio: PortfolioService) {}
+  constructor(private fb: FormBuilder, private portfolio: PortfolioService, private authService: AuthService) {}
 
   ngOnInit(): void {
+    const user = this.authService.getUser();
+    const role = (user?.role || '').toLowerCase();
+    this.canUpload = role === 'admin' || role === 'superadmin';
+
     this.form = this.fb.group({
       mobile: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
       groupId: [''],

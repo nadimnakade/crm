@@ -18,6 +18,7 @@ export class FollowupListComponent implements OnInit {
   followups: any[] = [];
   isLoading = false;
   selectedFollowup: any = null;
+  searchTerm: string = '';
   
   // Pagination
   currentPage = 1;
@@ -35,7 +36,16 @@ export class FollowupListComponent implements OnInit {
 
   loadFollowups(): void {
     this.isLoading = true;
-    this.callService.getFollowUps({ page: this.currentPage, pageSize: this.pageSize }).subscribe({
+    const params: any = {
+      page: this.currentPage,
+      pageSize: this.pageSize
+    };
+    const trimmed = (this.searchTerm || '').trim();
+    if (trimmed) {
+      params.search = trimmed;
+    }
+
+    this.callService.getFollowUps(params).subscribe({
       next: (res) => {
         this.followups = res.data;
         this.total = res.total;
@@ -51,6 +61,17 @@ export class FollowupListComponent implements OnInit {
 
   onPageChange(page: number): void {
     this.currentPage = page;
+    this.loadFollowups();
+  }
+
+  onSearch(): void {
+    this.currentPage = 1;
+    this.loadFollowups();
+  }
+
+  clearSearch(): void {
+    this.searchTerm = '';
+    this.currentPage = 1;
     this.loadFollowups();
   }
 

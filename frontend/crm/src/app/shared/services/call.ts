@@ -106,12 +106,12 @@ export class CallService {
   }
 
   // Recent orders count (by date, default today) — optimized count-only endpoint
-  getRecentOrderCount(agentId?: number, date?: string): Observable<{ total: number }> {
+  getRecentOrderCount(agentId?: number, date?: string, options?: { skipLoader?: boolean }): Observable<{ total: number }> {
     const params: any = {};
     if (agentId) params.agentId = String(agentId);
     if (date) params.date = date;
     return this.http.get<{ total: number }>(`${this.apiUrl}/orders/recent/count`, {
-      headers: this.getHeaders(),
+      headers: options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders(),
       params
     });
   }
@@ -133,9 +133,9 @@ export class CallService {
   }
 
   // Get due follow-ups
-  getDueFollowUps(all: boolean = false): Observable<any[]> {
+  getDueFollowUps(all: boolean = false, options?: { skipLoader?: boolean }): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due`, {
-      headers: this.getHeaders(),
+      headers: options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders(),
       params: { all: String(all) }
     });
   }

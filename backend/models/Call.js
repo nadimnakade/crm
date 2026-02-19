@@ -60,7 +60,23 @@ const Call = sequelize.define('Call', {
   }
 }, {
   timestamps: true,
-  tableName: 'Calls'
+  tableName: 'Calls',
+  indexes: [
+    // Single-column indexes
+    { fields: ['createdAt'] },
+    { fields: ['date'] },
+    { fields: ['orderId'] },
+    { fields: ['agentId'] },
+    { fields: ['outcome'] },
+    { fields: ['followUpRequired'] },
+    { fields: ['followUpDate'] },
+    // Composite indexes for dashboard/report queries
+    { fields: ['createdAt', 'orderId'] },
+    { fields: ['createdAt', 'agentId'] },
+    { fields: ['createdAt', 'outcome'] },
+    { fields: ['date', 'agentId'] },
+    { fields: ['date', 'orderId'] }
+  ]
 });
 
 module.exports = Call;
