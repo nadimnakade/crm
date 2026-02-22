@@ -24,21 +24,31 @@ export class OrderService {
     return this.http.get(`${this.apiUrl}/template`, { responseType: 'blob' });
   }
 
-  getReorders(page: number = 1, pageSize: number = 10): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/reorders?page=${page}&pageSize=${pageSize}`);
+  getReorders(params?: { page?: number; pageSize?: number; from?: string; to?: string; search?: string }): Observable<any> {
+    const q: any = {};
+    if (params?.page) q.page = String(params.page);
+    if (params?.pageSize) q.pageSize = String(params.pageSize);
+    if (params?.from) q.from = params.from;
+    if (params?.to) q.to = params.to;
+    if (params?.search) q.search = params.search;
+    return this.http.get<any>(`${this.apiUrl}/reorders`, { params: q });
   }
 
-  getReordersCount(options?: { skipLoader?: boolean }): Observable<{ count: number }> {
+  getReordersCount(from?: string, to?: string, options?: { skipLoader?: boolean }): Observable<{ count: number }> {
     const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
-    return this.http.get<{ count: number }>(`${this.apiUrl}/reorders/count`, { headers });
+    const params: any = {};
+    if (from) params.from = from;
+    if (to) params.to = to;
+    return this.http.get<{ count: number }>(`${this.apiUrl}/reorders/count`, { headers, params });
   }
 
-  getUploadedOrders(date?: string): Observable<any[]> {
-    let params = {};
-    if (date) {
-      params = { date };
-    }
-    return this.http.get<any[]>(`${this.apiUrl}/uploaded`, { params });
+  getUploadedOrders(params?: { from?: string; to?: string; page?: number; pageSize?: number }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
+    const q: any = {};
+    if (params?.from) q.from = params.from;
+    if (params?.to) q.to = params.to;
+    if (params?.page) q.page = String(params.page);
+    if (params?.pageSize) q.pageSize = String(params.pageSize);
+    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/uploaded`, { params: q });
   }
 
   updateOrderStatus(id: number, data: any): Observable<any> {

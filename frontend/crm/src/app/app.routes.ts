@@ -38,7 +38,10 @@ export const routes: Routes = [
       { path: 'reports/followups', loadComponent: () => import('./features/reports/followup-report/followup-report').then(m => m.FollowupReportComponent), canActivate: [AuthGuard] },
       { path: 'followups', loadComponent: () => import('./features/followups/followup-list/followup-list').then(m => m.FollowupListComponent), canActivate: [AuthGuard] },
       { path: 'followups/upload', loadComponent: () => import('./features/followups/followup-upload/followup-upload').then(m => m.FollowupUploadComponent), canActivate: [AuthGuard, AdminGuard] },
-      { path: 'followups/uploaded', loadComponent: () => import('./features/followups/followup-uploaded-list/followup-uploaded-list').then(m => m.FollowupUploadedListComponent), canActivate: [AuthGuard, AdminGuard] },
+      { path: 'followups/uploaded', loadComponent: () => import('./features/followups/followup-uploaded-list/followup-uploaded-list').then(m => m.FollowupUploadedListComponent), canActivate: [AuthGuard] },
+      { path: 'followups/today', loadComponent: () => import('./features/followups/today-followups/today-followups').then(m => m.TodayFollowupsComponent), canActivate: [AuthGuard] },
+      { path: 'followups/history', loadComponent: () => import('./features/followups/followup-history/followup-history').then(m => m.FollowupHistoryComponent), canActivate: [AuthGuard] },
+      { path: 'followups/reorder-history', loadComponent: () => import('./features/followups/reorder-history/reorder-history').then(m => m.ReorderHistoryComponent), canActivate: [AuthGuard] },
       { path: 'customer-medicine-detail', loadComponent: () => import('./features/medicine/customer-medicine-detail/customer-medicine-detail').then(m => m.CustomerMedicineDetailComponent) },
       // Placeholder routes
       { path: 'messages', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },

@@ -231,7 +231,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private loadReordersTodayCount(): void {
     this.loadingReordersCount = true;
-    this.orderService.getReordersCount({ skipLoader: true }).subscribe({
+    this.orderService.getReordersCount(undefined, undefined, { skipLoader: true }).subscribe({
       next: (res) => { 
         this.reordersTodayCount = Number(res?.count || 0); 
         this.loadingReordersCount = false;

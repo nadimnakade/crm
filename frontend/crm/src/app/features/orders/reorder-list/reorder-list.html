@@ -1,8 +1,24 @@
 <div class="container-fluid mt-4">
-  <div class="row mb-3">
-    <div class="col-12">
-      <h2>Re-order List ({{ today | date:'mediumDate' }})</h2>
-      <p class="text-muted">Showing orders placed exactly one month ago.</p>
+  <div class="row mb-3 align-items-center">
+    <div class="col-md-4">
+      <h2>Re-order List</h2>
+      <p class="text-muted">Showing orders uploaded in selected date range.</p>
+    </div>
+    <div class="col-md-5 text-end">
+      <label class="me-2 fw-bold">From:</label>
+      <input type="date" class="form-control d-inline-block w-auto me-2"
+             [(ngModel)]="fromDate" (change)="onDateChange()">
+      <label class="me-2 fw-bold ms-3">To:</label>
+      <input type="date" class="form-control d-inline-block w-auto"
+             [(ngModel)]="toDate" (change)="onDateChange()">
+    </div>
+    <div class="col-md-3 mt-2 mt-md-0">
+      <input type="text"
+             class="form-control"
+             placeholder="Search by name, phone, order ID..."
+             [(ngModel)]="search"
+             (keyup.enter)="onSearchChange()"
+             (blur)="onSearchChange()">
     </div>
   </div>
 
@@ -33,7 +49,7 @@
           <tr>
             <td colspan="8" style="text-align: center;">
               
-                No re-orders found for today.
+                No re-orders found for selected date range.
               
             </td>
           </tr>
@@ -69,24 +85,24 @@
             <th>Order ID</th>
             <th>Amount</th>
             <th>Status</th>
-            <th>Agent</th>
-            <th>Action</th>
+            <th>Agent Name</th>
+            <th>Action</th>            
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let order of reorders; let i = index">
-            <td>{{ order.date | date:'mediumDate' }}</td>
+            <td>{{ order.createdAt | date:'mediumDate' }}</td>
             <td>{{ order.orderDetails?.customerName || order.customer?.firstName || '-' }}</td>
-            <!-- <td>
+             <td>
               <span *ngIf="i === 0">{{ order.orderDetails?.customerMobileNo || order.customer?.phone }}</span>
               <span *ngIf="i > 0">
                 {{ ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:0:2) + 'XXXXXX' + ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:-2) }}
               </span>
-            </td> -->
-            <td>{{ order.orderDetails?.customerMobileNo || '-' }}</td>
+            </td> 
+            <!-- <td>{{ order.orderDetails?.customerMobileNo || '-' }}</td> -->
             <td>{{ order.orderDetails?.alternate || '-' }}</td>
             <td>{{ order.orderDetails?.orderId || order.orderId }}</td>
-            <td>{{ order.orderDetails?.pay || order.orderDetails?.mrp || '-' }}</td>
+            <td>{{ order.orderDetails?.amount || order.orderDetails?.mrp || '-' }}</td>
             <td>{{ order.outcome }}</td>
             <td>{{ order.agent?.firstName }} {{ order.agent?.lastName }}</td>
             <td>

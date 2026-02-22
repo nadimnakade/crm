@@ -110,5 +110,67 @@
       </button>
     </div>
   </div>
+
+  <hr class="my-4">
+
+  <div class="card-body">
+    <h5 class="mb-1 text-center">Follow-up updates by agent</h5>
+    <p class="text-muted text-center mb-2">
+      Export all follow-up status changes tagged by agent (hierarchy-wise).
+    </p>
+    <div class="mb-3 row">
+      <label class="col-sm-2 col-form-label">From</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="followupUpdatesFrom" class="form-control" />
+      </div>
+
+      <label class="col-sm-2 col-form-label">To</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="followupUpdatesTo" class="form-control" />
+      </div>
+    </div>
+    <div class="actions align-center align-items-center text-center mt-3">
+      <button class="btn btn-outline-primary m-1" (click)="setFollowupUpdatesRangeMonths(1)">Last 1 month</button>
+      <button class="btn btn-outline-primary m-1" (click)="setFollowupUpdatesRangeMonths(3)">Last 3 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setFollowupUpdatesRangeMonths(6)">Last 6 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setFollowupUpdatesRangeMonths(12)">Last 12 months</button>
+      <button class="btn btn-primary m-1" (click)="exportFollowupUpdates()" [disabled]="!followupUpdatesFrom || !followupUpdatesTo || exportingFollowupUpdates">
+        <i class="fa-solid fa-download"></i>
+        <span *ngIf="!exportingFollowupUpdates">Export Excel</span>
+        <span *ngIf="exportingFollowupUpdates">Exporting...</span>
+      </button>
+    </div>
+  </div>
+
+  <hr class="my-4">
+
+  <div class="card-body">
+    <h5 class="mb-1 text-center">Reorder updates by agent</h5>
+    <p class="text-muted text-center mb-2">
+      Export all reorder status changes tagged by agent (hierarchy-wise).
+    </p>
+    <div class="mb-3 row">
+      <label class="col-sm-2 col-form-label">From</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="reorderUpdatesFrom" class="form-control" />
+      </div>
+
+      <label class="col-sm-2 col-form-label">To</label>
+      <div class="col-sm-4">
+        <input type="date" [(ngModel)]="reorderUpdatesTo" class="form-control" />
+      </div>
+    </div>
+    <div class="actions align-center align-items-center text-center mt-3">
+      <button class="btn btn-outline-primary m-1" (click)="setReorderUpdatesRangeMonths(1)">Last 1 month</button>
+      <button class="btn btn-outline-primary m-1" (click)="setReorderUpdatesRangeMonths(3)">Last 3 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setReorderUpdatesRangeMonths(6)">Last 6 months</button>
+      <button class="btn btn-outline-primary m-1" (click)="setReorderUpdatesRangeMonths(12)">Last 12 months</button>
+      <button class="btn btn-primary m-1" (click)="exportReorderUpdates()" [disabled]="!reorderUpdatesFrom || !reorderUpdatesTo || exportingReorderUpdates">
+        <i class="fa-solid fa-download"></i>
+        <span *ngIf="!exportingReorderUpdates">Export Excel</span>
+        <span *ngIf="exportingReorderUpdates">Exporting...</span>
+      </button>
+    </div>
+  </div>
 </div>
 

@@ -318,7 +318,6 @@ exports.getUploadedFollowUps = async (req, res) => {
     endExclusive.setDate(endExclusive.getDate() + 1);
 
     const baseWhere = {
-      callType: 'Follow-up Upload',
       followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive }
     };
 
@@ -361,23 +360,33 @@ exports.getUploadedFollowUps = async (req, res) => {
     const { rows, count } = await Call.findAndCountAll({
       where,
       include,
-      order: [['followUpDate', 'ASC']],
+      order: [['followUpDate', 'DESC'], ['createdAt', 'DESC']],
       limit: pageSize,
       offset
     });
 
-    const data = rows.map(r => ({
-      id: r.id,
-      customerId: r.customerId,
-      followUpDate: r.followUpDate,
-      name: `${r.Customer?.firstName || ''} ${r.Customer?.lastName || ''}`.trim(),
-      number: r.Customer?.phone || r.Customer?.mobileNumber || '',
-      orderId: r.orderId,
-      type: r.category,
-      outcome: r.outcome,
-      reason: r.reason,
-      agent: r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : ''
-    }));
+    const data = rows.map(r => {
+      const hasOrder = !!(r.orderId || r.orderDetails);
+      const callTypeLower = (r.callType || '').toString().toLowerCase();
+      let type = r.category;
+
+      if (callTypeLower !== 'follow-up upload' && r.followUpRequired) {
+        type = hasOrder ? 'Order Followup' : 'Fresh Followup';
+      }
+
+      return {
+        id: r.id,
+        customerId: r.customerId,
+        followUpDate: r.followUpDate,
+        name: `${r.Customer?.firstName || ''} ${r.Customer?.lastName || ''}`.trim(),
+        number: r.Customer?.phone || r.Customer?.mobileNumber || '',
+        orderId: r.orderId,
+        type,
+        outcome: r.outcome,
+        reason: r.reason,
+        agent: r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : ''
+      };
+    });
 
     res.json({ data, total: count, page, pageSize });
   } catch (error) {
@@ -452,7 +461,7 @@ exports.getFollowUps = async (req, res) => {
   }
 };
 
-// @desc    Update follow-up status (First Order Wins logic)
+// @desc    Update follow-up status (First Order Wins logic) and persist status history
 // @route   PUT /api/calls/:id/followup-status
 // @access  Private
 exports.updateFollowUpStatus = async (req, res) => {
@@ -467,6 +476,8 @@ exports.updateFollowUpStatus = async (req, res) => {
       await transaction.rollback();
       return res.status(404).json({ message: 'Call not found' });
     }
+
+    const previousOutcome = call.outcome || null;
 
     // Update current call
     call.outcome = status;
@@ -491,6 +502,21 @@ exports.updateFollowUpStatus = async (req, res) => {
     }
     
     await call.save({ transaction });
+
+    // Append status history when outcome changed
+    if (status && previousOutcome !== status) {
+      try {
+        const { CallStatusHistory } = require('../models');
+        await CallStatusHistory.create({
+          CallId: call.id,
+          PreviousStatus: previousOutcome,
+          NewStatus: status,
+          ChangedBy: agentId
+        }, { transaction });
+      } catch (e) {
+        console.error('Failed to persist follow-up status history', e);
+      }
+    }
 
     // Critical Logic: First Order Wins
     if (status === 'Order') {

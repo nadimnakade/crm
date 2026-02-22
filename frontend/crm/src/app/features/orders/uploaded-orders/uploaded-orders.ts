@@ -12,7 +12,11 @@ import { OrderService } from '../../../core/services/order.service';
 export class UploadedOrdersComponent implements OnInit {
   orders: any[] = [];
   loading = false;
-  selectedDate: string = '';
+  fromDate: string = '';
+  toDate: string = '';
+  page = 1;
+  pageSize = 20;
+  total = 0;
   
   // Modal state
   showModal = false;
@@ -26,8 +30,10 @@ export class UploadedOrdersComponent implements OnInit {
   closeReason: string = 'Order Created';
 
   constructor(private orderService: OrderService) {
-     const today = new Date();
-     this.selectedDate = today.toISOString().split('T')[0];
+    const today = new Date();
+    const iso = today.toISOString().split('T')[0];
+    this.fromDate = iso;
+    this.toDate = iso;
   }
 
   ngOnInit(): void {
@@ -36,9 +42,10 @@ export class UploadedOrdersComponent implements OnInit {
 
   fetchOrders(): void {
     this.loading = true;
-    this.orderService.getUploadedOrders(this.selectedDate).subscribe({
-      next: (data) => {
-        this.orders = data;
+    this.orderService.getUploadedOrders({ from: this.fromDate, to: this.toDate, page: this.page, pageSize: this.pageSize }).subscribe({
+      next: (res) => {
+        this.orders = res?.data || [];
+        this.total = res?.total || 0;
         this.loading = false;
       },
       error: (err) => {
@@ -46,6 +53,36 @@ export class UploadedOrdersComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  onDateChange(): void {
+    this.page = 1;
+    this.fetchOrders();
+  }
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil(this.total / this.pageSize));
+  }
+
+  get pages(): number[] {
+    const total = this.totalPages;
+    const current = this.page;
+    const maxButtons = 7;
+    const pages: number[] = [];
+    let start = Math.max(1, current - Math.floor(maxButtons / 2));
+    let end = start + maxButtons - 1;
+    if (end > total) {
+      end = total;
+      start = Math.max(1, end - maxButtons + 1);
+    }
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  }
+
+  onPageChange(page: number): void {
+    if (page < 1 || page > this.totalPages || page === this.page) return;
+    this.page = page;
+    this.fetchOrders();
   }
 
   openStatusModal(order: any): void {

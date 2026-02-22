@@ -32,6 +32,16 @@ export class ReportsMenuComponent implements OnInit {
   interTo: string = '';
   exportingInteractions = false;
 
+  // Follow-up status updates by agent
+  followupUpdatesFrom: string = '';
+  followupUpdatesTo: string = '';
+  exportingFollowupUpdates = false;
+
+  // Reorder status updates by agent
+  reorderUpdatesFrom: string = '';
+  reorderUpdatesTo: string = '';
+  exportingReorderUpdates = false;
+
   constructor(
     private cmdSvc: CustomerMedicineDetailService,
     private callSvc: CallService,
@@ -78,6 +88,22 @@ export class ReportsMenuComponent implements OnInit {
     from.setMonth(now.getMonth() - months);
     this.interFrom = from.toISOString().slice(0, 10);
     this.interTo = now.toISOString().slice(0, 10);
+  }
+
+  setFollowupUpdatesRangeMonths(months: number): void {
+    const now = new Date();
+    const from = new Date(now);
+    from.setMonth(now.getMonth() - months);
+    this.followupUpdatesFrom = from.toISOString().slice(0, 10);
+    this.followupUpdatesTo = now.toISOString().slice(0, 10);
+  }
+
+  setReorderUpdatesRangeMonths(months: number): void {
+    const now = new Date();
+    const from = new Date(now);
+    from.setMonth(now.getMonth() - months);
+    this.reorderUpdatesFrom = from.toISOString().slice(0, 10);
+    this.reorderUpdatesTo = now.toISOString().slice(0, 10);
   }
 
   async exportCmd(): Promise<void> {
@@ -156,6 +182,70 @@ export class ReportsMenuComponent implements OnInit {
       alert('Export failed or not authorized. Please ensure admin access.');
     } finally {
       this.exportingInteractions = false;
+    }
+  }
+
+  async exportFollowupUpdates(): Promise<void> {
+    if (!this.followupUpdatesFrom || !this.followupUpdatesTo) {
+      alert('Please select a From and To date for Follow-up Updates.');
+      return;
+    }
+    if (this.exportingFollowupUpdates) return;
+    this.exportingFollowupUpdates = true;
+    try {
+      const blob = await firstValueFrom(
+        this.reportSvc.exportFollowupStatusUpdates({
+          from: this.followupUpdatesFrom,
+          to: this.followupUpdatesTo,
+          limit: 10000,
+          format: 'xlsx'
+        })
+      );
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'followup-updates-by-agent.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Follow-up updates export failed', err);
+      alert('Export failed or not authorized. Please ensure admin/manager access.');
+    } finally {
+      this.exportingFollowupUpdates = false;
+    }
+  }
+
+  async exportReorderUpdates(): Promise<void> {
+    if (!this.reorderUpdatesFrom || !this.reorderUpdatesTo) {
+      alert('Please select a From and To date for Reorder Updates.');
+      return;
+    }
+    if (this.exportingReorderUpdates) return;
+    this.exportingReorderUpdates = true;
+    try {
+      const blob = await firstValueFrom(
+        this.reportSvc.exportReorderStatusUpdates({
+          from: this.reorderUpdatesFrom,
+          to: this.reorderUpdatesTo,
+          limit: 10000,
+          format: 'xlsx'
+        })
+      );
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reorder-updates-by-agent.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Reorder updates export failed', err);
+      alert('Export failed or not authorized. Please ensure admin/manager access.');
+    } finally {
+      this.exportingReorderUpdates = false;
     }
   }
 

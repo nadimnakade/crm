@@ -144,11 +144,8 @@ export class FollowupReportComponent implements OnInit {
     if (this.exporting) return;
     this.exporting = true;
     try {
-      const now = new Date();
-      const from = this.localISODate(now);
-      const nextMonth = new Date(now);
-      nextMonth.setMonth(now.getMonth() + 1);
-      const to = this.localISODate(nextMonth);
+      const from = this.fromDate || undefined;
+      const to = this.toDate || undefined;
 
       const blob = await (await import('rxjs')).firstValueFrom(
         this.reportSvc.exportFollowups({ from, to, limit: 10000, format: 'xlsx' })

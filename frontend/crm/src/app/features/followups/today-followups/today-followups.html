@@ -1,0 +1,63 @@
+<div class="card glass-card h-100 shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Followups Tagged by Agents Today(All Agents)</h5>
+    <div>
+      <button class="btn btn-sm btn-outline-secondary me-2" (click)="load()" [disabled]="loading">
+        Refresh
+      </button>
+      <button class="btn btn-sm btn-primary" (click)="export()" [disabled]="loading || exporting">
+        Export
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+    <div class="table-responsive" *ngIf="!loading && !error">
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Followup Date</th>
+            <th>Order Id</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Agent</th>
+            <th>Created On</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of data">
+            <td>{{ r.followUpDate | date:'yyyy-MM-dd HH:mm' }}</td>
+            <td>{{ r.orderId || r.orderDetails?.orderId }}</td>
+            <td>{{ (r.customer?.firstName || '') + ' ' + (r.customer?.lastName || '') }}</td>
+            <td>{{ r.customer?.phone }}</td>
+            <td>{{ (r.agent?.firstName || '') + ' ' + (r.agent?.lastName || '') }}</td>
+            <td>{{ r.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+          </tr>
+          <tr *ngIf="data.length === 0">
+            <td colspan="6" class="text-center text-muted">No follow-ups tagged for today.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-2" *ngIf="!error">
+      <div>
+        <small>Total: {{ total }} | Page {{ page }} of {{ Math.max(1, Math.ceil(total / pageSize)) }}</small>
+      </div>
+      <div class="btn-toolbar" role="toolbar" aria-label="Pagination toolbar">
+        <div class="btn-group me-2" role="group" aria-label="Prev/Next">
+          <button class="btn btn-outline-secondary" (click)="setPage(-1)" [disabled]="page <= 1">Prev</button>
+          <button class="btn btn-outline-secondary" (click)="setPage(1)" [disabled]="page >= Math.max(1, Math.ceil(total / pageSize))">Next</button>
+        </div>
+        <div class="btn-group" role="group" aria-label="Pages">
+          <button *ngFor="let pn of pageNumbers"
+                  class="btn"
+                  [ngClass]="pn === page ? 'btn-primary' : 'btn-outline-secondary'"
+                  (click)="gotoPage(pn)">{{ pn }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

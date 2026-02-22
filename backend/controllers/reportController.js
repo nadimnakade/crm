@@ -1,5 +1,5 @@
 const xlsx = require('xlsx');
-const { sequelize, Call, User, Role } = require('../models');
+const { sequelize, Call, User, Role, CallStatusHistory } = require('../models');
 const { QueryTypes, Op } = require('sequelize');
 const cacheStore = new Map();
 function getCache(key) {
@@ -62,6 +62,45 @@ function formatLocalDateTime(dt) {
   const mi = pad2(d.getUTCMinutes());
   const ss = pad2(d.getUTCSeconds());
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+}
+
+async function getStatusReportVisibility(userId) {
+  const user = await User.findByPk(userId, {
+    include: [{ model: Role }]
+  });
+  if (!user) {
+    return { scope: 'agent', allowedUserIds: [] };
+  }
+  const roleName = user.Role && user.Role.name ? user.Role.name.toLowerCase() : '';
+  const roleId = user.Role && user.Role.id ? Number(user.Role.id) : Number(user.roleId);
+
+  if (
+    ['superadmin', 'super admin', 'admin', 'orders viewer', 'vieworder'].includes(roleName) ||
+    [1, 2, 1004].includes(roleId)
+  ) {
+    return { scope: 'admin', allowedUserIds: [] };
+  }
+
+  if (roleName === 'manager' || roleId === 3) {
+    const team = await User.findAll({ where: { managerId: user.id }, attributes: ['id'] });
+    const teamIds = team.map(t => t.id);
+    return { scope: 'manager', allowedUserIds: [user.id, ...teamIds] };
+  }
+
+  return { scope: 'agent', allowedUserIds: [user.id] };
+}
+
+function mapStatusRow(r) {
+  return {
+    ChangedAt: formatLocalDateTime(r.ChangedAt),
+    AgentName: [r.AgentFirstName, r.AgentLastName].filter(Boolean).join(' ').trim(),
+    ChangedBy: [r.ChangedByFirstName, r.ChangedByLastName].filter(Boolean).join(' ').trim(),
+    PreviousStatus: r.PreviousStatus,
+    NewStatus: r.NewStatus,
+    OrderId: r.orderId,
+    CustomerName: [r.CustomerFirstName, r.CustomerLastName].filter(Boolean).join(' ').trim(),
+    CustomerMobileNo: r.CustomerPhone
+  };
 }
 
 // Export customer-wise interactions (Calls + latest status) as Excel or CSV
@@ -352,6 +391,336 @@ exports.exportFollowups = async (req, res) => {
   } catch (error) {
     console.error('Followups export failed:', error);
     res.status(500).json({ message: 'Failed to export followups', error: error.message });
+  }
+};
+
+// Export follow-up status updates by agent (hierarchy-wise)
+// GET /api/reports/followup-updates/export?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=&format=xlsx|csv
+exports.exportFollowupStatusUpdates = async (req, res) => {
+  try {
+    try { req.setTimeout(300000); } catch {}
+    const { from, to } = req.query || {};
+    const limit = parseInt(req.query.limit, 10) || 10000;
+    const format = (req.query.format || 'xlsx').toLowerCase();
+
+    const { start, endExclusive } = getISTRange(from || null, to || null);
+    const visibility = await getStatusReportVisibility(req.user.id);
+    const isAdminScope = visibility.scope === 'admin';
+    const allowedUserIds = visibility.allowedUserIds && visibility.allowedUserIds.length
+      ? visibility.allowedUserIds
+      : [0];
+
+    const statusList = [
+      'Lead',
+      'Re-Follow-up',
+      'Order',
+      'Order Already Placed',
+      'Not Interested',
+      'Not Required',
+      'No Answer'
+    ];
+
+    const rows = await sequelize.query(
+      `
+        SELECT TOP (:limit)
+          h.[ChangedAt],
+          h.[PreviousStatus],
+          h.[NewStatus],
+          h.[ChangedBy],
+          c.[id] AS CallId,
+          c.[orderId],
+          cust.[firstName] AS CustomerFirstName,
+          cust.[lastName] AS CustomerLastName,
+          cust.[phone] AS CustomerPhone,
+          agent.[firstName] AS AgentFirstName,
+          agent.[lastName] AS AgentLastName,
+          changer.[firstName] AS ChangedByFirstName,
+          changer.[lastName] AS ChangedByLastName
+        FROM dbo.CallStatusHistory h WITH (NOLOCK)
+        LEFT JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
+        LEFT JOIN dbo.Customers cust WITH (NOLOCK) ON cust.id = c.customerId
+        LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
+        LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
+        WHERE h.[ChangedAt] >= :start
+          AND h.[ChangedAt] < :endExclusive
+          AND h.[NewStatus] IN (:statusList)
+          AND (:isAdmin = 1 OR h.[ChangedBy] IN (:allowedUserIds))
+        ORDER BY h.[ChangedAt] DESC, h.[Id] DESC
+      `,
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: {
+          start,
+          endExclusive,
+          limit,
+          statusList,
+          isAdmin: isAdminScope ? 1 : 0,
+          allowedUserIds
+        }
+      }
+    );
+
+    const headers = [
+      'ChangedAt',
+      'AgentName',
+      'ChangedBy',
+      'PreviousStatus',
+      'NewStatus',
+      'OrderId',
+      'CustomerName',
+      'CustomerMobileNo'
+    ];
+
+    const data = (rows || []).map(mapStatusRow);
+
+    if (format === 'csv') {
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      const csv = xlsx.utils.sheet_to_csv(ws);
+      const buf = Buffer.from(csv, 'utf8');
+      res.setHeader('Content-Disposition', 'attachment; filename="followup-updates-by-agent.csv"');
+      res.setHeader('Content-Type', 'text/csv');
+      return res.send(buf);
+    } else {
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      xlsx.utils.book_append_sheet(wb, ws, 'FollowupUpdates');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename="followup-updates-by-agent.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buf);
+    }
+  } catch (error) {
+    console.error('Followup status updates export failed:', error);
+    res.status(500).json({ message: 'Failed to export followup status updates', error: error.message });
+  }
+};
+
+// JSON list follow-up status updates (for UI table)
+// GET /api/reports/followup-updates?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=
+exports.listFollowupStatusUpdates = async (req, res) => {
+  try {
+    const { from, to } = req.query || {};
+    const limit = parseInt(req.query.limit, 10) || 1000;
+
+    const { start, endExclusive } = getISTRange(from || null, to || null);
+    const visibility = await getStatusReportVisibility(req.user.id);
+    const isAdminScope = visibility.scope === 'admin';
+    const allowedUserIds = visibility.allowedUserIds && visibility.allowedUserIds.length
+      ? visibility.allowedUserIds
+      : [0];
+
+    const statusList = [
+      'Lead',
+      'Re-Follow-up',
+      'Order',
+      'Order Already Placed',
+      'Not Interested',
+      'Not Required',
+      'No Answer'
+    ];
+
+    const rows = await sequelize.query(
+      `
+        SELECT TOP (:limit)
+          h.[Id],
+          h.[ChangedAt],
+          h.[PreviousStatus],
+          h.[NewStatus],
+          h.[ChangedBy],
+          c.[id] AS CallId,
+          c.[orderId],
+          cust.[firstName] AS CustomerFirstName,
+          cust.[lastName] AS CustomerLastName,
+          cust.[phone] AS CustomerPhone,
+          agent.[firstName] AS AgentFirstName,
+          agent.[lastName] AS AgentLastName,
+          changer.[firstName] AS ChangedByFirstName,
+          changer.[lastName] AS ChangedByLastName
+        FROM dbo.CallStatusHistory h WITH (NOLOCK)
+        LEFT JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
+        LEFT JOIN dbo.Customers cust WITH (NOLOCK) ON cust.id = c.customerId
+        LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
+        LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
+        WHERE h.[ChangedAt] >= :start
+          AND h.[ChangedAt] < :endExclusive
+          AND h.[NewStatus] IN (:statusList)
+          AND (:isAdmin = 1 OR h.[ChangedBy] IN (:allowedUserIds))
+        ORDER BY h.[ChangedAt] DESC, h.[Id] DESC
+      `,
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: {
+          start,
+          endExclusive,
+          limit,
+          statusList,
+          isAdmin: isAdminScope ? 1 : 0,
+          allowedUserIds
+        }
+      }
+    );
+
+    const data = (rows || []).map(mapStatusRow);
+    res.json({ data, total: data.length });
+  } catch (error) {
+    console.error('Followup status updates list failed:', error);
+    res.status(500).json({ message: 'Failed to list followup status updates', error: error.message });
+  }
+};
+
+// Export Reorder status updates by agent (hierarchy-wise)
+// GET /api/reports/reorder-updates/export?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=&format=xlsx|csv
+exports.exportReorderStatusUpdates = async (req, res) => {
+  try {
+    try { req.setTimeout(300000); } catch {}
+    const { from, to } = req.query || {};
+    const limit = parseInt(req.query.limit, 10) || 10000;
+    const format = (req.query.format || 'xlsx').toLowerCase();
+
+    const { start, endExclusive } = getISTRange(from || null, to || null);
+    const visibility = await getStatusReportVisibility(req.user.id);
+    const isAdminScope = visibility.scope === 'admin';
+    const allowedUserIds = visibility.allowedUserIds && visibility.allowedUserIds.length
+      ? visibility.allowedUserIds
+      : [0];
+
+    const rows = await sequelize.query(
+      `
+        SELECT TOP (:limit)
+          h.[ChangedAt],
+          h.[PreviousStatus],
+          h.[NewStatus],
+          h.[ChangedBy],
+          c.[id] AS CallId,
+          c.[orderId],
+          cust.[firstName] AS CustomerFirstName,
+          cust.[lastName] AS CustomerLastName,
+          cust.[phone] AS CustomerPhone,
+          agent.[firstName] AS AgentFirstName,
+          agent.[lastName] AS AgentLastName,
+          changer.[firstName] AS ChangedByFirstName,
+          changer.[lastName] AS ChangedByLastName
+        FROM dbo.CallStatusHistory h WITH (NOLOCK)
+        LEFT JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
+        LEFT JOIN dbo.Customers cust WITH (NOLOCK) ON cust.id = c.customerId
+        LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
+        LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
+        WHERE h.[ChangedAt] >= :start
+          AND h.[ChangedAt] < :endExclusive
+          AND h.[NewStatus] = 'Reorder'
+          AND (:isAdmin = 1 OR h.[ChangedBy] IN (:allowedUserIds))
+        ORDER BY h.[ChangedAt] DESC, h.[Id] DESC
+      `,
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: {
+          start,
+          endExclusive,
+          limit,
+          isAdmin: isAdminScope ? 1 : 0,
+          allowedUserIds
+        }
+      }
+    );
+
+    const headers = [
+      'ChangedAt',
+      'AgentName',
+      'ChangedBy',
+      'PreviousStatus',
+      'NewStatus',
+      'OrderId',
+      'CustomerName',
+      'CustomerMobileNo'
+    ];
+
+    const data = (rows || []).map(mapStatusRow);
+
+    if (format === 'csv') {
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      const csv = xlsx.utils.sheet_to_csv(ws);
+      const buf = Buffer.from(csv, 'utf8');
+      res.setHeader('Content-Disposition', 'attachment; filename="reorder-updates-by-agent.csv"');
+      res.setHeader('Content-Type', 'text/csv');
+      return res.send(buf);
+    } else {
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(data, { header: headers });
+      xlsx.utils.book_append_sheet(wb, ws, 'ReorderUpdates');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename="reorder-updates-by-agent.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buf);
+    }
+  } catch (error) {
+    console.error('Reorder status updates export failed:', error);
+    res.status(500).json({ message: 'Failed to export reorder status updates', error: error.message });
+  }
+};
+
+// JSON list reorder status updates (for UI table)
+// GET /api/reports/reorder-updates?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=
+exports.listReorderStatusUpdates = async (req, res) => {
+  try {
+    const { from, to } = req.query || {};
+    const limit = parseInt(req.query.limit, 10) || 1000;
+
+    const { start, endExclusive } = getISTRange(from || null, to || null);
+    const visibility = await getStatusReportVisibility(req.user.id);
+    const isAdminScope = visibility.scope === 'admin';
+    const allowedUserIds = visibility.allowedUserIds && visibility.allowedUserIds.length
+      ? visibility.allowedUserIds
+      : [0];
+
+    const rows = await sequelize.query(
+      `
+        SELECT TOP (:limit)
+          h.[Id],
+          h.[ChangedAt],
+          h.[PreviousStatus],
+          h.[NewStatus],
+          h.[ChangedBy],
+          c.[id] AS CallId,
+          c.[orderId],
+          cust.[firstName] AS CustomerFirstName,
+          cust.[lastName] AS CustomerLastName,
+          cust.[phone] AS CustomerPhone,
+          agent.[firstName] AS AgentFirstName,
+          agent.[lastName] AS AgentLastName,
+          changer.[firstName] AS ChangedByFirstName,
+          changer.[lastName] AS ChangedByLastName
+        FROM dbo.CallStatusHistory h WITH (NOLOCK)
+        LEFT JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
+        LEFT JOIN dbo.Customers cust WITH (NOLOCK) ON cust.id = c.customerId
+        LEFT JOIN dbo.Users agent WITH (NOLOCK) ON agent.id = c.agentId
+        LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
+        WHERE h.[ChangedAt] >= :start
+          AND h.[ChangedAt] < :endExclusive
+          AND h.[NewStatus] = 'Reorder'
+          AND (:isAdmin = 1 OR h.[ChangedBy] IN (:allowedUserIds))
+        ORDER BY h.[ChangedAt] DESC, h.[Id] DESC
+      `,
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: {
+          start,
+          endExclusive,
+          limit,
+          isAdmin: isAdminScope ? 1 : 0,
+          allowedUserIds
+        }
+      }
+    );
+
+    const data = (rows || []).map(mapStatusRow);
+    res.json({ data, total: data.length });
+  } catch (error) {
+    console.error('Reorder status updates list failed:', error);
+    res.status(500).json({ message: 'Failed to list reorder status updates', error: error.message });
   }
 };
 

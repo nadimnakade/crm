@@ -18,6 +18,7 @@ export class LayoutComponent implements OnInit {
   userRole: string | null = null;
   canManageUsersAndRoles: boolean = false;
   isOrdersOnlyRole: boolean = false;
+  isManagerOrAdmin: boolean = false;
   reportsOpen: boolean = false;
   ordersOpen: boolean = false;
   uploadsOpen: boolean = false;
@@ -47,6 +48,7 @@ export class LayoutComponent implements OnInit {
     this.userRole = user?.role || null;
     const role = (this.userRole || '').toLowerCase();
     this.canManageUsersAndRoles = role === 'admin' || role === 'superadmin';
+    this.isManagerOrAdmin = ['manager','admin','superadmin'].includes(role);
     this.canUpload = this.canManageUsersAndRoles; // Only admins can upload
     // Orders-only role is explicitly named 'vieworder'
     this.isOrdersOnlyRole = role === 'vieworder';

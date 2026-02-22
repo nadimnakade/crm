@@ -69,14 +69,14 @@
         <i class="fa-solid fa-chevron-down chevron" [style.transform]="ordersOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
       </div>
       <div class="nav-submenu" *ngIf="ordersOpen">
-        <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/uploaded" routerLinkActive="active" class="submenu-item" title="Order List">
+        <!-- <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/uploaded" routerLinkActive="active" class="submenu-item" title="Order List">
           <i class="fa-solid fa-table-list nav-icon"></i>
           <span class="label">Order List</span>
-        </a>
-        <!-- <a *ngIf="!isOrdersOnlyRole" routerLink="/orders/reorder-list" routerLinkActive="active" class="submenu-item" title="Re-orders">
+        </a> -->
+        <a  routerLink="/orders/reorder-list" routerLinkActive="active" class="submenu-item" title="Re-orders">
           <i class="fa-solid fa-repeat nav-icon"></i>
           <span class="label">Re-orders</span>
-        </a> -->
+        </a>
       </div>
       <!-- Uploads group (admin only) -->
       <div *ngIf="canUpload" class="nav-item-row" (click)="toggleUploads()">
@@ -124,18 +124,30 @@
         <i class="fa-solid fa-chevron-down chevron" [style.transform]="followupsOpen ? 'rotate(180deg)' : 'rotate(0deg)'"></i>
       </div>
       <div class="nav-submenu" *ngIf="followupsOpen">
-        <a routerLink="/followups" routerLinkActive="active" class="submenu-item">
+        <!-- <a routerLink="/followups" routerLinkActive="active" class="submenu-item">
           <i class="fa-solid fa-list-check nav-icon"></i>
           <span class="label">List</span>
+        </a> -->
+        <a routerLink="/followups/today" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-calendar-day nav-icon"></i>
+          <span class="label">Followup by Agents</span>
         </a>
         <a routerLink="/followups/uploaded" routerLinkActive="active" class="submenu-item">
           <i class="fa-solid fa-file-lines nav-icon"></i>
-          <span class="label">Uploaded List</span>
+          <span class="label">Todays Followup</span>
         </a>
-        <a routerLink="/reports/followups" routerLinkActive="active" class="submenu-item">
+        <a routerLink="/followups/history" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-clock-rotate-left nav-icon"></i>
+          <span class="label">Followup History</span>
+        </a>
+        <a routerLink="/followups/reorder-history" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-clock-rotate-left nav-icon"></i>
+          <span class="label">Reorder History</span>
+        </a>
+        <!-- <a routerLink="/reports/followups" routerLinkActive="active" class="submenu-item">
           <i class="fa-solid fa-calendar-check nav-icon"></i>
           <span class="label">Report</span>
-        </a>
+        </a> -->
       </div>
       
       <!-- Remove duplicate standalone items to keep groups consistent -->

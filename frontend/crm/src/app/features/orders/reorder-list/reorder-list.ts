@@ -15,6 +15,9 @@ import { OrderService } from '../../../core/services/order.service';
   page = 1;
   pageSize = 100;
   totalReorders = 0;
+  fromDate: string = '';
+  toDate: string = '';
+  search: string = '';
 
   get totalPages(): number {
     return Math.ceil(this.totalReorders / this.pageSize);
@@ -31,7 +34,12 @@ import { OrderService } from '../../../core/services/order.service';
   followUpDate: string = '';
   closeReason: string = 'Order Created';
 
-  constructor(private orderService: OrderService) {}
+  constructor(private orderService: OrderService) {
+    const today = new Date();
+    const iso = today.toISOString().split('T')[0];
+    this.fromDate = iso;
+    this.toDate = iso;
+  }
 
   ngOnInit(): void {
     this.fetchReorders();
@@ -39,7 +47,13 @@ import { OrderService } from '../../../core/services/order.service';
 
   fetchReorders(): void {
     this.loading = true;
-    this.orderService.getReorders(this.page, this.pageSize).subscribe({
+    this.orderService.getReorders({
+      page: this.page,
+      pageSize: this.pageSize,
+      from: this.fromDate,
+      to: this.toDate,
+      search: this.search
+    }).subscribe({
       next: (data: any) => {
         let rows: any[] = [];
         if (data && data.rows) {
@@ -73,6 +87,16 @@ import { OrderService } from '../../../core/services/order.service';
   onPageChange(newPage: number): void {
     if (newPage < 1 || newPage > Math.ceil(this.totalReorders / this.pageSize)) return;
     this.page = newPage;
+    this.fetchReorders();
+  }
+
+  onDateChange(): void {
+    this.page = 1;
+    this.fetchReorders();
+  }
+
+  onSearchChange(): void {
+    this.page = 1;
     this.fetchReorders();
   }
 

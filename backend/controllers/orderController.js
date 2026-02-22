@@ -1,7 +1,7 @@
 const path = require('path');
 const xlsx = require('xlsx');
 const fs = require('fs');
-const { Call, Customer, User, Role, sequelize } = require('../models');
+const { Call, Customer, User, Role, sequelize, CallStatusHistory } = require('../models');
 const { Op } = require('sequelize');
 
 // Expected headers for bulk upload (case-insensitive match)
@@ -235,7 +235,7 @@ exports.uploadOrders = async (req, res) => {
   }
 };
 
-// Get Re-orders (orders from exactly 1 month ago)
+// Get Re-orders (uploaded orders filtered by upload date range, search, and pagination)
 exports.getReorders = async (req, res) => {
   try {
     // Check user role for permission
@@ -244,65 +244,76 @@ exports.getReorders = async (req, res) => {
     });
 
     const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const fromStr = (req.query.from || '').toString().trim();
+    const toStr = (req.query.to || '').toString().trim();
+    const search = (req.query.search || '').toString().trim();
 
-    const today = new Date();
-    // Calculate date 1 month ago
-    const targetDate = new Date(today);
-    targetDate.setMonth(today.getMonth() - 1);
-    
-    // Set time range for that day (00:00:00 to 23:59:59)
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    // Determine query conditions
-    const where = {
-      [Op.and]: [
-        { date: { [Op.between]: [startOfDay, endOfDay] } },
-        {
-          [Op.or]: [
-            { category: 'Order' },
-            { category: 'System Import' },
-            { callType: 'Order Upload' },
-            { orderId: { [Op.ne]: null } }
-          ]
-        },
-        {
-          [Op.or]: [
-            { updatedAt: { [Op.lt]: todayStart } },
-            {
-              [Op.and]: [
-                { updatedAt: { [Op.gte]: todayStart } },
-                { outcome: { [Op.in]: ['Ringing', 'Follow-up'] } }
-              ]
-            }
-          ]
-        }
-      ]
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0);
     };
 
-    // If not admin, restrict to own orders
+    const today = new Date();
+    let start = parseYMD(fromStr) || new Date(today);
+    let end = parseYMD(toStr) || new Date(start);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(end.getTime());
+    endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const baseWhere = {
+      callType: 'Order Upload',
+      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+    };
+
     if (!isAdmin) {
-      where.agentId = req.user.id;
+      baseWhere.agentId = req.user.id;
     }
-    
-    // Include Customer and Agent info
+
+    let customerWhere = undefined;
+    const callSearchWhere = [];
+    const hasSearch = search.length > 0;
+    if (hasSearch) {
+      callSearchWhere.push(
+        { orderId: { [Op.like]: `%${search}%` } },
+        { category: { [Op.like]: `%${search}%` } },
+        { notes: { [Op.like]: `%${search}%` } },
+        { outcome: { [Op.like]: `%${search}%` } }
+      );
+      const digitsOnly = search.replace(/[^0-9]/g, '');
+      const phoneFilter = digitsOnly.length >= 5 ? { phone: { [Op.like]: `%${digitsOnly}%` } } : undefined;
+      const ors = [
+        { firstName: { [Op.like]: `%${search}%` } },
+        { lastName: { [Op.like]: `%${search}%` } }
+      ];
+      if (phoneFilter) ors.push(phoneFilter);
+      customerWhere = { [Op.or]: ors };
+    }
+
+    const include = [
+      customerWhere
+        ? { model: Customer, where: customerWhere, required: true }
+        : { model: Customer },
+      { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+    ];
+
+    const where = hasSearch
+      ? { [Op.and]: [baseWhere, { [Op.or]: callSearchWhere }] }
+      : baseWhere;
+
     const page = parseInt(req.query.page, 10) || 1;
-    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const pageSize = parseInt(req.query.pageSize, 10) || 100;
     const offset = (page - 1) * pageSize;
 
     const { count, rows } = await Call.findAndCountAll({
       where,
-      include: [
-        { model: Customer },
-        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
-      ],
-      order: [
-        [sequelize.literal(`CASE WHEN "Call"."updatedAt" >= '${todayStart.toISOString()}' THEN 1 ELSE 0 END`), 'ASC'],
-        ['date', 'DESC']
-      ],
+      include,
+      order: [['createdAt', 'DESC']],
       limit: pageSize,
       offset
     });
@@ -314,7 +325,7 @@ exports.getReorders = async (req, res) => {
   }
 };
 
-// Get Re-orders Count
+// Get Re-orders Count (uploaded orders count by upload date range)
 exports.getReordersCount = async (req, res) => {
   try {
     // Check user role for permission
@@ -323,50 +334,36 @@ exports.getReordersCount = async (req, res) => {
     });
 
     const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const fromStr = (req.query.from || '').toString().trim();
+    const toStr = (req.query.to || '').toString().trim();
 
-    const today = new Date();
-    // Calculate date 1 month ago
-    const targetDate = new Date(today);
-    targetDate.setMonth(today.getMonth() - 1);
-    
-    // Set time range for that day (00:00:00 to 23:59:59)
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    // Determine query conditions
-    const where = {
-      [Op.and]: [
-        { date: { [Op.between]: [startOfDay, endOfDay] } },
-        {
-          [Op.or]: [
-            { category: 'Order' },
-            { category: 'System Import' },
-            { callType: 'Order Upload' },
-            { orderId: { [Op.ne]: null } }
-          ]
-        },
-        {
-          [Op.or]: [
-            { updatedAt: { [Op.lt]: todayStart } },
-            {
-              [Op.and]: [
-                { updatedAt: { [Op.gte]: todayStart } },
-                { outcome: { [Op.in]: ['Ringing', 'Not Interested', 'Follow-up'] } }
-              ]
-            }
-          ]
-        }
-      ]
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0);
     };
 
-    // If not admin, restrict to own orders
+    const today = new Date();
+    let start = parseYMD(fromStr) || new Date(today);
+    let end = parseYMD(toStr) || new Date(start);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(end.getTime());
+    endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const where = {
+      callType: 'Order Upload',
+      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+    };
+
     if (!isAdmin) {
       where.agentId = req.user.id;
     }
-    
+
     const count = await Call.count({ where });
 
     res.json({ count });
@@ -376,7 +373,7 @@ exports.getReordersCount = async (req, res) => {
   }
 };
 
-// Get Uploaded Orders (filtered by date)
+// Get Uploaded Orders (filtered by upload date range, defaults to today)
 exports.getUploadedOrders = async (req, res) => {
   try {
     // Check user role for permission
@@ -385,39 +382,53 @@ exports.getUploadedOrders = async (req, res) => {
     });
 
     const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
-    const { date } = req.query;
+    const fromStr = (req.query.from || '').toString().trim();
+    const toStr = (req.query.to || '').toString().trim();
 
-    const where = {
-      callType: 'Order Upload'
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      return new Date(y, mo, d, 0, 0, 0, 0);
     };
 
-    if (date) {
-      const targetDate = new Date(date);
-      // Validate date
-      if (!isNaN(targetDate.getTime())) {
-        const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-        const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
-        where.date = {
-          [Op.between]: [startOfDay, endOfDay]
-        };
-      }
-    }
+    const today = new Date();
+    let start = parseYMD(fromStr) || new Date(today);
+    let end = parseYMD(toStr) || new Date(start);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(end.getTime());
+    endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const where = {
+      callType: 'Order Upload',
+      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+    };
 
     // If not admin, restrict to own uploads/assigned orders
     if (!isAdmin) {
        where.agentId = req.user.id; 
     }
 
-    const calls = await Call.findAll({
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 20;
+    const offset = (page - 1) * pageSize;
+
+    const { rows, count } = await Call.findAndCountAll({
       where,
       include: [
         { model: Customer },
         { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
       ],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit: pageSize,
+      offset
     });
 
-    res.json(calls);
+    res.json({ data: rows, total: count, page, pageSize });
   } catch (error) {
     console.error('Get uploaded orders failed:', error);
     res.status(500).json({ message: 'Failed to fetch uploaded orders', error: error.message });
@@ -429,6 +440,7 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { caseStatus, subStatus, followUpDate, closeReason } = req.body;
+    const userId = req.user.id;
     
     const call = await Call.findByPk(id);
     if (!call) {
@@ -455,6 +467,8 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: 'Invalid Case Status' });
     }
 
+    const previousOutcome = call.outcome || null;
+
     // Update the call record
     await call.update({
       outcome: newOutcome,
@@ -464,6 +478,19 @@ exports.updateOrderStatus = async (req, res) => {
       // Let's append to notes for history
       notes: (call.notes || '') + `\n[${new Date().toLocaleString()}] Status updated to: ${newOutcome}`
     });
+
+    if (newOutcome && previousOutcome !== newOutcome) {
+      try {
+        await CallStatusHistory.create({
+          CallId: call.id,
+          PreviousStatus: previousOutcome,
+          NewStatus: newOutcome,
+          ChangedBy: userId
+        });
+      } catch (e) {
+        console.error('Failed to persist order status history', e);
+      }
+    }
 
     res.json({ message: 'Status updated successfully', call });
   } catch (error) {

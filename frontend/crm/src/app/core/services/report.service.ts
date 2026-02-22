@@ -67,6 +67,72 @@ export class ReportService {
     });
   }
 
+  getFollowupStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    limit?: number;
+  }): Observable<{ data: any[]; total: number }> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+
+    return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/followup-updates`, {
+      params
+    });
+  }
+
+  getReorderStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    limit?: number;
+  }): Observable<{ data: any[]; total: number }> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+
+    return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/reorder-updates`, {
+      params
+    });
+  }
+
+  exportFollowupStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    format?: 'xlsx' | 'csv';
+  }): Observable<Blob> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+    params = params.set('format', options.format || 'xlsx');
+
+    return this.http.get(`${this.apiUrl}/followup-updates/export`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+
+  exportReorderStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    format?: 'xlsx' | 'csv';
+  }): Observable<Blob> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+    params = params.set('format', options.format || 'xlsx');
+
+    return this.http.get(`${this.apiUrl}/reorder-updates/export`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+
   getFollowupReportExportUrl(from?: string, to?: string, agentId?: number): string {
     let params = new HttpParams();
     if (from) params = params.set('from', from);

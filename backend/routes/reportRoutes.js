@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
-const { exportInteractions, exportOrders, exportFollowups, getTopAgents, getActiveUsers, getWeeklyOrderStats, getCallOutcomeStats } = require('../controllers/reportController');
+const { exportInteractions, exportOrders, exportFollowups, exportFollowupStatusUpdates, exportReorderStatusUpdates, listFollowupStatusUpdates, listReorderStatusUpdates, getTopAgents, getActiveUsers, getWeeklyOrderStats, getCallOutcomeStats } = require('../controllers/reportController');
 
 // Admin-only export for customer-wise interaction logs (include Orders Viewer)
 router.get('/interactions/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Orders Viewer', 'orders viewer'), exportInteractions);
@@ -9,6 +9,13 @@ router.get('/interactions/export', protect, authorize('Admin', 'Super Admin', 'a
 router.get('/orders/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Orders Viewer', 'orders viewer'), exportOrders);
 // Admin-only export for followup orders (include Orders Viewer)
 router.get('/followups/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Orders Viewer', 'orders viewer'), exportFollowups);
+// Hierarchy-wise export for follow-up status updates by agent (admin, manager, orders viewer)
+router.get('/followup-updates/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Manager', 'manager', 'Orders Viewer', 'orders viewer'), exportFollowupStatusUpdates);
+// Hierarchy-wise export for reorder status updates by agent (admin, manager, orders viewer)
+router.get('/reorder-updates/export', protect, authorize('Admin', 'Super Admin', 'admin', 'Manager', 'manager', 'Orders Viewer', 'orders viewer'), exportReorderStatusUpdates);
+// JSON list endpoints (agents also allowed; hierarchy handled in controller)
+router.get('/followup-updates', protect, listFollowupStatusUpdates);
+router.get('/reorder-updates', protect, listReorderStatusUpdates);
 
 // Dashboard Reports
 // Top 10 Daily Agents (by Orders)
