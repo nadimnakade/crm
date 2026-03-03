@@ -37,7 +37,7 @@ exports.uploadOrders = async (req, res) => {
       include: [{ model: Role }]
     });
     const userRole = userWithRole && userWithRole.Role ? (userWithRole.Role.name || '').toLowerCase() : '';
-    if (userRole !== 'admin' && userRole !== 'super admin') {
+    if (userRole !== 'admin' && userRole !== 'super admin' && userRole !== 'superadmin') {
       return res.status(403).json({ message: 'Access denied: Only admins can upload orders' });
     }
     const userId = req.user ? req.user.id : 1; // Default to admin if no user
@@ -268,7 +268,25 @@ exports.getReorders = async (req, res) => {
 
     const baseWhere = {
       callType: 'Order Upload',
-      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive },
+      // Exclude all records that have been closed by agents
+      // Treat the following outcomes as CLOSED for reorders
+      outcome: { 
+        [Op.notIn]: [
+          'Order Created',
+          'Reorder',
+          'Re-Followup',
+          'No Answer',
+          'DND',
+          'Lead',
+          'Transfer',
+          'Order already Placed',
+          'Order Already Placed',
+          'Not required',
+          'Pending',
+          'Not Interested'
+        ] 
+      }
     };
 
     if (!isAdmin) {
@@ -313,7 +331,13 @@ exports.getReorders = async (req, res) => {
     const { count, rows } = await Call.findAndCountAll({
       where,
       include,
-      order: [['createdAt', 'DESC']],
+      order: [
+        ['followUpRequired', 'DESC'],
+        [sequelize.literal('CASE WHEN followUpDate IS NULL THEN 1 ELSE 0 END'), 'ASC'],
+        ['followUpDate', 'ASC'],
+        ['createdAt', 'DESC'],
+        ['id', 'DESC']
+      ],
       limit: pageSize,
       offset
     });
@@ -357,7 +381,23 @@ exports.getReordersCount = async (req, res) => {
 
     const where = {
       callType: 'Order Upload',
-      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive },
+      outcome: { 
+        [Op.notIn]: [
+          'Order Created',
+          'Reorder',
+          'Re-Followup',
+          'No Answer',
+          'DND',
+          'Lead',
+          'Transfer',
+          'Order already Placed',
+          'Order Already Placed',
+          'Not required',
+          'Pending',
+          'Not Interested'
+        ] 
+      }
     };
 
     if (!isAdmin) {
@@ -453,16 +493,38 @@ exports.updateOrderStatus = async (req, res) => {
     let newFollowUpRequired = false;
 
     if (caseStatus === 'Open') {
-      newOutcome = subStatus; // Ringing, Follow-up
-      if (subStatus === 'Follow-up') {
+      newOutcome = subStatus;
+      const needsFollowUpDate = ['Call back', 'Fresh Followup', 'Re-Followup', 'Timing'].includes(subStatus);
+      if (needsFollowUpDate) {
         if (!followUpDate) {
           return res.status(400).json({ message: 'Follow-up date is required' });
         }
-        newFollowUpDate = new Date(followUpDate);
+        const d = new Date(followUpDate);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ message: 'Invalid follow-up date' });
+        }
+        newFollowUpDate = d;
         newFollowUpRequired = true;
+      } else {
+        newFollowUpRequired = false;
+        newFollowUpDate = null;
       }
     } else if (caseStatus === 'Close') {
-      newOutcome = closeReason; // Order Created, Reorder, Not Interested
+      newOutcome = closeReason; // Order Created, Reorder, Not Interested, Re-Followup
+      if (closeReason === 'Re-Followup') {
+        if (!followUpDate) {
+          return res.status(400).json({ message: 'Follow-up date is required' });
+        }
+        const d = new Date(followUpDate);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ message: 'Invalid follow-up date' });
+        }
+        newFollowUpRequired = true;
+        newFollowUpDate = d;
+      } else {
+        newFollowUpRequired = false;
+        newFollowUpDate = null;
+      }
     } else {
       return res.status(400).json({ message: 'Invalid Case Status' });
     }

@@ -30,7 +30,7 @@ import { OrderService } from '../../../core/services/order.service';
   
   // Form fields
   caseStatus: string = 'Open';
-  subStatus: string = 'Ringing';
+  subStatus: string = 'No Answer';
   followUpDate: string = '';
   closeReason: string = 'Order Created';
 
@@ -105,9 +105,16 @@ import { OrderService } from '../../../core/services/order.service';
     this.showModal = true;
     // Reset form
     this.caseStatus = 'Open';
-    this.subStatus = 'Ringing';
+    this.subStatus = 'No Answer';
     this.followUpDate = '';
     this.closeReason = 'Order Created';
+  }
+
+  get isFollowUpRequired(): boolean {
+    const openStatusesWithDate = ['Call back', 'Fresh Followup', 'Timing'];
+    const needsOnOpen = this.caseStatus === 'Open' && openStatusesWithDate.includes(this.subStatus);
+    const needsOnClose = this.caseStatus === 'Close' && this.closeReason === 'Re-Followup';
+    return needsOnOpen || needsOnClose;
   }
 
   closeStatusModal(): void {
@@ -118,7 +125,7 @@ import { OrderService } from '../../../core/services/order.service';
   saveStatus(): void {
     if (!this.selectedOrder) return;
 
-    if (this.caseStatus === 'Open' && this.subStatus === 'Follow-up' && !this.followUpDate) {
+    if (this.isFollowUpRequired && !this.followUpDate) {
       alert('Please select a follow-up date.');
       return;
     }

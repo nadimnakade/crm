@@ -84,6 +84,12 @@
                 <button class="btn btn-sm btn-outline-primary" (click)="openStatusDialog(r)">
                   Update Status
                 </button>
+                <button
+                  class="btn btn-sm btn-outline-secondary ms-1"
+                  *ngIf="isAdmin"
+                  (click)="openTransferModal(r)">
+                  Transfer
+                </button>
               </td>
             </tr>
           </tbody>
@@ -115,3 +121,41 @@
   (save)="onDialogSave($event)"
   (cancel)="onDialogCancel()">
 </app-followup-status-dialog>
+
+<div
+  class="modal fade"
+  tabindex="-1"
+  [ngClass]="{ 'show': showTransferModal }"
+  [style.display]="showTransferModal ? 'block' : 'none'"
+  role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Transfer Follow-up</h5>
+        <button type="button" class="btn-close" (click)="closeTransferModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Select Agent</label>
+          <select class="form-select" [(ngModel)]="selectedAgentId">
+            <option [ngValue]="''">Select agent</option>
+            <option *ngFor="let agent of agents" [ngValue]="agent.id">
+              {{ agent.firstName }} {{ agent.lastName }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeTransferModal()">Cancel</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="transferFollowup()"
+          [disabled]="!selectedAgentId">
+          Transfer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showTransferModal"></div>

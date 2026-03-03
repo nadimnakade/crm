@@ -333,6 +333,35 @@
           </div>
         </div>
 
+        <div class="stat-card orders col-md-4">
+          <div class="stat-content">
+            <h3>Followups Tagged Today</h3>
+            <div class="stat-value" *ngIf="!loadingFollowupsTaggedCount; else followupsTaggedLoading">{{ followupsTaggedTodayCount }}</div>
+            <ng-template #followupsTaggedLoading>
+              <span class="skeleton-rect" style="display:inline-block; width:36px;"></span>
+            </ng-template>
+            <a class="view-link" [routerLink]="['/followups/counts-hierarchy']">View breakdown</a>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+        </div>
+
+        <div class="stat-card orders col-md-4">
+          <div class="stat-content">
+            <h3>Reorders Tagged Today</h3>
+            <div class="stat-value" *ngIf="!loadingReorderTaggedCount; else reorderTaggedLoading">{{ reorderTaggedTodayCount }}</div>
+            <ng-template #reorderTaggedLoading>
+              <span class="skeleton-rect" style="display:inline-block; width:36px;"></span>
+            </ng-template>
+            <a class="view-link" [routerLink]="['/followups/reorder-history']">View reorder history</a>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+        </div>
+
+
         <div class="stat-card clients d-none">
           <div class="stat-content">
             <h3>New Clients</h3>

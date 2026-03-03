@@ -318,7 +318,8 @@ exports.getUploadedFollowUps = async (req, res) => {
     endExclusive.setDate(endExclusive.getDate() + 1);
 
     const baseWhere = {
-      followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive }
+      followUpDate: { [Op.gte]: start, [Op.lt]: endExclusive },
+      outcome: { [Op.notIn]: ['Lead', 'Order', 'Order Already Placed', 'Reorder'] }
     };
 
     if (visibility.scope === 'agent') {
@@ -409,7 +410,7 @@ exports.getFollowUps = async (req, res) => {
 
     const where = {
       followUpRequired: true,
-      outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+      outcome: { [Op.notIn]: ['Lead', 'Order', 'Order Already Placed', 'Reorder'] }
     };
 
     // Role-based filtering
@@ -497,7 +498,7 @@ exports.updateFollowUpStatus = async (req, res) => {
           call.followUpDate = normalized;
         }
       }
-    } else if (['Order', 'Order Already Placed', 'Not Interested', 'Not Required'].includes(status)) {
+    } else if (['Lead', 'Order', 'Order Already Placed', 'Reorder'].includes(status)) {
       call.followUpRequired = false;
     }
     
@@ -580,6 +581,38 @@ exports.getCallById = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    Transfer follow-up to another agent (admin only)
+// @route   PUT /api/calls/:id/transfer-followup
+// @access  Private (Admin, Super Admin)
+exports.transferFollowup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newAgentId } = req.body || {};
+
+    if (!newAgentId) {
+      return res.status(400).json({ message: 'newAgentId is required' });
+    }
+
+    const call = await Call.findByPk(id);
+    if (!call) {
+      return res.status(404).json({ message: 'Follow-up not found' });
+    }
+
+    const agent = await User.findByPk(newAgentId);
+    if (!agent) {
+      return res.status(400).json({ message: 'Target agent not found' });
+    }
+
+    call.agentId = newAgentId;
+    await call.save();
+
+    res.json({ message: 'Follow-up transferred successfully' });
+  } catch (error) {
+    console.error('Transfer follow-up failed:', error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
 };
@@ -1010,18 +1043,29 @@ exports.getRecentOrderCount = async (req, res) => {
 
     const visibility = await getVisibility(req.user);
     const applyDateFilter = !!dateStr || visibility.scope !== 'admin';
+    // Orders today should count:
+    // 1) Normal orders (non 'Order Upload') that have HasOrder=1
+    // 2) Reorders where agent tagged outcome = 'Order Created' (callType 'Order Upload')
     const where = {
       [Op.and]: [
-        // Leverage persisted computed column + index for fast counts
-        sequelize.where(sequelize.col('HasOrder'), 1),
-        // Count only non-empty orderDetails or orderId-only excluding FollowUp outcomes
-        { [Op.or]: [
-          sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2"),
-          { [Op.and]: [
-            { orderId: { [Op.ne]: null } },
-            { outcome: { [Op.notIn]: ['No', 'follow-up-scheduled'] } }
-          ] }
-        ] },
+        {
+          [Op.or]: [
+            // Non-reorder orders with HasOrder flag
+            {
+              [Op.and]: [
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.ne]: 'order upload' }),
+                sequelize.where(sequelize.col('HasOrder'), 1)
+              ]
+            },
+            // Reorders that resulted in Order Created
+            {
+              [Op.and]: [
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), 'order upload'),
+                { outcome: 'Order Created' }
+              ]
+            }
+          ]
+        },
         ...(applyDateFilter ? [{ createdAt: { [Op.between]: [start, end] } }] : [])
       ]
     };

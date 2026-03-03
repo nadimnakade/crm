@@ -104,18 +104,18 @@ async function seedDefaults() {
       }
     });
 
-    await User.findOrCreate({
-      where: { email: 'superadmin@crm.com' },
-      defaults: {
-        username: 'superadmin',
-        email: 'superadmin@crm.com',
-        password: '123456', // plain text per current setup
-        firstName: 'Super',
-        lastName: 'Admin',
-        roleId: role.id,
-        isActive: true
-      }
-    });
+    // await User.findOrCreate({
+    //   where: { email: 'superadmin@crm.com' },
+    //   defaults: {
+    //     username: 'superadmin',
+    //     email: 'superadmin@crm.com',
+    //     password: '123456', // plain text per current setup
+    //     firstName: 'Super',
+    //     lastName: 'Admin',
+    //     roleId: role.id,
+    //     isActive: true
+    //   }
+    // });
 
     console.log('Seed check complete: Super Admin role and user ensured');
   } catch (err) {

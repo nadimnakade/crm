@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CallService } from '../../../core/services/call.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { UserService } from '../../../shared/services/user';
 import { FollowupStatusDialogComponent } from '../followup-status-dialog';
 import Swal from 'sweetalert2';
 
@@ -24,7 +26,18 @@ export class FollowupUploadedListComponent implements OnInit {
   pageSize = 20;
   total = 0;
 
-  constructor(private callService: CallService, private router: Router) {}
+  isAdmin = false;
+  showTransferModal = false;
+  selectedFollowupForTransfer: any = null;
+  agents: any[] = [];
+  selectedAgentId: string = '';
+
+  constructor(
+    private callService: CallService,
+    private router: Router,
+    private authService: AuthService,
+    private userService: UserService
+  ) {}
 
   ngOnInit(): void {
     const today = new Date();
@@ -32,6 +45,22 @@ export class FollowupUploadedListComponent implements OnInit {
     this.fromDate = iso;
     this.toDate = iso;
     this.load();
+    this.initRoleAndAgents();
+  }
+
+  private initRoleAndAgents(): void {
+    const role = this.authService.getUser()?.role?.toLowerCase();
+    this.isAdmin = role === 'admin' || role === 'super admin' || role === 'superadmin';
+    if (this.isAdmin) {
+      this.userService.getUsers().subscribe({
+        next: (data) => {
+          this.agents = data || [];
+        },
+        error: (err) => {
+          console.error('Failed to load agents', err);
+        }
+      });
+    }
   }
 
   load(): void {
@@ -80,6 +109,19 @@ export class FollowupUploadedListComponent implements OnInit {
     this.selectedFollowup = row;
   }
 
+  openTransferModal(row: any): void {
+    if (!this.isAdmin) return;
+    this.selectedFollowupForTransfer = row;
+    this.selectedAgentId = '';
+    this.showTransferModal = true;
+  }
+
+  closeTransferModal(): void {
+    this.showTransferModal = false;
+    this.selectedFollowupForTransfer = null;
+    this.selectedAgentId = '';
+  }
+
   onDialogSave(event: any): void {
     if (!this.selectedFollowup) return;
     this.callService.updateFollowUpStatus(this.selectedFollowup.id, event).subscribe({
@@ -101,6 +143,21 @@ export class FollowupUploadedListComponent implements OnInit {
 
   onDialogCancel(): void {
     this.selectedFollowup = null;
+  }
+
+  transferFollowup(): void {
+    if (!this.selectedFollowupForTransfer || !this.selectedAgentId) return;
+    this.callService.transferFollowup(String(this.selectedFollowupForTransfer.id), { newAgentId: this.selectedAgentId }).subscribe({
+      next: () => {
+        Swal.fire('Success', 'Follow-up transferred successfully', 'success');
+        this.closeTransferModal();
+        this.load();
+      },
+      error: (err) => {
+        console.error('Error transferring follow-up', err);
+        Swal.fire('Error', 'Failed to transfer follow-up', 'error');
+      }
+    });
   }
 
   private localISODate(d: Date): string {

@@ -93,4 +93,9 @@ export class CallService {
   getDueFollowUps(all: boolean = false): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due?all=${all}`);
   }
+
+  // Transfer follow-up to another agent (admin only)
+  transferFollowup(id: string, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${id}/transfer-followup`, data);
+  }
 }

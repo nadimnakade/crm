@@ -94,10 +94,11 @@
             <td>{{ order.createdAt | date:'mediumDate' }}</td>
             <td>{{ order.orderDetails?.customerName || order.customer?.firstName || '-' }}</td>
              <td>
-              <span *ngIf="i === 0">{{ order.orderDetails?.customerMobileNo || order.customer?.phone }}</span>
+              {{ order.orderDetails?.customerMobileNo || order.customer?.phone }}
+              <!-- <span *ngIf="i === 0">{{ order.orderDetails?.customerMobileNo || order.customer?.phone }}</span>
               <span *ngIf="i > 0">
                 {{ ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:0:2) + 'XXXXXX' + ((order.orderDetails?.customerMobileNo || order.customer?.phone) | slice:-2) }}
-              </span>
+              </span> -->
             </td> 
             <!-- <td>{{ order.orderDetails?.customerMobileNo || '-' }}</td> -->
             <td>{{ order.orderDetails?.alternate || '-' }}</td>
@@ -155,12 +156,13 @@
           <div class="mb-3" *ngIf="caseStatus === 'Open'">
             <label class="form-label">Sub-Status</label>
             <select class="form-select" [(ngModel)]="subStatus" name="subStatus">
-              <option value="Ringing">Ringing</option>
-              <option value="Follow-up">Follow-up</option>
+              <option value="Call back">Call back</option>
+              <option value="Call Cut">Call Cut</option>
+              <option value="Timing">Timing</option>
             </select>
           </div>
 
-          <div class="mb-3" *ngIf="caseStatus === 'Open' && subStatus === 'Follow-up'">
+          <div class="mb-3" *ngIf="isFollowUpRequired">
             <label class="form-label">Follow-up Date <span class="text-danger">*</span></label>
             <input type="datetime-local" class="form-control" [(ngModel)]="followUpDate" name="followUpDate">
           </div>
@@ -168,8 +170,16 @@
           <div class="mb-3" *ngIf="caseStatus === 'Close'">
             <label class="form-label">Close Reason</label>
             <select class="form-select" [(ngModel)]="closeReason" name="closeReason">
-              <option value="Order Created">Order Created</option>
+              <option value="No Answer">No Answer</option>
+              <option value="DND">DND</option>
+              <option value="Lead">Lead</option>
+              <option value="Transfer">Transfer</option>
+              <option value="Re-Followup">Re-Followup</option>
+              <option value="Order already Placed">Order already Placed</option>
+              <option value="Not required">Not required</option>
+              <option value="Pending">Pending</option>
               <option value="Reorder">Reorder</option>
+              <option value="Order Created">Order Created</option>
               <option value="Not Interested">Not Interested</option>
             </select>
           </div>

@@ -97,6 +97,19 @@ export class ReportService {
     });
   }
 
+  getFollowupCountsHierarchy(options: {
+    from?: string;
+    to?: string;
+  }): Observable<any[]> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+
+    return this.http.get<any[]>(`${this.apiUrl}/followup-counts-hierarchy`, {
+      params
+    });
+  }
+
   exportFollowupStatusUpdates(options: {
     from?: string;
     to?: string;
@@ -128,6 +141,43 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/reorder-updates/export`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+
+  getOrderStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    status?: string;
+    limit?: number;
+  }): Observable<{ data: any[]; total: number }> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.status) params = params.set('status', options.status);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+
+    return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/order-status`, {
+      params
+    });
+  }
+
+  exportOrderStatusUpdates(options: {
+    from?: string;
+    to?: string;
+    status?: string;
+    limit?: number;
+    format?: 'xlsx' | 'csv';
+  }): Observable<Blob> {
+    let params = new HttpParams();
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    if (options.status) params = params.set('status', options.status);
+    if (options.limit != null) params = params.set('limit', String(options.limit));
+    params = params.set('format', options.format || 'xlsx');
+
+    return this.http.get(`${this.apiUrl}/order-status/export`, {
       params,
       responseType: 'blob'
     });

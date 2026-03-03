@@ -78,9 +78,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Orders today count
   ordersTodayCount: number = 0;
   reordersTodayCount: number = 0;
+  reorderTaggedTodayCount: number = 0;
+  followupsTaggedTodayCount: number = 0;
   // Section loaders
   loadingOrdersCount: boolean = false;
   loadingReordersCount: boolean = false;
+  loadingReorderTaggedCount: boolean = false;
+  loadingFollowupsTaggedCount: boolean = false;
   loadingTopAgents: boolean = false;
   loadingActiveUsers: boolean = false;
   loadingDueFollowups: boolean = false;
@@ -180,11 +184,53 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadOrdersTodayCount();
     // Reorders count (today)
     this.loadReordersTodayCount();
+    // Reorders tagged today (status updates)
+    this.loadReorderTaggedTodayCount();
+    // Followups tagged today
+    this.loadFollowupsTaggedTodayCount();
     // New Reports - Admin Only
     if (this.isAdmin || this.isSuperAdmin) {
       this.loadTopAgentsByOrder();
       this.loadActiveUserReport();
     }
+  }
+
+  private localISODate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private loadReorderTaggedTodayCount(): void {
+    this.loadingReorderTaggedCount = true;
+    const today = new Date();
+    const todayStr = this.localISODate(today);
+    this.reportService.getReorderStatusUpdates({ from: todayStr, to: todayStr, limit: 1000 }).subscribe({
+      next: (res) => {
+        this.reorderTaggedTodayCount = Number(res?.total || (Array.isArray(res?.data) ? res.data.length : 0));
+        this.loadingReorderTaggedCount = false;
+      },
+      error: () => {
+        this.reorderTaggedTodayCount = 0;
+        this.loadingReorderTaggedCount = false;
+      }
+    });
+  }
+
+  private loadFollowupsTaggedTodayCount(): void {
+    this.loadingFollowupsTaggedCount = true;
+    this.reportService.getFollowupCountsHierarchy({}).subscribe({
+      next: (data: any[]) => {
+        this.followupsTaggedTodayCount = (data || []).reduce((sum, item) => sum + (item.totalCount || 0), 0);
+        this.loadingFollowupsTaggedCount = false;
+      },
+      error: (err) => {
+        console.error('Failed to get followup tagged count', err);
+        this.followupsTaggedTodayCount = 0;
+        this.loadingFollowupsTaggedCount = false;
+      }
+    });
   }
 
   loadTopAgentsByOrder() {

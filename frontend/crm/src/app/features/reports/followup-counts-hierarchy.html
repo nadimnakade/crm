@@ -1,0 +1,38 @@
+<div class="hierarchy-container">
+  <div class="page-header">
+    <h2>Followups Tagged Today - Hierarchy Breakdown</h2>
+    <div class="total-badge">
+      Total: {{ totalCount }}
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+  </div>
+
+  <div *ngIf="!loading && hierarchyData.length === 0" class="empty-state">
+    No followups tagged today.
+  </div>
+
+  <div *ngIf="!loading && hierarchyData.length > 0" class="hierarchy-list">
+    <div class="manager-group" *ngFor="let manager of hierarchyData">
+      <div class="manager-header">
+        <div class="manager-info">
+          <i class="fa-solid fa-user-tie"></i>
+          <span class="name">{{ manager.managerName }}</span>
+        </div>
+        <div class="count-badge manager-count">{{ manager.totalCount }}</div>
+      </div>
+      
+      <div class="agent-list">
+        <div class="agent-item" *ngFor="let agent of manager.agents">
+          <div class="agent-info">
+            <i class="fa-solid fa-user"></i>
+            <span class="name">{{ agent.agentName }}</span>
+          </div>
+          <div class="count-badge agent-count">{{ agent.count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
