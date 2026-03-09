@@ -106,6 +106,7 @@ exports.login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
       role: role ? role.name : null,
       token: token,
       sessionToken: sessionToken
@@ -153,6 +154,7 @@ exports.getProfile = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
         role: user.Role ? user.Role.name : null
       });
     } else {

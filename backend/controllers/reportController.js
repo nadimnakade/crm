@@ -819,7 +819,8 @@ exports.getFollowupCountsHierarchy = async (req, res) => {
       'Re-Follow-up', 
       'Timing', 
       'Follow-up', 
-      'Follow Up'
+      'Follow Up',
+      'Follow-up Scheduled'
     ];
 
     // Query to get counts grouped by Agent and Manager

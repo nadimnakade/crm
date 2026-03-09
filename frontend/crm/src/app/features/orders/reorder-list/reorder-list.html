@@ -107,6 +107,13 @@
             <td>{{ order.outcome }}</td>
             <td>{{ order.agent?.firstName }} {{ order.agent?.lastName }}</td>
             <td>
+              <button class="btn btn-sm btn-outline-success me-1" 
+                      (click)="callCustomer(order)"
+                      [disabled]="callingIds.has(order.id)"
+                      title="Call Now">
+                <i class="fa fa-phone" *ngIf="!callingIds.has(order.id)"></i>
+                <span *ngIf="callingIds.has(order.id)" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              </button>
               <button class="btn btn-sm btn-outline-primary" (click)="openStatusModal(order)">
                 Update Status
               </button>

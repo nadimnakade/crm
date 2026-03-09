@@ -45,6 +45,7 @@ export const routes: Routes = [
       { path: 'followups/counts-hierarchy', loadComponent: () => import('./features/reports/followup-counts-hierarchy').then(m => m.FollowupCountsHierarchyComponent), canActivate: [AuthGuard] },
       { path: 'followups/reorder-history', loadComponent: () => import('./features/followups/reorder-history/reorder-history').then(m => m.ReorderHistoryComponent), canActivate: [AuthGuard] },
       { path: 'customer-medicine-detail', loadComponent: () => import('./features/medicine/customer-medicine-detail/customer-medicine-detail').then(m => m.CustomerMedicineDetailComponent) },
+      { path: 'my-base', loadComponent: () => import('./features/my-base/my-base').then(m => m.MyBaseComponent), canActivate: [AuthGuard] },
       // Placeholder routes
       { path: 'messages', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },
       { path: 'settings', loadComponent: () => import('./shared/ui/not-implemented').then(m => m.NotImplementedComponent) },

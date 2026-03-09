@@ -75,6 +75,8 @@ app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/portfolio', require('./routes/portfolioRoutes'));
 app.use('/api/customer-medicine-details', require('./routes/customerMedicineDetailRoutes'));
+app.use('/api/smartflo', require('./routes/smartfloRoutes'));
+app.use('/api/agent-base', require('./routes/agentBaseRoutes'));
  // Import customers route removed per user instruction
 app.use('/api/reports', reportRoutes);
  // Import customers route removed per user instruction

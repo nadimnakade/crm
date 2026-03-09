@@ -6,6 +6,7 @@ const CallAttachment = require('./CallAttachment');
 const CustomerPortfolio = require('./CustomerPortfolio');
 const CallStatusHistory = require('./CallStatusHistory');
 const Session = require('./Session');
+const AgentBase = require('./AgentBase');
 const { sequelize } = require('../config/db');
 
 // Define associations
@@ -15,6 +16,10 @@ Role.hasMany(User, { foreignKey: 'roleId' });
 // Manager → Agents relationship
 User.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
 User.hasMany(User, { foreignKey: 'managerId', as: 'teamMembers' });
+
+// AgentBase → User
+AgentBase.belongsTo(User, { foreignKey: 'agentId', as: 'agent' });
+User.hasMany(AgentBase, { foreignKey: 'agentId', as: 'agentBase' });
 
 // Removed assignedAgentId relationship due to column removal from Customers table
 
@@ -228,6 +233,7 @@ module.exports = {
   CallStatusHistory,
   CustomerPortfolio,
   Session,
+  AgentBase,
   sequelize,
   syncDatabase
-};
+};

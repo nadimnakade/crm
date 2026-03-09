@@ -49,18 +49,18 @@
             <td>{{ c.orderId || c.orderDetails?.orderId || '—' }}</td>
             <!-- <td>{{ c.notes || '—' }}</td> -->
             <td>
-              <a class="btn btn-sm btn-outline-primary" [routerLink]="['/calls', c.id]">View / Upload Files</a>
-              <button class="btn btn-sm btn-outline-info ms-2" (click)="openOrderModalForCall(c)" [disabled]="!c.orderDetails">Order Details</button>
+              <a class="btn btn-sm btn-outline-primary" [routerLink]="['/calls', c.callId]">View / Upload Files</a>
+              <button class="btn btn-sm btn-outline-info ms-2" (click)="openOrderModalForCall(c)" [disabled]="!c.orderDetails || c.isStatusEvent">Order Details</button>
             </td>
             <td>
-              <button class="btn btn-sm btn-outline-secondary" (click)="toggleDetails(c.id)">
-                {{ expandedId === c.id ? 'Hide' : 'View' }}
+              <button class="btn btn-sm btn-outline-secondary" (click)="toggleDetails(c)">
+                {{ expandedId === c.rowKey ? 'Hide' : 'View' }}
               </button>
             </td>
           </tr>
           <!-- Expanded details row -->
           <tr *ngFor="let c of calls">
-            <td colspan="8" *ngIf="expandedId === c.id" class="bg-light">
+            <td colspan="8" *ngIf="expandedId === c.rowKey" class="bg-light">
               <div class="row">
                 <div class="col-md-6" *ngIf="c.orderDetails">
                   <h6>Order Details</h6>
@@ -97,10 +97,10 @@
                 </div>
                 <div class="col-12 mt-2">
                   <h6>Attachments</h6>
-                  <div *ngIf="!attachmentsByCall[c.id]" class="text-muted">Loading attachments...</div>
-                  <div *ngIf="attachmentsByCall[c.id] && attachmentsByCall[c.id].length === 0" class="text-muted">No attachments</div>
-                  <ul *ngIf="attachmentsByCall[c.id] && attachmentsByCall[c.id].length > 0" class="mb-0">
-                    <li *ngFor="let f of attachmentsByCall[c.id]">
+                  <div *ngIf="!attachmentsByCall[c.callId]" class="text-muted">Loading attachments...</div>
+                  <div *ngIf="attachmentsByCall[c.callId] && attachmentsByCall[c.callId].length === 0" class="text-muted">No attachments</div>
+                  <ul *ngIf="attachmentsByCall[c.callId] && attachmentsByCall[c.callId].length > 0" class="mb-0">
+                    <li *ngFor="let f of attachmentsByCall[c.callId]">
                       <a [href]="f.url" target="_blank">{{ f.name }}</a>
                       <span class="badge bg-secondary ms-2">{{ f.type }}</span>
                     </li>

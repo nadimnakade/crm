@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 })
 export class CallService {
   private apiUrl = `${environment.apiBase}/calls`;
+  private smartfloUrl = `${environment.apiBase}/smartflo`;
 
   constructor(private http: HttpClient) { }
 
@@ -97,5 +98,13 @@ export class CallService {
   // Transfer follow-up to another agent (admin only)
   transferFollowup(id: string, data: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/${id}/transfer-followup`, data);
+  }
+
+  // Smartflo Click-to-Call
+  initiateSmartfloCall(fromNumber: string, toNumber: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.smartfloUrl}/click-to-call`,
+      { from: fromNumber, to: toNumber }
+    );
   }
 }

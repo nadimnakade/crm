@@ -13,6 +13,7 @@ export interface LoginResponse {
   lastName: string;
   role: string;
   token: string;
+  phone: string;
 }
 
 export interface User {
@@ -22,6 +23,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: string;
+  phone: string;
 }
 
 @Injectable({
@@ -58,6 +60,7 @@ export class AuthService {
     return this.http.post<LoginResponse>(`${this.apiUrl}/login`, { email, password }, { headers })
       .pipe(
         tap((response: LoginResponse) => {
+          debugger
           this.setToken(response.token);
           this.setUser({
             id: response.id,
@@ -65,7 +68,8 @@ export class AuthService {
             email: response.email,
             firstName: response.firstName,
             lastName: response.lastName,
-            role: response.role
+            role: response.role,
+            phone: response.phone
           });
           this.isAuthenticatedSubject.next(true);
           // Reset idle timeout on successful login

@@ -31,7 +31,9 @@ export class LoginComponent implements OnInit {
     this.errorMessage = '';
     this.authService.login(this.loginData.email, this.loginData.password)
       .subscribe({
+        
         next: () => {
+          
           this.router.navigate(['/dashboard']);
         },
         error: (error) => {

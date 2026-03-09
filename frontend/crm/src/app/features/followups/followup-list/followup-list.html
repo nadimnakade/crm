@@ -77,6 +77,14 @@
               </td>
               <td>{{ item.Agent?.name }}</td>
               <td class="text-right">
+                <button class="btn btn-sm btn-outline-success me-1" 
+                        (click)="callCustomer(item)"
+                        [disabled]="callingIds.has(item.id)"
+                        title="Call Now">
+                  <i class="fa fa-phone" *ngIf="!callingIds.has(item.id)"></i>
+                  <span *ngIf="callingIds.has(item.id)" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  Call Now
+                </button>
                 <button class="btn btn-sm btn-outline-primary" (click)="openStatusDialog(item)">
                   Update Status
                 </button>

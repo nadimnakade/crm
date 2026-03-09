@@ -31,6 +31,7 @@ export class FollowupUploadedListComponent implements OnInit {
   selectedFollowupForTransfer: any = null;
   agents: any[] = [];
   selectedAgentId: string = '';
+  callingIds = new Set<number>();
 
   constructor(
     private callService: CallService,
@@ -156,6 +157,36 @@ export class FollowupUploadedListComponent implements OnInit {
       error: (err) => {
         console.error('Error transferring follow-up', err);
         Swal.fire('Error', 'Failed to transfer follow-up', 'error');
+      }
+    });
+  }
+
+  callCustomer(row: any): void {
+    const customerPhone = "91" + row.number;
+    if (!customerPhone) {
+      Swal.fire('Error', 'Customer phone number not available', 'error');
+      return;
+    }
+
+    const user = this.authService.getUser();
+    const agentPhone = '919240258079';//user?.phone;
+
+    if (!agentPhone) {
+      Swal.fire('Error', 'Your (Agent) phone number is not configured in your profile. Please contact admin.', 'error');
+      return;
+    }
+
+    this.callingIds.add(row.id);
+
+    this.callService.initiateSmartfloCall(agentPhone, '918108783956').subscribe({
+      next: (res) => {
+        this.callingIds.delete(row.id);
+        Swal.fire('Success', 'Call initiated successfully. Please pick up your phone.', 'success');
+      },
+      error: (err) => {
+        this.callingIds.delete(row.id);
+        const msg = err.error?.message || 'Failed to initiate call';
+        Swal.fire('Error', msg, 'error');
       }
     });
   }

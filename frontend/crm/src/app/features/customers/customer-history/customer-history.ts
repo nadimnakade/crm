@@ -39,10 +39,10 @@ export class CustomerHistoryComponent implements OnInit {
       ]},
       { value: 'new-order-related', label: 'New Order Related', subs: [
         { value: 'discount-query', label: 'Discount Query' },
-        { value: 'follow-up-scheduled', label: 'Follow-up Scheduled' },
-        { value: 'lead', label: 'Lead' }
+        { value: 'Follow-up Scheduled', label: 'Follow-up Scheduled' },
+        { value: 'Lead', label: 'Lead' }
       ]},
-       { value: 'lab-option', label: 'Lab', subs: [
+      { value: 'lab-option', label: 'Lab', subs: [
         { value: 'lab-statusy', label: 'Status' },
         { value: 'lab-report', label: 'Report' },
         { value: 'lab-enquiry', label: 'Enquiry' }
@@ -53,8 +53,8 @@ export class CustomerHistoryComponent implements OnInit {
     ],
     outbound: [
       { value: 'sales-call', label: 'Sales Call', subs: [
-        { value: 'Yes', label: 'Lead' },
-        { value: 'No', label: 'FollowUp' }
+        { value: 'Lead', label: 'Lead' },
+        { value: 'Follow-up', label: 'FollowUp' }
       ]},
       { value: 'previous-order-history', label: 'Previous Order History', subs: [
         { value: 'order-entry', label: 'Order Entry' },
@@ -97,7 +97,7 @@ export class CustomerHistoryComponent implements OnInit {
   private pendingRefundDetails: { customerName: string; customerNumber: string; customerOrderId: string; medicineName: string; medicineQty: string; returnReason: string; accountHolderName: string; accountNumber: string; ifscCode: string; imageName?: string } | null = null;
 
   // Expanded interaction details row state
-  expandedId: number | null = null;
+  expandedId: string | null = null;
 
   // Attachments per call (loaded on demand)
   attachmentsByCall: Record<number, Array<{ name: string; url: string; type: string }>> = {};
@@ -177,8 +177,8 @@ export class CustomerHistoryComponent implements OnInit {
     const isSalesOutbound = callType === 'outbound' && (category === 'sales' || category === 'sales-call');
     if (!outcome) return '—';
     if (isSalesOutbound) {
-      if (outcome.toLowerCase() === 'yes' || outcome.toLowerCase() === 'positive') return 'Lead';
-      if (outcome.toLowerCase() === 'no' || outcome.toLowerCase() === 'negative') return 'FollowUp';
+      if (outcome.toLowerCase() === 'yes' || outcome.toLowerCase() === 'positive' || outcome.toLowerCase() === 'lead') return 'Lead';
+      if (outcome.toLowerCase() === 'no' || outcome.toLowerCase() === 'negative' || outcome.toLowerCase() === 'follow-up') return 'FollowUp';
     }
     return outcome;
   }
@@ -247,10 +247,13 @@ export class CustomerHistoryComponent implements OnInit {
     this.orderDetailsForm.get('orderId')?.setValue(clean);
   }
 
-  toggleDetails(id: number): void {
-    this.expandedId = this.expandedId === id ? null : id;
+  toggleDetails(row: any): void {
+    const rowKey = row?.rowKey as string | undefined;
+    const callId = row?.callId as number | undefined;
+    if (!rowKey || !callId) return;
+    this.expandedId = this.expandedId === rowKey ? null : rowKey;
     if (this.expandedId) {
-      this.loadAttachments(this.expandedId);
+      this.loadAttachments(callId);
     }
   }
 
@@ -316,8 +319,8 @@ export class CustomerHistoryComponent implements OnInit {
     const ct = (this.historyForm.get('callType')?.value || '').toString().toLowerCase();
     const cat = (this.historyForm.get('category')?.value || '').toString().toLowerCase();
     const sub = (this.historyForm.get('subCategory')?.value || '').toString().toLowerCase();
-    return (ct === 'outbound' && cat === 'sales-call' && sub === 'no') ||
-           (ct === 'inbound' && cat === 'new-order-related' && sub === 'follow-up-scheduled');
+    return (ct === 'outbound' && cat === 'sales-call' && (sub === 'no' || sub === 'follow-up')) ||
+           (ct === 'inbound' && cat === 'new-order-related' && (sub === 'follow-up-scheduled' || sub === 'follow-up scheduled'));
   }
 
   openOrderModal(): void {
@@ -428,12 +431,12 @@ export class CustomerHistoryComponent implements OnInit {
         // Normalize NVARCHAR JSON fields for order/refund details
         const normalized = data.map((c: any) => ({
           ...c,
+          rowKey: `call-${c.id}`,
+          callId: c.id,
           orderDetails: typeof c.orderDetails === 'string' ? this.parseJSON(c.orderDetails) : c.orderDetails,
           refundDetails: typeof c.refundDetails === 'string' ? this.parseJSON(c.refundDetails) : c.refundDetails
         }));
-        this.calls = normalized;
-        // Populate the bottom Order Details section from persisted history
-        this.orderDetailsList = normalized
+        const baseOrderDetailsList = normalized
           .filter((c: any) => !!c.orderDetails)
           .map((c: any) => ({
             customerName: c.orderDetails.customerName || '',
@@ -446,7 +449,53 @@ export class CustomerHistoryComponent implements OnInit {
             agentName: `${(c.agent?.firstName || '').trim()} ${(c.agent?.lastName || '').trim()}`.trim(),
             createdAt: c.createdAt || null
           }));
-        this.isLoading = false;
+
+        this.callService.getCustomerStatusHistory(this.customerId).subscribe({
+          next: (hist) => {
+            const historyRows = Array.isArray(hist?.data) ? hist.data : [];
+            const statusEvents = historyRows.map((h: any) => {
+              const orderDetails = typeof h.orderDetails === 'string' ? this.parseJSON(h.orderDetails) : h.orderDetails;
+              const changedAt = h.changedAt || null;
+              const callId = Number(h.callId || 0);
+              const historyId = h.historyId || `${callId}-${String(changedAt || '')}`;
+              return {
+                rowKey: `status-${historyId}`,
+                callId,
+                isStatusEvent: true,
+                createdAt: changedAt,
+                date: changedAt,
+                callType: 'Status Update',
+                category: h.category || null,
+                outcome: h.newStatus || null,
+                orderId: h.orderId || null,
+                orderDetails,
+                refundDetails: undefined,
+                notes: '',
+                agent: {
+                  firstName: h.changedByFirstName || '',
+                  lastName: h.changedByLastName || ''
+                }
+              };
+            });
+
+            const combined = [...statusEvents, ...normalized];
+            combined.sort((a: any, b: any) => {
+              const at = new Date(a?.createdAt || a?.date || 0).getTime();
+              const bt = new Date(b?.createdAt || b?.date || 0).getTime();
+              return bt - at;
+            });
+
+            this.calls = combined;
+            this.orderDetailsList = baseOrderDetailsList;
+            this.isLoading = false;
+          },
+          error: (err) => {
+            console.error('Failed to load status history', err);
+            this.calls = normalized;
+            this.orderDetailsList = baseOrderDetailsList;
+            this.isLoading = false;
+          }
+        });
       },
       error: (err) => {
         console.error('Failed to load history', err);

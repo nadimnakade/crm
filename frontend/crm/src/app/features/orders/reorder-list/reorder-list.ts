@@ -2,6 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { OrderService } from '../../../core/services/order.service';
+import { CallService } from '../../../shared/services/call';
+import { AuthService } from '../../../core/services/auth.service';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-reorder-list',
@@ -33,12 +36,47 @@ import { OrderService } from '../../../core/services/order.service';
   subStatus: string = 'No Answer';
   followUpDate: string = '';
   closeReason: string = 'Order Created';
+  callingIds = new Set<number>();
 
-  constructor(private orderService: OrderService) {
+  constructor(
+    private orderService: OrderService,
+    private callService: CallService,
+    private authService: AuthService
+  ) {
     const today = new Date();
     const iso = today.toISOString().split('T')[0];
     this.fromDate = iso;
     this.toDate = iso;
+  }
+
+  callCustomer(order: any): void {
+    const customerPhone = order.orderDetails?.customerMobileNo || order.customer?.phone;
+    if (!customerPhone) {
+      Swal.fire('Error', 'Customer phone number not available', 'error');
+      return;
+    }
+
+    const user = this.authService.getUser();
+    const agentPhone = user?.phone;
+
+    if (!agentPhone) {
+      Swal.fire('Error', 'Your (Agent) phone number is not configured in your profile. Please contact admin.', 'error');
+      return;
+    }
+
+    this.callingIds.add(order.id);
+
+    this.callService.initiateSmartfloCall(agentPhone, customerPhone).subscribe({
+      next: (res) => {
+        this.callingIds.delete(order.id);
+        Swal.fire('Success', 'Call initiated successfully. Please pick up your phone.', 'success');
+      },
+      error: (err) => {
+        this.callingIds.delete(order.id);
+        const msg = err.error?.message || 'Failed to initiate call';
+        Swal.fire('Error', msg, 'error');
+      }
+    });
   }
 
   ngOnInit(): void {

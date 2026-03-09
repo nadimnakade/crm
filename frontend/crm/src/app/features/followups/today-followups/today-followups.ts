@@ -1,14 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { CallService } from '../../../shared/services/call';
-import { ReportService } from '../../../core/services/report.service';
 import { AuthService } from '../../../shared/auth/auth';
+import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 
 @Component({
   selector: 'app-today-followups',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './today-followups.html'
 })
 export class TodayFollowupsComponent implements OnInit {
@@ -18,6 +19,8 @@ export class TodayFollowupsComponent implements OnInit {
   total = 0;
   page = 1;
   pageSize = 20;
+  searchQuery = '';
+  private searchSubject = new Subject<string>();
 
   isManagerOrAdmin = false;
   exporting = false;
@@ -26,9 +29,17 @@ export class TodayFollowupsComponent implements OnInit {
 
   constructor(
     private callSvc: CallService,
-    private auth: AuthService,
-    private reportSvc: ReportService
-  ) {}
+    private auth: AuthService
+  ) {
+    this.searchSubject.pipe(
+      debounceTime(500),
+      distinctUntilChanged()
+    ).subscribe(query => {
+      this.searchQuery = query;
+      this.page = 1;
+      this.load();
+    });
+  }
 
   private localISODate(d: Date): string {
     const y = d.getFullYear();
@@ -48,6 +59,11 @@ export class TodayFollowupsComponent implements OnInit {
     this.load();
   }
 
+  onSearch(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.searchSubject.next(input.value);
+  }
+
   load(): void {
     if (!this.isManagerOrAdmin) return;
     this.loading = true;
@@ -62,9 +78,10 @@ export class TodayFollowupsComponent implements OnInit {
       sortBy: 'followUpDate',
       sortOrder: 'ASC',
       from: todayStr,
-      to: todayStr
+      to: todayStr,
+      search: this.searchQuery
     }).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         this.data = res.data || [];
         this.total = res.total || 0;
         this.loading = false;
@@ -72,6 +89,36 @@ export class TodayFollowupsComponent implements OnInit {
       error: () => {
         this.error = 'Failed to load today\'s follow-ups.';
         this.loading = false;
+      }
+    });
+  }
+
+  exportToday(): void {
+    const today = new Date();
+    const todayStr = this.localISODate(today);
+    this.exporting = true;
+    
+    this.callSvc.getFollowupReport({
+      from: todayStr,
+      to: todayStr,
+      export: 'true',
+      search: this.searchQuery
+    }).subscribe({
+      next: (blob: any) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Followups-${todayStr}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.exporting = false;
+      },
+      error: (err) => {
+        console.error('Export failed', err);
+        this.exporting = false;
+        alert('Failed to export data');
       }
     });
   }
@@ -106,29 +153,5 @@ export class TodayFollowupsComponent implements OnInit {
       return Array.from({ length: last }, (_, i) => i + 1);
     }
     return pages;
-  }
-
-  async export(): Promise<void> {
-    if (!this.isManagerOrAdmin || this.exporting) return;
-    this.exporting = true;
-    try {
-      const today = new Date();
-      const todayStr = this.localISODate(today);
-      const blob = await (await import('rxjs')).firstValueFrom(
-        this.reportSvc.exportFollowups({ from: todayStr, to: todayStr, limit: 10000, format: 'xlsx' })
-      );
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `today-followups-${todayStr}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      this.error = 'Export failed.';
-    } finally {
-      this.exporting = false;
-    }
   }
 }

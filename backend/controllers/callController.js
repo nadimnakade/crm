@@ -1,5 +1,5 @@
 const { Call, Customer, User, Role, sequelize } = require('../models');
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const xlsx = require('xlsx');
 const path = require('path');
 
@@ -504,8 +504,8 @@ exports.updateFollowUpStatus = async (req, res) => {
     
     await call.save({ transaction });
 
-    // Append status history when outcome changed
-    if (status && previousOutcome !== status) {
+    // Append status history for every update to track interactions
+    if (status) {
       try {
         const { CallStatusHistory } = require('../models');
         await CallStatusHistory.create({
@@ -621,6 +621,7 @@ exports.transferFollowup = async (req, res) => {
 // @route   POST /api/calls
 // @access  Private
 exports.createCall = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const {
       customerId,
@@ -656,15 +657,18 @@ exports.createCall = async (req, res) => {
     // Validate follow-up requirements
     const mustHaveFollowUpDate = requiresFollowUpDate(callType, category, outcome);
     if (mustHaveFollowUpDate && !followUpDate) {
+      await transaction.rollback();
       return res.status(422).json({
         message: 'Follow-up date is required for this interaction',
         rule: 'outbound > sales-call > followup OR inbound > new order related > follow-up scheduled'
       });
     }
 
+    const finalAgentId = agentId || (req.user ? req.user.id : null);
+
     const call = await Call.create({
       customerId,
-      agentId: agentId || (req.user ? req.user.id : null),
+      agentId: finalAgentId,
       callType,
       category,
       date,
@@ -676,10 +680,61 @@ exports.createCall = async (req, res) => {
       refundDetails,
       followUpRequired: mustHaveFollowUpDate ? true : !!followUpRequired,
       followUpDate: followUpDate || null
-    });
+    }, { transaction });
 
+    // Append status history for initial creation
+    if (outcome) {
+      const { CallStatusHistory } = require('../models');
+      await CallStatusHistory.create({
+        CallId: call.id,
+        PreviousStatus: null,
+        NewStatus: outcome,
+        ChangedBy: finalAgentId
+      }, { transaction });
+    }
+
+    // --- AUTO-CLOSE LOGIC: Update pending "Order Upload" and "Follow-up Upload" tasks ---
+    // If an agent logs a new call for this customer, we assume they are working the list.
+    // We update the original "task" record so it drops off the "To Do" lists.
+    const newOutcome = outcome || 'Worked';
+    
+    // 1. Close pending Reorders (Order Upload)
+    await Call.update(
+      { 
+        outcome: newOutcome,
+        notes: sequelize.fn('concat', sequelize.col('notes'), `\n[Auto] Worked via Call #${call.id} on ${new Date().toISOString()}`)
+      },
+      {
+        where: {
+          customerId,
+          callType: 'Order Upload',
+          outcome: { [Op.or]: ['Completed', null, ''] }
+        },
+        transaction
+      }
+    );
+
+    // 2. Close pending Follow-up Uploads
+    await Call.update(
+      { 
+        outcome: newOutcome,
+        notes: sequelize.fn('concat', sequelize.col('notes'), `\n[Auto] Worked via Call #${call.id} on ${new Date().toISOString()}`)
+      },
+      {
+        where: {
+          customerId,
+          callType: { [Op.in]: ['Follow-up Upload', 'Followup Upload', 'follow-up upload', 'followup upload'] },
+          outcome: { [Op.or]: ['Follow-up', null, ''] }
+        },
+        transaction
+      }
+    );
+    // -----------------------------------------------------------------------------------
+
+    await transaction.commit();
     res.status(201).json(call);
   } catch (error) {
+    await transaction.rollback();
     console.error(error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
@@ -1040,6 +1095,7 @@ exports.getRecentOrderCount = async (req, res) => {
     const start = new Date(base); start.setHours(0,0,0,0);
     const end = new Date(base); end.setHours(23,59,59,999);
     const requestedAgentId = req.query.agentId ? parseInt(req.query.agentId, 10) : null;
+    const search = (req.query.search || '').trim();
 
     const visibility = await getVisibility(req.user);
     const applyDateFilter = !!dateStr || visibility.scope !== 'admin';
@@ -1144,7 +1200,10 @@ exports.getFollowupReport = async (req, res) => {
     ];
     const bulkUploadFollowups = [
       sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.in]: ['follow-up upload','followup upload','followups upload'] }),
-      { followUpRequired: true }
+      { followUpRequired: true },
+      // Only show initial state outcomes (Follow-up, null, empty)
+      // If agent updates it to 'Ringing', 'Order', etc., it should disappear
+      { outcome: { [Op.or]: [{ [Op.eq]: 'Follow-up' }, { [Op.is]: null }, { [Op.eq]: '' }] } }
     ];
 
     const where = {
@@ -1172,6 +1231,63 @@ exports.getFollowupReport = async (req, res) => {
       if (requestedAgentId) where.agentId = requestedAgentId;
     }
 
+    // Search logic (Customer Name, Phone, or Order ID)
+    if (search) {
+      const searchLike = `%${search}%`;
+      const searchOrs = [
+        { '$Customer.firstName$': { [Op.like]: searchLike } },
+        { '$Customer.lastName$': { [Op.like]: searchLike } },
+        { orderId: { [Op.like]: searchLike } }
+      ];
+
+      // Add phone search if digits present
+      const digitsOnly = search.replace(/[^0-9]/g, '');
+      if (digitsOnly.length >= 3) {
+        searchOrs.push({ '$Customer.phone$': { [Op.like]: `%${digitsOnly}%` } });
+      }
+
+      // We must push to the top-level Op.and array
+      where[Op.and].push({
+        [Op.or]: searchOrs
+      });
+    }
+
+    // Export logic
+    if (req.query.export === 'true') {
+      // Use subQuery: false to allow filtering by included Customer columns
+      const rows = await Call.findAll({
+        where,
+        include: [
+          { model: Customer, attributes: ['firstName', 'lastName', 'phone'] },
+          { model: User, as: 'agent', attributes: ['firstName', 'lastName'] }
+        ],
+        order: [['followUpDate', 'ASC']],
+        subQuery: false, 
+        raw: true,
+        nest: true
+      });
+
+      const exportData = rows.map(r => ({
+        'Date': r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '',
+        'Customer Name': r.Customer ? `${r.Customer.firstName} ${r.Customer.lastName || ''}`.trim() : 'N/A',
+        'Phone': r.Customer ? r.Customer.phone : 'N/A',
+        'Agent': r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : 'N/A',
+        'Follow Up Date': r.followUpDate ? new Date(r.followUpDate).toLocaleDateString() : '',
+        'Order ID': r.orderId || '',
+        'Outcome': r.outcome,
+        'Notes': r.notes
+      }));
+
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(exportData);
+      xlsx.utils.book_append_sheet(wb, ws, 'FollowUps');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Disposition', 'attachment; filename="FollowupReport.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buf);
+    }
+
     const offset = (page - 1) * pageSize;
     const allowedSort = ['followUpDate', 'createdAt', 'orderId'];
     const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['followUpDate', 'ASC']];
@@ -1184,7 +1300,8 @@ exports.getFollowupReport = async (req, res) => {
       ],
       order,
       limit: pageSize,
-      offset
+      offset,
+      subQuery: false // IMPORTANT: Required for filtering by associated model columns (Customer) with pagination
     });
 
     const data = rows.map(r => ({
@@ -1399,6 +1516,48 @@ exports.getCallHistorySource = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+exports.getCustomerStatusHistory = async (req, res) => {
+  try {
+    const customerId = parseInt(req.params.customerId, 10);
+    if (!customerId) {
+      return res.status(400).json({ message: 'customerId is required' });
+    }
+
+    const rows = await sequelize.query(
+      `
+        SELECT
+          h.Id AS historyId,
+          h.CallId AS callId,
+          h.PreviousStatus AS previousStatus,
+          h.NewStatus AS newStatus,
+          h.ChangedAt AS changedAt,
+          h.ChangedBy AS changedBy,
+          changer.firstName AS changedByFirstName,
+          changer.lastName AS changedByLastName,
+          c.callType AS callType,
+          c.category AS category,
+          c.orderId AS orderId,
+          c.orderDetails AS orderDetails
+        FROM dbo.CallStatusHistory h WITH (NOLOCK)
+        INNER JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
+        LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
+        WHERE c.customerId = :customerId
+        ORDER BY h.ChangedAt DESC, h.Id DESC
+      `,
+      {
+        raw: true,
+        type: QueryTypes.SELECT,
+        replacements: { customerId }
+      }
+    );
+
+    return res.json({ data: rows });
+  } catch (error) {
+    console.error('getCustomerStatusHistory failed:', error);
+    return res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 

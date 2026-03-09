@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly, getFollowUps, updateFollowUpStatus, uploadFollowUps, getUploadedFollowUps, transferFollowup } = require('../controllers/callController');
+const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly, getFollowUps, updateFollowUpStatus, uploadFollowUps, getUploadedFollowUps, transferFollowup, getCustomerStatusHistory } = require('../controllers/callController');
 const { getCallFiles, getCallHistory, getCallFilesSource, getCallHistorySource } = require('../controllers/callController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../utils/fileUpload');
@@ -32,6 +32,8 @@ router.get('/orders/followups', protect, require('../controllers/callController'
 
 // Due follow-ups
 router.get('/follow-ups/due', protect, require('../controllers/callController').getDueFollowUps);
+
+router.get('/customer/:customerId/status-history', protect, getCustomerStatusHistory);
 
 router.route('/:id')
   .get(protect, getCallById)

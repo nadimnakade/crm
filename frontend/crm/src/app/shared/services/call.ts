@@ -9,6 +9,7 @@ import { environment } from '../../../environments/environment';
 })
 export class CallService {
   private apiUrl = `${environment.apiBase}/calls`;
+  private smartfloUrl = `${environment.apiBase}/smartflo`;
 
   constructor(
     private http: HttpClient,
@@ -100,75 +101,98 @@ export class CallService {
     if (params?.date) q.date = params.date;
     
     return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(
-      `${this.apiUrl}/orders/recent`,
+      `${this.apiUrl}/recent-order-details`,
       { headers: this.getHeaders(), params: q }
     );
   }
 
-  // Recent orders count (by date, default today) — optimized count-only endpoint
-  getRecentOrderCount(agentId?: number, date?: string, options?: { skipLoader?: boolean }): Observable<{ total: number }> {
-    const params: any = {};
-    if (agentId) params.agentId = String(agentId);
-    if (date) params.date = date;
-    return this.http.get<{ total: number }>(`${this.apiUrl}/orders/recent/count`, {
-      headers: options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders(),
+  getDueFollowUps(limitOrShowAll: number | boolean = 5, options?: { skipLoader?: boolean }): Observable<any[]> {
+    let limit = 5;
+    let showAll = false;
+    
+    if (typeof limitOrShowAll === 'boolean') {
+      showAll = limitOrShowAll;
+      limit = 100; // Default limit when showing all, or we can remove limit
+    } else {
+      limit = limitOrShowAll;
+    }
+
+    const headers = options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders();
+    
+    // Check if we need to use the 'all' param like core service or stick to existing
+    // If showAll is true, we might want to pass a param to backend
+    const params: any = { limit };
+    if (showAll) {
+      params.all = 'true';
+    }
+
+    return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due`, {
+      headers,
       params
     });
   }
 
-  // Followup report: today through next month
-  getFollowupReport(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'ASC'|'DESC'; agentId?: number; from?: string; to?: string }): Observable<{ data: any[]; total: number; page: number; pageSize: number }> {
-    const q: any = {};
-    if (params?.page) q.page = String(params.page);
-    if (params?.pageSize) q.pageSize = String(params.pageSize);
-    if (params?.sortBy) q.sortBy = params.sortBy;
-    if (params?.sortOrder) q.sortOrder = params.sortOrder;
-    if (params?.agentId) q.agentId = String(params.agentId);
-    if (params?.from) q.from = params.from;
-    if (params?.to) q.to = params.to;
-    return this.http.get<{ data: any[]; total: number; page: number; pageSize: number }>(`${this.apiUrl}/orders/followups`, {
-      headers: this.getHeaders(),
-      params: q
+  getRecentOrderCount(startDate?: string, endDate?: string, options?: { skipLoader?: boolean }): Observable<{ total: number }> {
+    const headers = options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders();
+    const params: any = {};
+    if (startDate) params.date = startDate; // Backend expects 'date', not 'startDate'
+    // endDate is ignored by backend currently as it only supports single date, but keeping arg for future
+    
+    return this.http.get<{ total: number }>(`${this.apiUrl}/orders/recent/count`, {
+      headers,
+      params
     });
   }
 
-  // Get due follow-ups
-  getDueFollowUps(all: boolean = false, options?: { skipLoader?: boolean }): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/follow-ups/due`, {
-      headers: options?.skipLoader ? this.getHeaders().set('X-Skip-Loading', '1') : this.getHeaders(),
-      params: { all: String(all) }
+  getCallFiles(id: number | string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/${id}/files`, { headers: this.getHeaders() });
+  }
+
+  getCustomerStatusHistory(customerId: number): Observable<{ data: any[] }> {
+    return this.http.get<{ data: any[] }>(`${this.apiUrl}/customer/${customerId}/status-history`, {
+      headers: this.getHeaders()
     });
   }
 
-  // Upload medicine list
-  uploadMedicineList(id: number | string, file: File): Observable<any> {
-    const formData = new FormData();
-    formData.append('medicineList', file);
-    return this.http.post(`${this.apiUrl}/${id}/upload/medicine`, formData, {
-      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
-    });
+  // Smartflo Click-to-Call
+  initiateSmartfloCall(fromNumber: string, toNumber: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.smartfloUrl}/click-to-call`,
+      { from: fromNumber, to: toNumber },
+      { headers: this.getHeaders() }
+    );
   }
 
-  // Upload prescription
-  uploadPrescription(id: number | string, file: File): Observable<any> {
-    const formData = new FormData();
-    formData.append('prescription', file);
-    return this.http.post(`${this.apiUrl}/${id}/upload/prescription`, formData, {
-      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
-    });
+  getFollowupReport(params: {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+    from?: string;
+    to?: string;
+    agentId?: number;
+    export?: string;
+    search?: string;
+  }): Observable<{ data: any[]; total: number } | Blob> {
+    if (params.export === 'true') {
+      return this.http.get(
+        `${this.apiUrl}/orders/followups`,
+        { headers: this.getHeaders(), params: params as any, responseType: 'blob' }
+      );
+    }
+    return this.http.get<{ data: any[]; total: number }>(
+      `${this.apiUrl}/orders/followups`,
+      { headers: this.getHeaders(), params: params as any }
+    );
   }
 
-  // Upload a general document attachment for a call
   uploadDocument(id: number | string, file: File): Observable<any> {
     const formData = new FormData();
     formData.append('document', file);
-    return this.http.post(`${this.apiUrl}/${id}/upload/document`, formData, {
-      headers: new HttpHeaders({ 'Authorization': `Bearer ${this.authService.getToken() || ''}` })
+    const token = this.authService.getToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
     });
-  }
-
-  // List uploaded files for a call
-  getCallFiles(id: number | string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/${id}/files`, { headers: this.getHeaders() });
+    return this.http.post(`${this.apiUrl}/${id}/upload/document`, formData, { headers });
   }
 }

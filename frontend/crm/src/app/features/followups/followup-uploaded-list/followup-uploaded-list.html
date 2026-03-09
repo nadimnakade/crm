@@ -81,6 +81,13 @@
               <td>{{ r.outcome || 'Pending' }}</td>
               <td>{{ r.agent || '-' }}</td>
               <td class="text-end">
+                <button class="btn btn-sm btn-outline-success me-1" 
+                        (click)="callCustomer(r)"
+                        [disabled]="callingIds.has(r.id)"
+                        title="Call Now">
+                  <i class="fa fa-phone" *ngIf="!callingIds.has(r.id)"></i>
+                  <span *ngIf="callingIds.has(r.id)" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                </button>
                 <button class="btn btn-sm btn-outline-primary" (click)="openStatusDialog(r)">
                   Update Status
                 </button>

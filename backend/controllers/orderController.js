@@ -269,23 +269,14 @@ exports.getReorders = async (req, res) => {
     const baseWhere = {
       callType: 'Order Upload',
       createdAt: { [Op.gte]: start, [Op.lt]: endExclusive },
-      // Exclude all records that have been closed by agents
-      // Treat the following outcomes as CLOSED for reorders
+      // Only show records that are in the initial state (unworked)
+      // Initial outcome is 'Completed' from upload, or null/empty
       outcome: { 
-        [Op.notIn]: [
-          'Order Created',
-          'Reorder',
-          'Re-Followup',
-          'No Answer',
-          'DND',
-          'Lead',
-          'Transfer',
-          'Order already Placed',
-          'Order Already Placed',
-          'Not required',
-          'Pending',
-          'Not Interested'
-        ] 
+        [Op.or]: [
+          { [Op.eq]: 'Completed' },
+          { [Op.is]: null },
+          { [Op.eq]: '' }
+        ]
       }
     };
 
@@ -323,6 +314,14 @@ exports.getReorders = async (req, res) => {
     const where = hasSearch
       ? { [Op.and]: [baseWhere, { [Op.or]: callSearchWhere }] }
       : baseWhere;
+
+    // Only show records that are in the initial 'Completed' state (from upload)
+    // Any other status means it has been worked on
+    if (where.outcome) {
+      where.outcome = 'Completed';
+    } else {
+      where.outcome = 'Completed';
+    }
 
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 100;
@@ -541,7 +540,8 @@ exports.updateOrderStatus = async (req, res) => {
       notes: (call.notes || '') + `\n[${new Date().toLocaleString()}] Status updated to: ${newOutcome}`
     });
 
-    if (newOutcome && previousOutcome !== newOutcome) {
+    // Always append status history for tracking interactions, even if status is unchanged
+    if (newOutcome) {
       try {
         await CallStatusHistory.create({
           CallId: call.id,
@@ -551,6 +551,39 @@ exports.updateOrderStatus = async (req, res) => {
         });
       } catch (e) {
         console.error('Failed to persist order status history', e);
+      }
+    }
+
+    const orderPlacedOutcomes = ['Order Created', 'Order'];
+    if (orderPlacedOutcomes.includes(newOutcome)) {
+      try {
+        const customer = await Customer.findByPk(call.customerId, { attributes: ['phone'] });
+        const customerPhone = customer && customer.phone;
+        if (customerPhone) {
+          const customersWithSamePhone = await Customer.findAll({
+            where: { phone: customerPhone },
+            attributes: ['id']
+          });
+          const customerIds = customersWithSamePhone.map(c => c.id);
+          
+          await Call.update(
+            {
+              outcome: 'Order Already Placed',
+              reason: 'Order placed via reorder',
+              followUpRequired: false
+            },
+            {
+              where: {
+                customerId: { [Op.in]: customerIds },
+                id: { [Op.ne]: id },
+                followUpRequired: true,
+                outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+              }
+            }
+          );
+        }
+      } catch (e) {
+        console.error('Failed to clear other follow-ups after reorder tagging', e);
       }
     }
 

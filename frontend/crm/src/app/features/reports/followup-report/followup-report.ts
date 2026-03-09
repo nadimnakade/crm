@@ -62,7 +62,7 @@ export class FollowupReportComponent implements OnInit {
     this.error = null;
     this.callSvc.getFollowupReport({ page: this.page, pageSize: this.pageSize, sortBy: this.sortBy, sortOrder: this.sortOrder, agentId: this.requestedAgentId, from: this.fromDate, to: this.toDate })
       .subscribe({
-        next: (res) => {
+        next: (res: any) => {
           this.data = res.data || [];
           this.total = res.total || 0;
           this.setLoading(false);

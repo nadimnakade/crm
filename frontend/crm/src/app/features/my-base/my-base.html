@@ -1,0 +1,104 @@
+<div class="container-fluid p-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 mb-0 text-gray-800">My Base</h2>
+    <div class="d-flex gap-2">
+      <input 
+        type="file" 
+        id="fileInput" 
+        (change)="onFileSelected($event)" 
+        accept=".xlsx, .xls" 
+        style="display: none;">
+      
+      <button 
+        *ngIf="isAdmin" 
+        class="btn btn-primary" 
+        (click)="triggerUpload()" 
+        [disabled]="uploading">
+        <i class="fas fa-upload me-2"></i>
+        {{ uploading ? 'Uploading...' : 'Upload Base' }}
+      </button>
+      
+      <button class="btn btn-success" (click)="exportData()">
+        <i class="fas fa-file-excel me-2"></i>
+        Export
+      </button>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center bg-white">
+      <h6 class="m-0 font-weight-bold text-primary">Agent Base List</h6>
+      <div class="input-group" style="width: 300px;">
+        <input 
+          type="text" 
+          class="form-control" 
+          placeholder="Search..." 
+          [ngModel]="searchQuery" 
+          (input)="onSearch($event)">
+        <span class="input-group-text"><i class="fas fa-search"></i></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped" width="100%" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Customer Name</th>
+              <th>Phone</th>
+              <th>Last Order</th>
+              <th>Follow Up</th>
+              <th>Order Count</th>
+              <th>Order ID</th>
+              <th>Payable</th>
+              <th>Agent Name</th>
+              <th>Team</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of dataSource">
+              <td>{{ row.customerName }}</td>
+              <td>{{ row.customerPhone }}</td>
+              <td>{{ row.lastOrderDate | date:'mediumDate' }}</td>
+              <td>{{ row.followUpDate | date:'mediumDate' }}</td>
+              <td>{{ row.orderCount }}</td>
+              <td>{{ row.orderId }}</td>
+              <td>{{ row.payableAmount | currency }}</td>
+              <td>{{ row.agentName }}</td>
+              <td>{{ row.team }}</td>
+            </tr>
+            <tr *ngIf="dataSource.length === 0 && !isLoading">
+              <td colspan="9" class="text-center py-4">No records found</td>
+            </tr>
+            <tr *ngIf="isLoading">
+              <td colspan="9" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="totalCount > 0">
+        <div>
+          Showing {{ pageIndex * pageSize + 1 }} to {{ (pageIndex + 1) * pageSize > totalCount ? totalCount : (pageIndex + 1) * pageSize }} of {{ totalCount }} entries
+        </div>
+        <nav aria-label="Page navigation">
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="pageIndex === 0">
+              <button class="page-link" (click)="prevPage()">Previous</button>
+            </li>
+            <li class="page-item disabled">
+              <span class="page-link">Page {{ pageIndex + 1 }} of {{ totalPages }}</span>
+            </li>
+            <li class="page-item" [class.disabled]="pageIndex >= totalPages - 1">
+              <button class="page-link" (click)="nextPage()">Next</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
