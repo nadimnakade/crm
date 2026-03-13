@@ -121,20 +121,6 @@ exports.uploadOrders = async (req, res) => {
         }
 
         // 2. Create Call Record (Order)
-        // Check if a call with this orderId exists (only if orderId is present)
-        if (orderId) {
-            const existingCall = await Call.findOne({ 
-                where: { 
-                    orderId: orderId 
-                } 
-            });
-
-            if (existingCall) {
-                errors.push({ row: i + 1, message: `Order ID ${orderId} already exists` });
-                continue;
-            }
-        }
-
         // Find Agent by name or use current user
         // Note: Ideally we should map agent name to ID. For now, we'll try to find a user by name, else fallback to current user.
         let assignedAgentId = userId;

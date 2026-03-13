@@ -1,13 +1,31 @@
 const { User, Role } = require('../models');
+const { Op } = require('sequelize');
 
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private
 exports.getUsers = async (req, res) => {
   try {
+    const search = req.query.search || req.query.searchTerm;
+    const where = {};
+    
+    if (search) {
+      const term = search.toString().trim();
+      const like = `%${term}%`;
+      where[Op.or] = [
+        { username: { [Op.like]: like } },
+        { email: { [Op.like]: like } },
+        { firstName: { [Op.like]: like } },
+        { lastName: { [Op.like]: like } },
+        { phone: { [Op.like]: like } }
+      ];
+    }
+
     const users = await User.findAll({
+      where,
       attributes: { exclude: ['password'] },
-      include: [{ model: Role }]
+      include: [{ model: Role }],
+      order: [['firstName', 'ASC']]
     });
     res.json(users);
   } catch (error) {

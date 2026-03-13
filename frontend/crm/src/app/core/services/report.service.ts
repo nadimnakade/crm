@@ -2,12 +2,21 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../shared/auth/auth';
 
 @Injectable({ providedIn: 'root' })
 export class ReportService {
   private apiUrl = `${environment.apiBase}/reports`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private auth: AuthService) {}
+
+  private getHeaders(options?: { skipLoader?: boolean }): HttpHeaders {
+    const token = this.auth.getToken();
+    let headers = new HttpHeaders();
+    if (token) headers = headers.set('Authorization', `Bearer ${token}`);
+    if (options?.skipLoader) headers = headers.set('X-Skip-Loading', '1');
+    return headers;
+  }
 
   exportInteractions(options: {
     from?: string;
@@ -26,6 +35,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/interactions/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -44,6 +54,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/orders/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -62,6 +73,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/followups/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -78,6 +90,7 @@ export class ReportService {
     if (options.limit != null) params = params.set('limit', String(options.limit));
 
     return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/followup-updates`, {
+      headers: this.getHeaders(),
       params
     });
   }
@@ -93,6 +106,7 @@ export class ReportService {
     if (options.limit != null) params = params.set('limit', String(options.limit));
 
     return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/reorder-updates`, {
+      headers: this.getHeaders(),
       params
     });
   }
@@ -106,6 +120,7 @@ export class ReportService {
     if (options.to) params = params.set('to', options.to);
 
     return this.http.get<any[]>(`${this.apiUrl}/followup-counts-hierarchy`, {
+      headers: this.getHeaders(),
       params
     });
   }
@@ -123,6 +138,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/followup-updates/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -141,6 +157,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/reorder-updates/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -159,6 +176,7 @@ export class ReportService {
     if (options.limit != null) params = params.set('limit', String(options.limit));
 
     return this.http.get<{ data: any[]; total: number }>(`${this.apiUrl}/order-status`, {
+      headers: this.getHeaders(),
       params
     });
   }
@@ -178,6 +196,7 @@ export class ReportService {
     params = params.set('format', options.format || 'xlsx');
 
     return this.http.get(`${this.apiUrl}/order-status/export`, {
+      headers: this.getHeaders(),
       params,
       responseType: 'blob'
     });
@@ -193,22 +212,18 @@ export class ReportService {
   }
 
   getTopAgents(options?: { skipLoader?: boolean }): Observable<any[]> {
-    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
-    return this.http.get<any[]>(`${this.apiUrl}/top-agents`, { headers });
+    return this.http.get<any[]>(`${this.apiUrl}/top-agents`, { headers: this.getHeaders(options) });
   }
 
   getActiveUsers(options?: { skipLoader?: boolean }): Observable<any[]> {
-    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
-    return this.http.get<any[]>(`${this.apiUrl}/active-users`, { headers });
+    return this.http.get<any[]>(`${this.apiUrl}/active-users`, { headers: this.getHeaders(options) });
   }
 
   getWeeklyOrderStats(options?: { skipLoader?: boolean }): Observable<any[]> {
-    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
-    return this.http.get<any[]>(`${this.apiUrl}/weekly-orders`, { headers });
+    return this.http.get<any[]>(`${this.apiUrl}/weekly-orders`, { headers: this.getHeaders(options) });
   }
 
   getCallOutcomeStats(options?: { skipLoader?: boolean }): Observable<any[]> {
-    const headers = options?.skipLoader ? new HttpHeaders({ 'X-Skip-Loading': '1' }) : undefined;
-    return this.http.get<any[]>(`${this.apiUrl}/call-outcomes`, { headers });
+    return this.http.get<any[]>(`${this.apiUrl}/call-outcomes`, { headers: this.getHeaders(options) });
   }
 }

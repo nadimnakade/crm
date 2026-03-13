@@ -328,42 +328,46 @@ exports.getUploadedFollowUps = async (req, res) => {
       baseWhere.agentId = { [Op.in]: visibility.allowedAgentIds };
     }
 
-    let customerWhere = undefined;
-    const callSearchWhere = [];
-    if (hasSearch) {
-      callSearchWhere.push(
-        { orderId: { [Op.like]: `%${rawSearch}%` } },
-        { category: { [Op.like]: `%${rawSearch}%` } },
-        { notes: { [Op.like]: `%${rawSearch}%` } },
-        { outcome: { [Op.like]: `%${rawSearch}%` } }
-      );
-      const digitsOnly = rawSearch.replace(/[^0-9]/g, '');
-      const phoneFilter = digitsOnly.length >= 5 ? { phone: { [Op.like]: `%${digitsOnly}%` } } : undefined;
-      const ors = [
-        { firstName: { [Op.like]: `%${rawSearch}%` } },
-        { lastName: { [Op.like]: `%${rawSearch}%` } }
-      ];
-      if (phoneFilter) ors.push(phoneFilter);
-      customerWhere = { [Op.or]: ors };
-    }
-
     const include = [
-      customerWhere
-        ? { model: Customer, where: customerWhere, required: true }
-        : { model: Customer },
+      { model: Customer },
       { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
     ];
 
-    const where = hasSearch
-      ? { [Op.and]: [baseWhere, { [Op.or]: callSearchWhere }] }
-      : baseWhere;
+    let where = baseWhere;
+
+    if (hasSearch) {
+      const searchLike = `%${rawSearch}%`;
+      const searchLower = rawSearch.toLowerCase();
+      
+      const orConditions = [
+        { orderId: { [Op.like]: searchLike } },
+        { category: { [Op.like]: searchLike } },
+        { notes: { [Op.like]: searchLike } },
+        { outcome: { [Op.like]: searchLike } },
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('Customer.firstName')), { [Op.like]: `%${searchLower}%` }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('Customer.lastName')), { [Op.like]: `%${searchLower}%` })
+      ];
+
+      const digitsOnly = rawSearch.replace(/[^0-9]/g, '');
+      if (digitsOnly.length >= 3) {
+        orConditions.push({ '$Customer.phone$': { [Op.like]: `%${digitsOnly}%` } });
+      }
+
+      where = {
+        [Op.and]: [
+          baseWhere,
+          { [Op.or]: orConditions }
+        ]
+      };
+    }
 
     const { rows, count } = await Call.findAndCountAll({
       where,
       include,
       order: [['followUpDate', 'DESC'], ['createdAt', 'DESC']],
       limit: pageSize,
-      offset
+      offset,
+      subQuery: false
     });
 
     const data = rows.map(r => {
@@ -440,8 +444,7 @@ exports.getFollowUps = async (req, res) => {
               sequelize.fn('LOWER', sequelize.col('Customer.lastName')),
               { [Op.like]: like }
             ),
-            { phone: { [Op.like]: `%${rawSearch}%` } },
-            { mobileNumber: { [Op.like]: `%${rawSearch}%` } }
+            { phone: { [Op.like]: `%${rawSearch}%` } }
           ]
         }
       };
@@ -452,7 +455,8 @@ exports.getFollowUps = async (req, res) => {
       include,
       order: [['followUpDate', 'ASC']],
       limit: pageSize,
-      offset
+      offset,
+      subQuery: false
     });
 
     res.json({ data: rows, total: count, page, pageSize });
@@ -519,18 +523,49 @@ exports.updateFollowUpStatus = async (req, res) => {
       }
     }
 
-    // Critical Logic: First Order Wins
-    if (status === 'Order') {
-      const customerPhone = call.Customer.phone;
-      
-      // Find other active follow-ups for this phone number
-      // We need to find calls linked to ANY customer with this phone number (in case of duplicates)
-      // But simpler is to find calls linked to customers with same phone
+    const toLast10Digits = (v) => {
+      const digits = (v || '').toString().replace(/[^0-9]/g, '');
+      if (!digits) return null;
+      return digits.length > 10 ? digits.slice(-10) : digits;
+    };
+
+    const last10 = toLast10Digits(call?.Customer?.phone);
+
+    if (status === 'Re-Follow-up' && call.followUpRequired && call.followUpDate && last10) {
       const customersWithSamePhone = await Customer.findAll({
-        where: { phone: customerPhone },
+        where: sequelize.where(sequelize.fn('RIGHT', sequelize.col('PhoneDigits'), 10), last10),
         attributes: ['id'],
         transaction
       });
+      const customerIds = customersWithSamePhone.map(c => c.id);
+      if (customerIds.length) {
+        await Call.update(
+          {
+            followUpRequired: false,
+            followUpDate: null,
+            reason: 'Follow-up rescheduled by another agent'
+          },
+          {
+            where: {
+              customerId: { [Op.in]: customerIds },
+              id: { [Op.ne]: id }, // Exclude current call
+              followUpRequired: true
+            },
+            transaction
+          }
+        );
+      }
+    }
+
+    // Critical Logic: First Order Wins
+    if (status === 'Order') {
+      const customersWithSamePhone = last10
+        ? await Customer.findAll({
+            where: sequelize.where(sequelize.fn('RIGHT', sequelize.col('PhoneDigits'), 10), last10),
+            attributes: ['id'],
+            transaction
+          })
+        : [];
       const customerIds = customersWithSamePhone.map(c => c.id);
 
       // Update other follow-ups
@@ -691,6 +726,52 @@ exports.createCall = async (req, res) => {
         NewStatus: outcome,
         ChangedBy: finalAgentId
       }, { transaction });
+    }
+
+    const toLast10Digits = (v) => {
+      const digits = (v || '').toString().replace(/[^0-9]/g, '');
+      if (!digits) return null;
+      return digits.length > 10 ? digits.slice(-10) : digits;
+    };
+
+    const customer = customerId ? await Customer.findByPk(customerId, { transaction }) : null;
+    const last10 = toLast10Digits(customer?.phone);
+    if (last10) {
+      const customersWithSamePhone = await Customer.findAll({
+        where: sequelize.where(sequelize.fn('RIGHT', sequelize.col('PhoneDigits'), 10), last10),
+        attributes: ['id'],
+        transaction
+      });
+      const customerIds = customersWithSamePhone.map(c => c.id);
+
+      if (call.followUpRequired && call.followUpDate && customerIds.length) {
+        await Call.update(
+          { followUpRequired: false, followUpDate: null },
+          {
+            where: {
+              customerId: { [Op.in]: customerIds },
+              id: { [Op.ne]: call.id },
+              followUpRequired: true
+            },
+            transaction
+          }
+        );
+      }
+
+      if ((call.outcome || '') === 'Order' && customerIds.length) {
+        await Call.update(
+          { outcome: 'Order Already Placed', reason: 'Order placed by another agent', followUpRequired: false },
+          {
+            where: {
+              customerId: { [Op.in]: customerIds },
+              id: { [Op.ne]: call.id },
+              followUpRequired: true,
+              outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+            },
+            transaction
+          }
+        );
+      }
     }
 
     // --- AUTO-CLOSE LOGIC: Update pending "Order Upload" and "Follow-up Upload" tasks ---

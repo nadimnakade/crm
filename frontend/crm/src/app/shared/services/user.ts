@@ -23,8 +23,12 @@ export class UserService {
     });
   }
 
-  getUsers(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiUrl, { headers: this.getHeaders() });
+  getUsers(search?: string): Observable<any[]> {
+    const params: any = {};
+    if (search) {
+      params.search = search;
+    }
+    return this.http.get<any[]>(this.apiUrl, { headers: this.getHeaders(), params });
   }
 
   getUser(id: number): Observable<any> {

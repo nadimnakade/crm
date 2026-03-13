@@ -212,12 +212,12 @@ END
 
 const syncDatabase = async () => {
   try {
+    await sequelize.sync();
     await ensureCallColumns();
     await ensureUserColumns();
     await ensureSeedRoles();
     await ensureCustomerIndexes();
     await ensureCallIndexes();
-    await sequelize.sync();
     console.log('Model sync complete (schema aligned)');
   } catch (error) {
     console.error('Model sync failed:', error);

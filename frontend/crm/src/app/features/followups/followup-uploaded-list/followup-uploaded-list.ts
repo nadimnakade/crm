@@ -169,7 +169,7 @@ export class FollowupUploadedListComponent implements OnInit {
     }
 
     const user = this.authService.getUser();
-    const agentPhone = '919240258079';//user?.phone;
+    const agentPhone = user?.phone;
 
     if (!agentPhone) {
       Swal.fire('Error', 'Your (Agent) phone number is not configured in your profile. Please contact admin.', 'error');
@@ -178,7 +178,7 @@ export class FollowupUploadedListComponent implements OnInit {
 
     this.callingIds.add(row.id);
 
-    this.callService.initiateSmartfloCall(agentPhone, '918108783956').subscribe({
+    this.callService.initiateSmartfloCall(agentPhone, customerPhone).subscribe({
       next: (res) => {
         this.callingIds.delete(row.id);
         Swal.fire('Success', 'Call initiated successfully. Please pick up your phone.', 'success');
