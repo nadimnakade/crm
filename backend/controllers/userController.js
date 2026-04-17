@@ -23,7 +23,7 @@ exports.getUsers = async (req, res) => {
 
     const users = await User.findAll({
       where,
-      attributes: { exclude: ['password'] },
+      attributes: { exclude: ['password', 'token'] },
       include: [{ model: Role }],
       order: [['firstName', 'ASC']]
     });
@@ -40,7 +40,7 @@ exports.getUsers = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id, {
-      attributes: { exclude: ['password'] },
+      attributes: { exclude: ['password', 'token'] },
       include: [{ model: Role }]
     });
 

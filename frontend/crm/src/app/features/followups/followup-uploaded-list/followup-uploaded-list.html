@@ -40,6 +40,13 @@
           <button class="btn btn-outline-secondary btn-sm" (click)="clearSearch()" [disabled]="!searchTerm">
             Clear
           </button>
+          <button class="btn btn-outline-success btn-sm ms-1" (click)="export()" [disabled]="exporting || isLoading">
+            <span *ngIf="!exporting"><i class="fa fa-download"></i> Export</span>
+            <span *ngIf="exporting" class="d-inline-flex align-items-center">
+              <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+              Exporting
+            </span>
+          </button>
         </div>
       </div>
     </div>

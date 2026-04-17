@@ -40,7 +40,7 @@ export class CustomerHistoryComponent implements OnInit {
       { value: 'new-order-related', label: 'New Order Related', subs: [
         { value: 'discount-query', label: 'Discount Query' },
         { value: 'Follow-up Scheduled', label: 'Follow-up Scheduled' },
-        { value: 'Lead', label: 'Lead' }
+        // { value: 'Lead', label: 'Lead' }
       ]},
       { value: 'lab-option', label: 'Lab', subs: [
         { value: 'lab-statusy', label: 'Status' },
@@ -53,7 +53,7 @@ export class CustomerHistoryComponent implements OnInit {
     ],
     outbound: [
       { value: 'sales-call', label: 'Sales Call', subs: [
-        { value: 'Lead', label: 'Lead' },
+        // { value: 'Lead', label: 'Lead' },
         { value: 'Follow-up', label: 'FollowUp' }
       ]},
       { value: 'previous-order-history', label: 'Previous Order History', subs: [

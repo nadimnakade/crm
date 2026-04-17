@@ -294,6 +294,7 @@ exports.getUploadedFollowUps = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 20;
     const offset = (page - 1) * pageSize;
+    const isExport = (req.query.export || '').toString().toLowerCase() === 'true';
     const visibility = await getVisibility(req.user);
     const rawSearch = (req.query.search || '').toString().trim();
     const hasSearch = rawSearch.length > 0;
@@ -359,6 +360,48 @@ exports.getUploadedFollowUps = async (req, res) => {
           { [Op.or]: orConditions }
         ]
       };
+    }
+
+    if (isExport) {
+      const rows = await Call.findAll({
+        where,
+        include,
+        order: [['followUpDate', 'DESC'], ['createdAt', 'DESC']],
+        subQuery: false
+      });
+
+      const exportRows = rows.map(r => {
+        const hasOrder = !!(r.orderId || r.orderDetails);
+        const callTypeLower = (r.callType || '').toString().toLowerCase();
+        let type = r.category;
+
+        if (callTypeLower !== 'follow-up upload' && r.followUpRequired) {
+          type = hasOrder ? 'Order Followup' : 'Fresh Followup';
+        }
+
+        return {
+          'Follow up': r.followUpDate ? new Date(r.followUpDate).toLocaleDateString() : '',
+          'Name': `${r.Customer?.firstName || ''} ${r.Customer?.lastName || ''}`.trim(),
+          'Number': r.Customer?.phone || r.Customer?.mobileNumber || '',
+          'Order ID': r.orderId || '',
+          'Type': type || '',
+          'Status': r.outcome || '',
+          'Reason': r.reason || '',
+          'Agent': r.agent ? `${r.agent.firstName} ${r.agent.lastName}`.trim() : ''
+        };
+      });
+
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(exportRows);
+      xlsx.utils.book_append_sheet(wb, ws, 'Uploaded Followups');
+      const b64 = xlsx.write(wb, { type: 'base64', bookType: 'xlsx' });
+      const buf = Buffer.from(b64, 'base64');
+
+      res.setHeader('Content-Disposition', 'attachment; filename="UploadedFollowups.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Length', String(buf.length));
+      res.setHeader('Cache-Control', 'no-store');
+      return res.end(buf);
     }
 
     const { rows, count } = await Call.findAndCountAll({

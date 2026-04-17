@@ -17,6 +17,7 @@ import Swal from 'sweetalert2';
 export class FollowupUploadedListComponent implements OnInit {
   rows: any[] = [];
   isLoading = false;
+  exporting = false;
   searchTerm: string = '';
   fromDate: string = '';
   toDate: string = '';
@@ -104,6 +105,54 @@ export class FollowupUploadedListComponent implements OnInit {
   onDateChange(): void {
     this.currentPage = 1;
     this.load();
+  }
+
+  export(): void {
+    if (this.exporting) return;
+
+    const params: any = {};
+    const trimmed = (this.searchTerm || '').trim();
+    if (trimmed) params.search = trimmed;
+    if (this.fromDate) params.from = this.fromDate;
+    if (this.toDate) params.to = this.toDate;
+
+    this.exporting = true;
+    this.callService.exportUploadedFollowUps(params).subscribe({
+      next: (blob: Blob) => {
+        blob.arrayBuffer().then((ab) => {
+          const bytes = new Uint8Array(ab.slice(0, 2));
+          const magic = String.fromCharCode(bytes[0] || 0, bytes[1] || 0);
+
+          if (magic !== 'PK') {
+            const text = new TextDecoder().decode(ab);
+            Swal.fire('Error', text || 'Export failed (invalid file response)', 'error');
+            this.exporting = false;
+            return;
+          }
+
+          const fileBlob = new Blob([ab], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = window.URL.createObjectURL(fileBlob);
+          const a = document.createElement('a');
+          const suffix = `${this.fromDate || ''}${this.toDate ? `-${this.toDate}` : ''}`.replace(/^-|-$/g, '');
+          a.href = url;
+          a.download = `UploadedFollowups${suffix ? `-${suffix}` : ''}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          this.exporting = false;
+        }).catch((e) => {
+          console.error('Export blob parse failed', e);
+          this.exporting = false;
+          Swal.fire('Error', 'Failed to export uploaded follow-ups', 'error');
+        });
+      },
+      error: (err) => {
+        console.error('Export failed', err);
+        this.exporting = false;
+        Swal.fire('Error', 'Failed to export uploaded follow-ups', 'error');
+      }
+    });
   }
 
   openStatusDialog(row: any): void {

@@ -47,6 +47,13 @@ export class CallService {
     return this.http.get(`${this.apiUrl}/followups/uploaded`, { params });
   }
 
+  exportUploadedFollowUps(params: any): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/followups/uploaded`, {
+      params: { ...params, export: 'true' },
+      responseType: 'blob'
+    });
+  }
+
   // Upload follow-ups
   uploadFollowUps(file: File): Observable<any> {
     const formData = new FormData();

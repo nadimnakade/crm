@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { User } = require('../models');
 
 // @desc    Initiate a click-to-call request via Smartflo API
 // @route   POST /api/click-to-call
@@ -48,46 +49,30 @@ exports.initiateCall = async (req, res) => {
       });
     }
 
-    const apiKey = process.env.SMARTFLO_API_KEY;
+    const userRow = await User.findByPk(req.user.id, { attributes: ['id', 'token', 'phone'] });
+    const userToken = String(userRow?.token || '').trim();
+    const apiKey = userToken;
 
     if (!apiKey) {
-      console.error("SMARTFLO_API_KEY missing");
+      console.error("Smartflo API key missing (user.token and SMARTFLO_API_KEY both empty)");
       return res.status(500).json({
         success: false,
         message: "Smartflo API key not configured"
       });
-    }
+    } 
 
-    const payload = {
-      agent_number: "+" + cleanFrom,
-      destination_number: "+" + cleanTo,
-      //caller_id: cleanFrom,
-      //async: "1"
-    };
+    
 
-    // console.log("========== SMARTFLO REQUEST ==========");
-    // 
-    // const response1 = await axios.post(
-    //   "https://api-smartflo.tatateleservices.com/v1/click_to_call_support",
-    //   payload,
-    //   {
-    //     headers: {
-    //       Authorization: apiKey,
-    //       "Content-Type": "application/json",
-    //       "accept": "application/json"   // add this
-    //     },
-    //     timeout: 15000
-    //   }
-    // );
+    const callerId =  validatePhone(userRow?.phone) || cleanFrom;
 
     const payload1 = {
       "async": 1,        
       "customer_number": cleanTo.length === 12 && cleanTo.startsWith("91") ? cleanTo.substring(2) : cleanTo, // Match Postman: 10 digits
       "customer_ring_timeout": 30,
-      "caller_id": "919240258079",          // Match Postman: 12 digits
-      "api_key": process.env.SMARTFLO_API_KEY
+      "caller_id": callerId,          // Match Postman: 12 digits
+      "api_key": apiKey
     };
-    console.log("Payload:", payload1);
+    console.log("Payload:", { ...payload1, api_key: '[redacted]' });
     const response = await axios.post(
       "https://api-smartflo.tatateleservices.com/v1/click_to_call_support",
       payload1,

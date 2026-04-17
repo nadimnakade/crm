@@ -143,7 +143,7 @@ exports.logout = async (req, res) => {
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] },
+      attributes: { exclude: ['password', 'token'] },
       include: [{ model: Role }]
     });
 

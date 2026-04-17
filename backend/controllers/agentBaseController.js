@@ -5,21 +5,58 @@ const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 
-// Helper to parse dates from Excel (which might be numbers or strings)
+const normalizeKey = (k) =>
+  String(k ?? '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
 const parseExcelDate = (val) => {
-  if (!val) return null;
-  if (val instanceof Date) return val;
-  if (typeof val === 'number') {
-    // Excel date serial number
-    return new Date(Math.round((val - 25569) * 86400 * 1000));
+  if (val === undefined || val === null || val === '') return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (typeof val === 'number') return new Date(Math.round((val - 25569) * 86400 * 1000));
+
+  const s = String(val).replace(/\u00A0/g, ' ').trim();
+  const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+  const dmyMatch = dmy.exec(s);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10);
+    let year = parseInt(dmyMatch[3], 10);
+    if (year < 100) year += 2000;
+    const d = new Date(year, month - 1, day, 0, 0, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
   }
-  // Try string parsing
-  const d = new Date(val);
+
+  const ddMon = /^(\d{1,2})[\- ]([A-Za-z]{3,})[\- ](\d{2,4})$/;
+  const ddMonMatch = ddMon.exec(s);
+  if (ddMonMatch) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const ddMonNoYear = /^(\d{1,2})[\- ]([A-Za-z]{3,})$/;
+  const ddMonNoYearMatch = ddMonNoYear.exec(s);
+  if (ddMonNoYearMatch) {
+    const year = new Date().getFullYear();
+    const d = new Date(`${s}-${year}`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 };
 
 exports.uploadAgentBase = async (req, res) => {
   try {
+    const user = await User.findByPk(req.user.id, { include: [Role] });
+    const roleNameLower = (user?.Role?.name || '').toLowerCase();
+    const isAdmin = ['admin', 'super admin', 'superadmin'].includes(roleNameLower);
+    if (!isAdmin) {
+      return res.status(403).json({ message: 'Access denied: Only admins can upload Agent Base' });
+    }
+
     const file = req.file;
     if (!file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -39,7 +76,7 @@ exports.uploadAgentBase = async (req, res) => {
     data = data.map(row => {
       const newRow = {};
       Object.keys(row).forEach(key => {
-        const cleanKey = key.trim().toLowerCase();
+        const cleanKey = normalizeKey(key);
         newRow[cleanKey] = row[key];
       });
       return newRow;
@@ -54,30 +91,33 @@ exports.uploadAgentBase = async (req, res) => {
       if (u.username) userMap.set(u.username.toLowerCase(), u.id);
     });
 
+    const getValue = (row, keys) => {
+      for (const key of keys) {
+        if (row[key] !== undefined) return row[key];
+      }
+      return undefined;
+    };
+
     const records = [];
     for (const row of data) {
-      // Map columns based on user provided headers (normalized keys)
-      // "last order", "follow up", "number", "count of order", "name", "order", "payable", "agent name", "team"
-      
-      const rawAgentName = row['agent name'] || row['agent'] || '';
+      const rawAgentName = getValue(row, ['agent name', 'agent']) || '';
       const agentNameLower = String(rawAgentName).trim().toLowerCase();
       let agentId = userMap.get(agentNameLower) || null;
 
-      // Clean up phone number (remove spaces, dashes)
-      let phone = row['number'] || row['phone'] || row['customer phone'] || row['mobile'] || '';
+      let phone = getValue(row, ['number', 'phone', 'customer phone', 'mobile']) || '';
       phone = String(phone).replace(/[^0-9]/g, '');
 
       records.push({
         agentId,
-        lastOrderDate: parseExcelDate(row['last order'] || row['last order date'] || row['date']),
-        followUpDate: parseExcelDate(row['follow up'] || row['follow up date']),
+        lastOrderDate: parseExcelDate(getValue(row, ['last order date', 'last order', 'date'])),
+        followUpDate: parseExcelDate(getValue(row, ['follow up date', 'follow date', 'follow up', 'follow', 'followup date', 'followup'])),
         customerPhone: phone.substring(0, 255), // Truncate to avoid varchar overflow
-        orderCount: parseInt(row['count of order'] || row['order count'] || 0, 10),
-        customerName: String(row['name'] || row['customer name'] || row['customer'] || '').substring(0, 255),
-        orderId: String(row['order'] || row['order id'] || '').substring(0, 255),
-        payableAmount: parseFloat(row['payable'] || row['payable amount'] || 0),
+        orderCount: parseInt(getValue(row, ['count of order', 'order count']) || 0, 10),
+        customerName: String(getValue(row, ['name', 'customer name', 'customer']) || '').substring(0, 255),
+        orderId: String(getValue(row, ['order id', 'order']) || '').substring(0, 255),
+        payableAmount: parseFloat(getValue(row, ['payable amount', 'payable']) || 0),
         agentName: String(rawAgentName || '').substring(0, 255),
-        team: String(row['team'] || '').substring(0, 255)
+        team: String(getValue(row, ['team']) || '').substring(0, 255)
       });
     }
 
@@ -93,6 +133,7 @@ exports.uploadAgentBase = async (req, res) => {
         followUpDate: r.followUpDate instanceof Date && !isNaN(r.followUpDate) ? r.followUpDate : null
       }));
 
+      await AgentBase.destroy({ where: {}, truncate: true });
       await AgentBase.bulkCreate(validRecords);
     } else {
       console.warn('No records to insert. Data length:', data.length);
