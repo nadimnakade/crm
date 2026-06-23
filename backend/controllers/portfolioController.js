@@ -131,7 +131,9 @@ exports.exportPortfolio = async (req, res) => {
     const from = (req.query.from || '').toString().trim();
     const to = (req.query.to || '').toString().trim();
     const unique = ['true', '1'].includes((req.query.unique || '').toString().toLowerCase());
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
+    const topSql = limit ? 'TOP (:limit)' : '';
 
     const fromDate = from ? new Date(from) : null;
     let toDate = null;
@@ -153,7 +155,7 @@ exports.exportPortfolio = async (req, res) => {
 
     if (mobile) {
       rows = await runQuery(`
-        SELECT TOP (:limit)
+        SELECT ${topSql}
           Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
         FROM CustomerPortfolio WITH (NOLOCK)
         WHERE Mobile = :mobile
@@ -184,7 +186,7 @@ exports.exportPortfolio = async (req, res) => {
                    MAX(UploadedAt) OVER (PARTITION BY Mobile) AS LatestAt
             FROM Base
           )
-          SELECT TOP (:limit)
+          SELECT ${topSql}
             Mobile,
             [Count] AS Count,
             LatestAt,
@@ -200,7 +202,7 @@ exports.exportPortfolio = async (req, res) => {
         const qLike = `%${q}%`;
         const digitsLike = digits ? `%${digits}%` : null;
         rows = await runQuery(`
-          SELECT TOP (:limit)
+          SELECT ${topSql}
             Id, Mobile, GroupId, Name, Address, PinCode, SkuName, FileName, FilePath, UploadedAt
           FROM CustomerPortfolio WITH (NOLOCK)
           WHERE (
@@ -232,7 +234,7 @@ exports.exportPortfolio = async (req, res) => {
                  MAX(UploadedAt) OVER (PARTITION BY Mobile) AS LatestAt
           FROM Base
         )
-        SELECT TOP (:limit)
+        SELECT ${topSql}
           Mobile,
           [Count] AS Count,
           LatestAt,

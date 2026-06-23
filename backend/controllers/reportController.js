@@ -111,14 +111,16 @@ exports.exportInteractions = async (req, res) => {
     try { res.setTimeout(300000); } catch {}
 
     const { from, to, customerId, agentId } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
     const fromDateUTC = from ? istStartUTCForDateStr(from) : null;
     const toDateExclusiveUTC = to ? istEndExclusiveUTCForDateStr(to) : null;
 
+    const topSql = limit ? 'TOP (:limit)' : '';
     const sql = `
-      SELECT TOP (:limit)
+      SELECT ${topSql}
        
         c.[date] AS CallDate,
         c.duration,
@@ -212,14 +214,16 @@ exports.exportOrders = async (req, res) => {
     try { req.setTimeout(300000); } catch {}    
 
     const { from, to } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
     const fromDateUTC = from ? istStartUTCForDateStr(from) : null;
     const toDateExclusiveUTC = to ? istEndExclusiveUTCForDateStr(to) : null;
 
+    const topSql = limit ? 'TOP (:limit)' : '';
     const sql = `
-      SELECT TOP (:limit)
+      SELECT ${topSql}
         c.orderId,
         c.orderDetails,
         c.[date] AS CallDate,
@@ -304,7 +308,9 @@ exports.exportFollowups = async (req, res) => {
     try { req.setTimeout(300000); } catch {}    
 
     const { from, to } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
+    const exportLimit = limit || 2147483647;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
     let fromDateUTC;
@@ -338,7 +344,7 @@ exports.exportFollowups = async (req, res) => {
         replacements: {
           fromDateUTC,
           toDateExclusiveUTC,
-          limit
+          limit: exportLimit
         }
       }
     );
@@ -401,8 +407,10 @@ exports.exportFollowupStatusUpdates = async (req, res) => {
   try {
     try { req.setTimeout(300000); } catch {}
     const { from, to } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
     const format = (req.query.format || 'xlsx').toLowerCase();
+    const topSql = limit ? 'TOP (:limit)' : '';
 
     const { start, endExclusive } = getISTRange(from || null, to || null);
     const visibility = await getStatusReportVisibility(req.user.id);
@@ -423,7 +431,7 @@ exports.exportFollowupStatusUpdates = async (req, res) => {
 
     const rows = await sequelize.query(
       `
-        SELECT TOP (:limit)
+        SELECT ${topSql}
           h.[ChangedAt],
           h.[PreviousStatus],
           h.[NewStatus],
@@ -577,8 +585,10 @@ exports.exportReorderStatusUpdates = async (req, res) => {
   try {
     try { req.setTimeout(300000); } catch {}
     const { from, to } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
     const format = (req.query.format || 'xlsx').toLowerCase();
+    const topSql = limit ? 'TOP (:limit)' : '';
 
     const { start, endExclusive } = getISTRange(from || null, to || null);
     const visibility = await getStatusReportVisibility(req.user.id);
@@ -589,7 +599,7 @@ exports.exportReorderStatusUpdates = async (req, res) => {
 
     const rows = await sequelize.query(
       `
-        SELECT TOP (:limit)
+        SELECT ${topSql}
           h.[ChangedAt],
           h.[PreviousStatus],
           h.[NewStatus],
@@ -905,7 +915,8 @@ exports.exportOrderStatusUpdates = async (req, res) => {
   try {
     try { req.setTimeout(300000); } catch {}
     const { from, to, status } = req.query || {};
-    const limit = parseInt(req.query.limit, 10) || 10000;
+    const limitRaw = (req.query.limit || '').toString().trim();
+    const limit = limitRaw ? Math.max(1, parseInt(limitRaw, 10) || 10000) : null;
     const format = (req.query.format || 'xlsx').toLowerCase();
 
     const { start, endExclusive } = getISTRange(from || null, to || null);
@@ -925,7 +936,7 @@ exports.exportOrderStatusUpdates = async (req, res) => {
 
     const rows = await sequelize.query(
       `
-        SELECT TOP (:limit)
+        SELECT ${limit ? 'TOP (:limit)' : ''}
           h.[ChangedAt],
           h.[PreviousStatus],
           h.[NewStatus],

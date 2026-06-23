@@ -24,12 +24,14 @@ app.use((req, res, next) => {
 });
 
 // CORS whitelist via env (comma-separated origins)
-// Always allow localhost dev origins when not in production, while preserving env configuration.
+// Public app origins stay allowed in production; localhost remains allowed only outside production.
 const envOrigins = (process.env.CORS_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean);
-const devOrigins = ['http://localhost:4200','http://localhost:4201', 'http://127.0.0.1:4200'];
+const publicOrigins = ['https://www.izsinfotech.in', 'https://izsinfotech.in'];
+const devOrigins = ['http://localhost:4200', 'http://localhost:4201', 'http://127.0.0.1:4200'];
 const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
-// If envOrigins is empty, allow all (legacy behavior). Otherwise allow env + dev (non-prod) origins.
-const mergedAllowedOrigins = envOrigins.length === 0 ? null : [...envOrigins, ...(isProd ? [] : devOrigins)];
+const mergedAllowedOrigins = envOrigins.length === 0
+  ? null
+  : Array.from(new Set([...envOrigins, ...publicOrigins, ...(isProd ? [] : devOrigins)]));
 
 app.use(cors({
   origin: (origin, callback) => {

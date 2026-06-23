@@ -224,46 +224,19 @@ exports.uploadOrders = async (req, res) => {
 // Get Re-orders (uploaded orders filtered by upload date range, search, and pagination)
 exports.getReorders = async (req, res) => {
   try {
-    // Check user role for permission
-    const user = await User.findByPk(req.user.id, {
-      include: [{ model: Role }]
-    });
-
-    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const roleId = Number(req.user?.roleId);
+    const isAdmin = [1, 2, 1004].includes(roleId);
     const fromStr = (req.query.from || '').toString().trim();
     const toStr = (req.query.to || '').toString().trim();
     const search = (req.query.search || '').toString().trim();
 
-    const parseYMD = (s) => {
-      if (!s) return null;
-      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
-      if (!m) return null;
-      const y = parseInt(m[1], 10);
-      const mo = parseInt(m[2], 10) - 1;
-      const d = parseInt(m[3], 10);
-      return new Date(y, mo, d, 0, 0, 0, 0);
-    };
-
-    const today = new Date();
-    let start = parseYMD(fromStr) || new Date(today);
-    let end = parseYMD(toStr) || new Date(start);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-    const endExclusive = new Date(end.getTime());
-    endExclusive.setDate(endExclusive.getDate() + 1);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const fd = fromStr || todayStr;
+    const td = toStr || fromStr || todayStr;
 
     const baseWhere = {
       callType: 'Order Upload',
-      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive },
-      // Only show records that are in the initial state (unworked)
-      // Initial outcome is 'Completed' from upload, or null/empty
-      outcome: { 
-        [Op.or]: [
-          { [Op.eq]: 'Completed' },
-          { [Op.is]: null },
-          { [Op.eq]: '' }
-        ]
-      }
+      outcome: 'Completed'
     };
 
     if (!isAdmin) {
@@ -292,29 +265,39 @@ exports.getReorders = async (req, res) => {
 
     const include = [
       customerWhere
-        ? { model: Customer, where: customerWhere, required: true }
-        : { model: Customer },
+        ? { model: Customer, where: customerWhere, required: true, attributes: ['id', 'firstName', 'lastName', 'phone'] }
+        : { model: Customer, attributes: ['id', 'firstName', 'lastName', 'phone'] },
       { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
     ];
 
+    const dateCondition = sequelize.where(
+      sequelize.literal('CAST(DATEADD(MINUTE, 330, [Call].[createdAt]) AS DATE)'),
+      { [Op.between]: [fd, td] }
+    );
     const where = hasSearch
-      ? { [Op.and]: [baseWhere, { [Op.or]: callSearchWhere }] }
-      : baseWhere;
-
-    // Only show records that are in the initial 'Completed' state (from upload)
-    // Any other status means it has been worked on
-    if (where.outcome) {
-      where.outcome = 'Completed';
-    } else {
-      where.outcome = 'Completed';
-    }
+      ? { [Op.and]: [baseWhere, dateCondition, { [Op.or]: callSearchWhere }] }
+      : { [Op.and]: [baseWhere, dateCondition] };
 
     const page = parseInt(req.query.page, 10) || 1;
-    const pageSize = parseInt(req.query.pageSize, 10) || 100;
+    const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 200);
     const offset = (page - 1) * pageSize;
 
     const { count, rows } = await Call.findAndCountAll({
       where,
+      attributes: [
+        'id',
+        'customerId',
+        'agentId',
+        'orderId',
+        'callType',
+        'category',
+        'outcome',
+        'notes',
+        'orderDetails',
+        'followUpRequired',
+        'followUpDate',
+        'createdAt'
+      ],
       include,
       order: [
         ['followUpRequired', 'DESC'],
@@ -324,7 +307,9 @@ exports.getReorders = async (req, res) => {
         ['id', 'DESC']
       ],
       limit: pageSize,
-      offset
+      offset,
+      subQuery: false,
+      distinct: true
     });
 
     res.json({ rows, count, page, pageSize });
@@ -337,36 +322,17 @@ exports.getReorders = async (req, res) => {
 // Get Re-orders Count (uploaded orders count by upload date range)
 exports.getReordersCount = async (req, res) => {
   try {
-    // Check user role for permission
-    const user = await User.findByPk(req.user.id, {
-      include: [{ model: Role }]
-    });
-
-    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const roleId = Number(req.user?.roleId);
+    const isAdmin = [1, 2, 1004].includes(roleId);
     const fromStr = (req.query.from || '').toString().trim();
     const toStr = (req.query.to || '').toString().trim();
 
-    const parseYMD = (s) => {
-      if (!s) return null;
-      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
-      if (!m) return null;
-      const y = parseInt(m[1], 10);
-      const mo = parseInt(m[2], 10) - 1;
-      const d = parseInt(m[3], 10);
-      return new Date(y, mo, d, 0, 0, 0, 0);
-    };
-
-    const today = new Date();
-    let start = parseYMD(fromStr) || new Date(today);
-    let end = parseYMD(toStr) || new Date(start);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-    const endExclusive = new Date(end.getTime());
-    endExclusive.setDate(endExclusive.getDate() + 1);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const fd = fromStr || todayStr;
+    const td = toStr || fromStr || todayStr;
 
     const where = {
       callType: 'Order Upload',
-      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive },
       outcome: { 
         [Op.notIn]: [
           'Order Created',
@@ -389,7 +355,12 @@ exports.getReordersCount = async (req, res) => {
       where.agentId = req.user.id;
     }
 
-    const count = await Call.count({ where });
+    const dateCondition = sequelize.where(
+      sequelize.literal('CAST(DATEADD(MINUTE, 330, [Call].[createdAt]) AS DATE)'),
+      { [Op.between]: [fd, td] }
+    );
+    const finalWhere = { [Op.and]: [where, dateCondition] };
+    const count = await Call.count({ where: finalWhere });
 
     res.json({ count });
   } catch (error) {
@@ -401,36 +372,17 @@ exports.getReordersCount = async (req, res) => {
 // Get Uploaded Orders (filtered by upload date range, defaults to today)
 exports.getUploadedOrders = async (req, res) => {
   try {
-    // Check user role for permission
-    const user = await User.findByPk(req.user.id, {
-      include: [{ model: Role }]
-    });
-
-    const isAdmin = user.Role && (user.Role.name === 'Super Admin' || user.Role.name === 'Admin');
+    const roleId = Number(req.user?.roleId);
+    const isAdmin = [1, 2, 1004].includes(roleId);
     const fromStr = (req.query.from || '').toString().trim();
     const toStr = (req.query.to || '').toString().trim();
 
-    const parseYMD = (s) => {
-      if (!s) return null;
-      const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
-      if (!m) return null;
-      const y = parseInt(m[1], 10);
-      const mo = parseInt(m[2], 10) - 1;
-      const d = parseInt(m[3], 10);
-      return new Date(y, mo, d, 0, 0, 0, 0);
-    };
-
-    const today = new Date();
-    let start = parseYMD(fromStr) || new Date(today);
-    let end = parseYMD(toStr) || new Date(start);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-    const endExclusive = new Date(end.getTime());
-    endExclusive.setDate(endExclusive.getDate() + 1);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const fd = fromStr || todayStr;
+    const td = toStr || fromStr || todayStr;
 
     const where = {
-      callType: 'Order Upload',
-      createdAt: { [Op.gte]: start, [Op.lt]: endExclusive }
+      callType: 'Order Upload'
     };
 
     // If not admin, restrict to own uploads/assigned orders
@@ -442,10 +394,29 @@ exports.getUploadedOrders = async (req, res) => {
     const pageSize = parseInt(req.query.pageSize, 10) || 20;
     const offset = (page - 1) * pageSize;
 
+    const dateCondition = sequelize.where(
+      sequelize.literal('CAST(DATEADD(MINUTE, 330, createdAt) AS DATE)'),
+      { [Op.between]: [fd, td] }
+    );
+    const finalWhere = { [Op.and]: [where, dateCondition] };
     const { rows, count } = await Call.findAndCountAll({
-      where,
+      where: finalWhere,
+      attributes: [
+        'id',
+        'customerId',
+        'agentId',
+        'orderId',
+        'callType',
+        'category',
+        'outcome',
+        'notes',
+        'orderDetails',
+        'followUpRequired',
+        'followUpDate',
+        'createdAt'
+      ],
       include: [
-        { model: Customer },
+        { model: Customer, attributes: ['id', 'firstName', 'lastName', 'phone'] },
         { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
       ],
       order: [['createdAt', 'DESC']],
@@ -479,7 +450,18 @@ exports.updateOrderStatus = async (req, res) => {
 
     if (caseStatus === 'Open') {
       newOutcome = subStatus;
-      const needsFollowUpDate = ['Call back', 'Fresh Followup', 'Re-Followup', 'Timing'].includes(subStatus);
+      const needsFollowUpDate = [
+        'Call back',
+        'Fresh Followup',
+        'Re-Followup',
+        'Timing',
+        'Follow-up',
+        'Follow Up',
+        'Followup',
+        'Follow-up Scheduled',
+        'Follow Up Scheduled',
+        'Followup Scheduled'
+      ].includes(subStatus);
       if (needsFollowUpDate) {
         if (!followUpDate) {
           return res.status(400).json({ message: 'Follow-up date is required' });
@@ -496,7 +478,7 @@ exports.updateOrderStatus = async (req, res) => {
       }
     } else if (caseStatus === 'Close') {
       newOutcome = closeReason; // Order Created, Reorder, Not Interested, Re-Followup
-      if (closeReason === 'Re-Followup') {
+      if (['Re-Followup', 'Follow-up', 'Follow Up', 'Followup', 'Follow-up Scheduled', 'Follow Up Scheduled', 'Followup Scheduled'].includes(closeReason)) {
         if (!followUpDate) {
           return res.status(400).json({ message: 'Follow-up date is required' });
         }
@@ -520,10 +502,7 @@ exports.updateOrderStatus = async (req, res) => {
     await call.update({
       outcome: newOutcome,
       followUpDate: newFollowUpDate,
-      followUpRequired: newFollowUpRequired,
-      // Update orderDetails status if needed, or keep history in notes?
-      // Let's append to notes for history
-      notes: (call.notes || '') + `\n[${new Date().toLocaleString()}] Status updated to: ${newOutcome}`
+      followUpRequired: newFollowUpRequired
     });
 
     // Always append status history for tracking interactions, even if status is unchanged
@@ -540,23 +519,73 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
+    if (newFollowUpRequired && newFollowUpDate) {
+      try {
+        const customer = await Customer.findByPk(call.customerId, { attributes: ['phone'] });
+        const toLast10Digits = (v) => {
+          const digits = (v || '').toString().replace(/[^0-9]/g, '');
+          if (!digits) return null;
+          return digits.length > 10 ? digits.slice(-10) : digits;
+        };
+        const last10 = toLast10Digits(customer?.phone);
+
+        if (last10) {
+          const customersWithSamePhone = await Customer.findAll({
+            where: { phone: { [Op.like]: `%${last10}` } },
+            attributes: ['id', 'phone']
+          });
+          const customerIds = customersWithSamePhone
+            .filter(c => toLast10Digits(c.phone) === last10)
+            .map(c => c.id);
+
+          if (customerIds.length) {
+            await Call.update(
+              {
+                followUpRequired: false,
+                followUpDate: null,
+                reason: 'Superseded by newer follow-up date'
+              },
+              {
+                where: {
+                  customerId: { [Op.in]: customerIds },
+                  id: { [Op.ne]: call.id },
+                  followUpRequired: true
+                }
+              }
+            );
+          }
+        }
+      } catch (e) {
+        console.error('Failed to clear older follow-ups when rescheduling order', e);
+      }
+    }
+
     const orderPlacedOutcomes = ['Order Created', 'Order'];
     if (orderPlacedOutcomes.includes(newOutcome)) {
       try {
         const customer = await Customer.findByPk(call.customerId, { attributes: ['phone'] });
-        const customerPhone = customer && customer.phone;
-        if (customerPhone) {
+        const customerPhone = customer?.phone;
+        const toLast10Digits = (v) => {
+          const digits = (v || '').toString().replace(/[^0-9]/g, '');
+          if (!digits) return null;
+          return digits.length > 10 ? digits.slice(-10) : digits;
+        };
+        const last10 = toLast10Digits(customerPhone);
+        if (last10) {
           const customersWithSamePhone = await Customer.findAll({
-            where: { phone: customerPhone },
-            attributes: ['id']
+            where: { phone: { [Op.like]: `%${last10}` } },
+            attributes: ['id', 'phone']
           });
-          const customerIds = customersWithSamePhone.map(c => c.id);
+          const customerIds = customersWithSamePhone
+            .filter(c => toLast10Digits(c.phone) === last10)
+            .map(c => c.id);
           
           await Call.update(
             {
               outcome: 'Order Already Placed',
               reason: 'Order placed via reorder',
-              followUpRequired: false
+              followUpRequired: false,
+              followUpDate: null
             },
             {
               where: {
@@ -573,7 +602,16 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
-    res.json({ message: 'Status updated successfully', call });
+    res.json({
+      message: 'Status updated successfully',
+      call: {
+        id: call.id,
+        outcome: call.outcome,
+        notes: call.notes,
+        followUpDate: call.followUpDate,
+        followUpRequired: call.followUpRequired
+      }
+    });
   } catch (error) {
     console.error('Update order status failed:', error);
     res.status(500).json({ message: 'Failed to update status', error: error.message });

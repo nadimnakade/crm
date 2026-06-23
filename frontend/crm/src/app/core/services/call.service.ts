@@ -54,6 +54,28 @@ export class CallService {
     });
   }
 
+  getOrderUploadedFollowUps(params: any): Observable<any> {
+    return this.http.get(`${this.apiUrl}/followups/orders`, { params });
+  }
+
+  exportOrderUploadedFollowUps(params: any): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/followups/orders`, {
+      params: { ...params, export: 'true' },
+      responseType: 'blob'
+    });
+  }
+
+  getImportantCalls(params: any): Observable<any> {
+    return this.http.get(`${this.apiUrl}/followups/important-calls`, { params });
+  }
+
+  exportImportantCalls(params: any): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/followups/important-calls`, {
+      params: { ...params, export: 'true' },
+      responseType: 'blob'
+    });
+  }
+
   // Upload follow-ups
   uploadFollowUps(file: File): Observable<any> {
     const formData = new FormData();

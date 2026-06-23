@@ -28,32 +28,32 @@ export class CustomerHistoryComponent implements OnInit {
   ];
 
   categoryMap: Record<string, Array<{ value: string; label: string; subs: Array<{ value: string; label: string }> }>> = {
-    inbound: [
-      { value: 'existing-order', label: 'Existing Order', subs: [
-        // { value: 'agent-comment', label: 'Agent Comment' },
-        { value: 'refund-call-transfer', label: 'Call Transfer' },
-        { value: 'refund-complaint', label: 'Call Complaint' },
-        { value: 'refund-order-status', label: 'Order Status' },
-        { value: 'refund-status', label: 'Refund Status' },
-        { value: 'refund-generation', label: 'Refund Generation' }
-      ]},
-      { value: 'new-order-related', label: 'New Order Related', subs: [
-        { value: 'discount-query', label: 'Discount Query' },
-        { value: 'Follow-up Scheduled', label: 'Follow-up Scheduled' },
-        // { value: 'Lead', label: 'Lead' }
-      ]},
-      { value: 'lab-option', label: 'Lab', subs: [
-        { value: 'lab-statusy', label: 'Status' },
-        { value: 'lab-report', label: 'Report' },
-        { value: 'lab-enquiry', label: 'Enquiry' }
-      ]},
-      { value: 'return-related', label: 'Return Related', subs: [
-        { value: 'for-return', label: 'For Return' }
-      ]}
-    ],
+    // inbound: [
+    //   { value: 'existing-order', label: 'Existing Order', subs: [
+    //     // { value: 'agent-comment', label: 'Agent Comment' },
+    //     { value: 'refund-call-transfer', label: 'Call Transfer' },
+    //     { value: 'refund-complaint', label: 'Call Complaint' },
+    //     { value: 'refund-order-status', label: 'Order Status' },
+    //     { value: 'refund-status', label: 'Refund Status' },
+    //     { value: 'refund-generation', label: 'Refund Generation' }
+    //   ]},
+    //   { value: 'new-order-related', label: 'New Order Related', subs: [
+    //     { value: 'discount-query', label: 'Discount Query' },
+    //     { value: 'Follow-up Scheduled', label: 'Follow-up Scheduled' },
+    //     // { value: 'Lead', label: 'Lead' }
+    //   ]},
+    //   { value: 'lab-option', label: 'Lab', subs: [
+    //     { value: 'lab-statusy', label: 'Status' },
+    //     { value: 'lab-report', label: 'Report' },
+    //     { value: 'lab-enquiry', label: 'Enquiry' }
+    //   ]},
+    //   { value: 'return-related', label: 'Return Related', subs: [
+    //     { value: 'for-return', label: 'For Return' }
+    //   ]}
+    // ],
     outbound: [
       { value: 'sales-call', label: 'Sales Call', subs: [
-        // { value: 'Lead', label: 'Lead' },
+        { value: 'Lead', label: 'Lead' },
         { value: 'Follow-up', label: 'FollowUp' }
       ]},
       { value: 'previous-order-history', label: 'Previous Order History', subs: [

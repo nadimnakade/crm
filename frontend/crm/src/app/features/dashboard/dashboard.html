@@ -70,7 +70,7 @@
           <div class="flex-grow-1">
             <h5 class="alert-heading mb-1">Due Follow-ups</h5>
             <div *ngFor="let follow of dueFollowUps.slice(0, 3)" class="mb-1">
-              <strong>{{follow.Customer?.name || 'Customer'}}</strong> ({{follow.Customer?.mobile}}) - {{follow.followUpDate | date:'medium'}}
+              <strong>{{((follow.Customer?.firstName || '') + ' ' + (follow.Customer?.lastName || '')).trim() || 'Customer'}}</strong> ({{follow.Customer?.phone}}) - {{follow.followUpDate | date:'medium'}}
               <span class="badge bg-secondary ms-2">{{follow.outcome}}</span>
             </div>
             <div *ngIf="dueFollowUps.length > 3">

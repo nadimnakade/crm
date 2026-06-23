@@ -114,7 +114,7 @@ export class ReportsMenuComponent implements OnInit {
     if (this.exportingCmd) return;
     this.exportingCmd = true;
     try {
-      const blob = await firstValueFrom(this.cmdSvc.export({ from: this.cmdFrom, to: this.cmdTo, unique: false, limit: 10000 }));
+      const blob = await firstValueFrom(this.cmdSvc.export({ from: this.cmdFrom, to: this.cmdTo, unique: false }));
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -140,7 +140,7 @@ export class ReportsMenuComponent implements OnInit {
     this.exportingOrders = true;
     try {
       const blob = await firstValueFrom(
-        this.reportSvc.exportOrders({ from: this.orderFrom, to: this.orderTo, limit: 10000, format: 'xlsx' })
+        this.reportSvc.exportOrders({ from: this.orderFrom, to: this.orderTo, format: 'xlsx' })
       );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -167,7 +167,7 @@ export class ReportsMenuComponent implements OnInit {
     this.exportingInteractions = true;
     try {
       const blob = await firstValueFrom(
-        this.reportSvc.exportInteractions({ from: this.interFrom, to: this.interTo, limit: 10000, format: 'xlsx' })
+        this.reportSvc.exportInteractions({ from: this.interFrom, to: this.interTo, format: 'xlsx' })
       );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -197,7 +197,6 @@ export class ReportsMenuComponent implements OnInit {
         this.reportSvc.exportFollowupStatusUpdates({
           from: this.followupUpdatesFrom,
           to: this.followupUpdatesTo,
-          limit: 10000,
           format: 'xlsx'
         })
       );
@@ -229,7 +228,6 @@ export class ReportsMenuComponent implements OnInit {
         this.reportSvc.exportReorderStatusUpdates({
           from: this.reorderUpdatesFrom,
           to: this.reorderUpdatesTo,
-          limit: 10000,
           format: 'xlsx'
         })
       );

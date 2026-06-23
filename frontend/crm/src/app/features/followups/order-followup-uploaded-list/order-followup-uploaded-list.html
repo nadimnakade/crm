@@ -1,0 +1,152 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Order's Followup</h2>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body pb-0">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search by name or phone"
+            [(ngModel)]="searchTerm"
+            (keyup.enter)="onSearch()"
+          />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0">From</label>
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="fromDate"
+            (change)="onDateChange()"
+          />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0">To</label>
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="toDate"
+            (change)="onDateChange()"
+          />
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-outline-primary btn-sm me-1" (click)="onSearch()">
+            <i class="fa fa-search"></i> Search
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="clearSearch()" [disabled]="!searchTerm">
+            Clear
+          </button>
+          <button class="btn btn-outline-success btn-sm ms-1" (click)="export()" [disabled]="exporting || isLoading">
+            <span *ngIf="!exporting"><i class="fa fa-download"></i> Export</span>
+            <span *ngIf="exporting" class="d-inline-flex align-items-center">
+              <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+              Exporting
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th>Follow up</th>
+              <th>Name</th>
+              <th>Number</th>
+              <th>Order ID</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Agent</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="8" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="!isLoading && rows.length === 0">
+              <td colspan="8" class="text-center py-4 text-muted">
+                No order follow-ups found.
+              </td>
+            </tr>
+            <tr *ngFor="let r of rows">
+              <td>{{ r.followUpDate | date:'mediumDate' }}</td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.number }}</td>
+              <td>{{ r.orderId || '-' }}</td>
+              <td>{{ r.type || '-' }}</td>
+              <td>{{ r.outcome || '-' }}</td>
+              <td>{{ r.agent || '-' }}</td>
+              <td class="text-end">
+                <button
+                  class="btn btn-sm btn-outline-success me-1"
+                  (click)="callCustomer(r)"
+                  [disabled]="callingIds.has(r.id)"
+                  title="Call"
+                >
+                  <i class="fa fa-phone"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary me-1" (click)="openStatusDialog(r)">
+                  Update Status
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" (click)="openTransferModal(r)" [disabled]="!isAdmin">
+                  Transfer
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center px-3 py-2">
+        <small class="text-muted">Total: {{ total }}</small>
+        <div class="btn-group" role="group" aria-label="Pagination">
+          <button class="btn btn-sm btn-outline-secondary" (click)="prevPage()" [disabled]="currentPage <= 1">Prev</button>
+          <button class="btn btn-sm btn-outline-secondary" *ngFor="let p of pages" (click)="goToPage(p)" [class.active]="p === currentPage">{{ p }}</button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="nextPage()" [disabled]="currentPage >= totalPages">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <app-followup-status-dialog
+    *ngIf="selectedFollowup"
+    [followup]="selectedFollowup"
+    (save)="onDialogSave($event)"
+    (cancel)="onDialogCancel()"
+  ></app-followup-status-dialog>
+
+  <div class="modal fade show" tabindex="-1" style="display:block;" *ngIf="showTransferModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Transfer Follow-up</h5>
+          <button type="button" class="btn-close" aria-label="Close" (click)="closeTransferModal()"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Select Agent</label>
+          <select class="form-select" [(ngModel)]="selectedAgentId">
+            <option value="">-- Select --</option>
+            <option *ngFor="let a of agents" [value]="a.id">
+              {{ (a.firstName || '') + ' ' + (a.lastName || '') }}
+            </option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeTransferModal()">Cancel</button>
+          <button class="btn btn-primary" (click)="transferFollowup()" [disabled]="!selectedAgentId">Transfer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

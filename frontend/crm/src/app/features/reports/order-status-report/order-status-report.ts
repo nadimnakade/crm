@@ -143,7 +143,6 @@ export class OrderStatusReportComponent implements OnInit {
       from: this.fromDate,
       to: this.toDate,
       status: this.status || undefined,
-      limit: 10000,
       format: 'xlsx'
     }).subscribe({
       next: (blob) => {

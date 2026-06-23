@@ -99,6 +99,10 @@
           <i class="fa-solid fa-file-circle-plus nav-icon"></i>
           <span class="label">Upload Follow-ups</span>
         </a>
+        <a routerLink="/followups/important-calls/upload" routerLinkActive="active" class="submenu-item" title="Upload Important Calls">
+          <i class="fa-solid fa-file-circle-plus nav-icon"></i>
+          <span class="label">Upload Important Calls</span>
+        </a>
       </div>
       <!-- Search group -->
       <div class="nav-item-row" (click)="toggleSearch()">
@@ -139,6 +143,14 @@
         <a routerLink="/followups/uploaded" routerLinkActive="active" class="submenu-item">
           <i class="fa-solid fa-file-lines nav-icon"></i>
           <span class="label">Todays Followup</span>
+        </a>
+        <a routerLink="/followups/important-calls" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-star nav-icon"></i>
+          <span class="label">Important Calls</span>
+        </a>
+        <a routerLink="/followups/orders" routerLinkActive="active" class="submenu-item">
+          <i class="fa-solid fa-file-invoice nav-icon"></i>
+          <span class="label">Order's Followup</span>
         </a>
         <a routerLink="/followups/history" routerLinkActive="active" class="submenu-item">
           <i class="fa-solid fa-clock-rotate-left nav-icon"></i>

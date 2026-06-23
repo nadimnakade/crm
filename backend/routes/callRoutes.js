@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly, getFollowUps, updateFollowUpStatus, uploadFollowUps, getUploadedFollowUps, transferFollowup, getCustomerStatusHistory } = require('../controllers/callController');
+const { getCalls, getCallById, createCall, updateCall, deleteCall, getRecentCalls, getTopCallersDaily, getTopCallersWeekly, getFollowUps, updateFollowUpStatus, uploadFollowUps, getUploadedFollowUps, getUploadedOrderFollowUps, getImportantCalls, transferFollowup, getCustomerStatusHistory } = require('../controllers/callController');
 const { getCallFiles, getCallHistory, getCallFilesSource, getCallHistorySource } = require('../controllers/callController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../utils/fileUpload');
@@ -12,6 +12,8 @@ router.get('/followups', protect, getFollowUps);
 router.put('/:id/followup-status', protect, updateFollowUpStatus);
 router.post('/followups/upload', protect, authorize('Admin', 'Super Admin', 'admin'), followupsUpload.single('file'), uploadFollowUps);
 router.get('/followups/uploaded', protect, getUploadedFollowUps);
+router.get('/followups/orders', protect, getUploadedOrderFollowUps);
+router.get('/followups/important-calls', protect, getImportantCalls);
 router.put('/:id/transfer-followup', protect, authorize('Admin', 'Super Admin', 'admin'), transferFollowup);
 
 router.route('/')

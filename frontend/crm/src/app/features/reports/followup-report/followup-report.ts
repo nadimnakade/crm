@@ -148,7 +148,7 @@ export class FollowupReportComponent implements OnInit {
       const to = this.toDate || undefined;
 
       const blob = await (await import('rxjs')).firstValueFrom(
-        this.reportSvc.exportFollowups({ from, to, limit: 10000, format: 'xlsx' })
+        this.reportSvc.exportFollowups({ from, to, format: 'xlsx' })
       );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
