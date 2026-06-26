@@ -31,7 +31,7 @@ export class FollowupListComponent implements OnInit {
   showTransferModal = false;
   selectedFollowupForTransfer: any = null;
   agents: any[] = [];
-  selectedAgentId: string = '';
+  selectedAgentIds: number[] = [];
   callingIds = new Set<number>();
 
   constructor(
@@ -47,7 +47,7 @@ export class FollowupListComponent implements OnInit {
   }
 
   callCustomer(item: any): void {
-    const customerPhone = item.Customer?.mobileNumber;
+    const customerPhone = item.Customer?.phone || item.Customer?.mobileNumber;
     if (!customerPhone) {
       Swal.fire('Error', 'Customer phone number not available', 'error');
       return;
@@ -139,21 +139,23 @@ export class FollowupListComponent implements OnInit {
   openTransferModal(followup: any): void {
     if (!this.isAdmin) return;
     this.selectedFollowupForTransfer = followup;
-    this.selectedAgentId = '';
+    this.selectedAgentIds = Array.isArray(followup?.assignedAgents) && followup.assignedAgents.length
+      ? followup.assignedAgents.map((agent: any) => Number(agent.id)).filter((id: number) => !!id)
+      : (followup?.agentId ? [Number(followup.agentId)] : []);
     this.showTransferModal = true;
   }
 
   closeTransferModal(): void {
     this.showTransferModal = false;
     this.selectedFollowupForTransfer = null;
-    this.selectedAgentId = '';
+    this.selectedAgentIds = [];
   }
 
   transferFollowup(): void {
-    if (!this.selectedFollowupForTransfer || !this.selectedAgentId) return;
-    this.callService.transferFollowup(String(this.selectedFollowupForTransfer.id), { newAgentId: this.selectedAgentId }).subscribe({
+    if (!this.selectedFollowupForTransfer || !this.selectedAgentIds.length) return;
+    this.callService.transferFollowup(String(this.selectedFollowupForTransfer.id), { agentIds: this.selectedAgentIds }).subscribe({
       next: () => {
-        Swal.fire('Success', 'Follow-up transferred successfully', 'success');
+        Swal.fire('Success', 'Follow-up assignments updated successfully', 'success');
         this.closeTransferModal();
         this.loadFollowups();
       },
@@ -162,6 +164,15 @@ export class FollowupListComponent implements OnInit {
         Swal.fire('Error', 'Failed to transfer follow-up', 'error');
       }
     });
+  }
+
+  getAssignedAgentNames(item: any): string {
+    const names = Array.isArray(item?.assignedAgents)
+      ? item.assignedAgents.map((agent: any) => agent?.name).filter((name: string) => !!name)
+      : [];
+    if (names.length) return names.join(', ');
+    const fallback = `${item?.agent?.firstName || ''} ${item?.agent?.lastName || ''}`.trim();
+    return fallback || '-';
   }
 
   onDialogSave(event: any): void {

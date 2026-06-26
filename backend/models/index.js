@@ -2,6 +2,7 @@ const User = require('./User');
 const Role = require('./Role');
 const Customer = require('./Customer');
 const Call = require('./Call');
+const CallAssignment = require('./CallAssignment');
 const CallAttachment = require('./CallAttachment');
 const CustomerPortfolio = require('./CustomerPortfolio');
 const CallStatusHistory = require('./CallStatusHistory');
@@ -29,6 +30,11 @@ Customer.hasMany(Call, { foreignKey: 'customerId' });
 Call.belongsTo(User, { foreignKey: 'agentId', as: 'agent' });
 User.hasMany(Call, { foreignKey: 'agentId', as: 'calls' });
 
+Call.hasMany(CallAssignment, { foreignKey: 'CallId', as: 'assignments' });
+CallAssignment.belongsTo(Call, { foreignKey: 'CallId' });
+CallAssignment.belongsTo(User, { foreignKey: 'AgentId', as: 'assignedAgent' });
+User.hasMany(CallAssignment, { foreignKey: 'AgentId', as: 'followupAssignments' });
+
 // Attachments and Status History associations
 Call.hasMany(CallAttachment, { foreignKey: 'CallId', as: 'attachments' });
 CallAttachment.belongsTo(Call, { foreignKey: 'CallId' });
@@ -55,6 +61,23 @@ IF COL_LENGTH('dbo.Calls', 'orderDetails') IS NULL
 
 IF COL_LENGTH('dbo.Calls', 'refundDetails') IS NULL
   ALTER TABLE dbo.Calls ADD refundDetails NVARCHAR(MAX) NULL;
+
+IF COL_LENGTH('dbo.Calls', 'createdBy') IS NULL
+  ALTER TABLE dbo.Calls ADD createdBy INT NULL;
+
+IF COL_LENGTH('dbo.Calls', 'updatedBy') IS NULL
+  ALTER TABLE dbo.Calls ADD updatedBy INT NULL;
+
+IF COL_LENGTH('dbo.Calls', 'resolvedBy') IS NULL
+  ALTER TABLE dbo.Calls ADD resolvedBy INT NULL;
+
+IF COL_LENGTH('dbo.Calls', 'resolvedAt') IS NULL
+  ALTER TABLE dbo.Calls ADD resolvedAt DATETIME2 NULL;
+
+UPDATE dbo.Calls
+SET createdBy = ISNULL(createdBy, agentId),
+    updatedBy = ISNULL(updatedBy, agentId)
+WHERE createdBy IS NULL OR updatedBy IS NULL;
 `;
   try {
     await sequelize.query(sql);
@@ -201,12 +224,77 @@ IF NOT EXISTS (
 BEGIN
   CREATE INDEX IX_Calls_HasOrder_CreatedAt ON dbo.Calls (HasOrder, createdAt);
 END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_CreatedBy' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_CreatedBy ON dbo.Calls (createdBy);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_UpdatedBy' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_UpdatedBy ON dbo.Calls (updatedBy);
+END
 `;
   try {
     await sequelize.query(sql);
     console.log('Ensured Calls indexes exist');
   } catch (e) {
     console.error('Failed ensuring Calls indexes:', e);
+  }
+};
+
+const ensureCallAssignmentsTable = async () => {
+  const sql = `
+IF OBJECT_ID('dbo.CallAssignments', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.CallAssignments (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    CallId INT NOT NULL,
+    AgentId INT NOT NULL,
+    AssignedBy INT NULL,
+    AssignedAt DATETIME2 NOT NULL CONSTRAINT DF_CallAssignments_AssignedAt DEFAULT SYSUTCDATETIME(),
+    IsResolved BIT NOT NULL CONSTRAINT DF_CallAssignments_IsResolved DEFAULT 0,
+    ResolvedBy INT NULL,
+    ResolvedAt DATETIME2 NULL,
+    createdAt DATETIME2 NOT NULL CONSTRAINT DF_CallAssignments_createdAt DEFAULT SYSUTCDATETIME(),
+    updatedAt DATETIME2 NOT NULL CONSTRAINT DF_CallAssignments_updatedAt DEFAULT SYSUTCDATETIME()
+  );
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'UQ_CallAssignments_Call_Agent' AND object_id = OBJECT_ID('dbo.CallAssignments')
+)
+BEGIN
+  CREATE UNIQUE INDEX UQ_CallAssignments_Call_Agent ON dbo.CallAssignments (CallId, AgentId);
+END
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_CallAssignments_Agent_Resolved' AND object_id = OBJECT_ID('dbo.CallAssignments')
+)
+BEGIN
+  CREATE INDEX IX_CallAssignments_Agent_Resolved ON dbo.CallAssignments (AgentId, IsResolved);
+END
+
+INSERT INTO dbo.CallAssignments (CallId, AgentId, AssignedBy, AssignedAt, IsResolved, createdAt, updatedAt)
+SELECT c.id, c.agentId, c.createdBy, c.createdAt, 0, c.createdAt, c.updatedAt
+FROM dbo.Calls c
+WHERE c.followUpRequired = 1
+  AND c.agentId IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM dbo.CallAssignments ca
+    WHERE ca.CallId = c.id AND ca.AgentId = c.agentId
+  );
+`;
+  try {
+    await sequelize.query(sql);
+    console.log('Ensured CallAssignments table exists');
+  } catch (e) {
+    console.error('Failed ensuring CallAssignments table:', e);
   }
 };
 
@@ -218,6 +306,7 @@ const syncDatabase = async () => {
     await ensureSeedRoles();
     await ensureCustomerIndexes();
     await ensureCallIndexes();
+    await ensureCallAssignmentsTable();
     console.log('Model sync complete (schema aligned)');
   } catch (error) {
     console.error('Model sync failed:', error);
@@ -229,6 +318,7 @@ module.exports = {
   Role,
   Customer,
   Call,
+  CallAssignment,
   CallAttachment,
   CallStatusHistory,
   CustomerPortfolio,

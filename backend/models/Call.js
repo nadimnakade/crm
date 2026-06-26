@@ -57,6 +57,22 @@ const Call = sequelize.define('Call', {
   reason: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  createdBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  updatedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  resolvedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  resolvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   timestamps: true,

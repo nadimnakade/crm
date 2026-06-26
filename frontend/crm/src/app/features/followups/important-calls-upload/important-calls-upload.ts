@@ -26,7 +26,7 @@ export class ImportantCallsUploadComponent {
     if (!this.selectedFile) return;
     this.uploading = true;
     this.result = null;
-    this.callService.uploadFollowUps(this.selectedFile).subscribe({
+    this.callService.uploadImportantCalls(this.selectedFile).subscribe({
       next: (res) => {
         this.result = res;
         this.uploading = false;

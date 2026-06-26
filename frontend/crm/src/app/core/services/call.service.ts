@@ -83,6 +83,12 @@ export class CallService {
     return this.http.post(`${this.apiUrl}/followups/upload`, formData);
   }
 
+  uploadImportantCalls(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post(`${this.apiUrl}/followups/important-calls/upload`, formData);
+  }
+
   // Update follow-up status
   updateFollowUpStatus(id: string, data: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/${id}/followup-status`, data);

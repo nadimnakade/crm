@@ -1,4 +1,4 @@
-const { Call, Customer, User, Role, sequelize } = require('../models');
+const { Call, CallAssignment, Customer, User, Role, sequelize } = require('../models');
 const { Op, QueryTypes } = require('sequelize');
 const xlsx = require('xlsx');
 const path = require('path');
@@ -36,6 +36,138 @@ function getCurrentISTYMD() {
   return `${map.year}-${map.month}-${map.day}`;
 }
 
+const FOLLOWUP_UPLOAD_TYPES = ['follow-up upload', 'followup upload', 'followups upload'];
+const IMPORTANT_CALL_UPLOAD_TYPE = 'Important Upload';
+const IMPORTANT_CALL_UPLOAD_TYPES = ['important upload', 'important call upload', 'important calls upload'];
+
+function normalizeAgentIds(agentIds, fallbackAgentId) {
+  const raw = Array.isArray(agentIds)
+    ? agentIds
+    : (agentIds !== undefined && agentIds !== null ? [agentIds] : []);
+  const parsed = raw
+    .map((value) => parseInt(value, 10))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  if (!parsed.length && fallbackAgentId) {
+    const fallback = parseInt(fallbackAgentId, 10);
+    if (Number.isInteger(fallback) && fallback > 0) parsed.push(fallback);
+  }
+  return Array.from(new Set(parsed));
+}
+
+async function ensureLegacyAssignment(call, actorId, transaction) {
+  if (!call?.id || !call?.agentId) return;
+  const queryOptions = transaction ? { transaction } : {};
+  const existing = await CallAssignment.count({
+    where: { CallId: call.id },
+    ...queryOptions
+  });
+  if (existing > 0) return;
+  await CallAssignment.create({
+    CallId: call.id,
+    AgentId: call.agentId,
+    AssignedBy: actorId || call.updatedBy || call.createdBy || call.agentId,
+    AssignedAt: call.createdAt || new Date(),
+    IsResolved: !call.followUpRequired,
+    ResolvedBy: call.followUpRequired ? null : (call.resolvedBy || actorId || null),
+    ResolvedAt: call.followUpRequired ? null : (call.resolvedAt || new Date())
+  }, queryOptions);
+}
+
+async function syncCallAssignments(call, agentIds, actorId, transaction) {
+  const desiredAgentIds = normalizeAgentIds(agentIds, call?.agentId);
+  if (!call?.id || !desiredAgentIds.length) return [];
+  const queryOptions = transaction ? { transaction } : {};
+
+  const existing = await CallAssignment.findAll({
+    where: { CallId: call.id },
+    ...queryOptions
+  });
+  const existingByAgentId = new Map(existing.map((row) => [Number(row.AgentId), row]));
+  const now = new Date();
+
+  for (const agentId of desiredAgentIds) {
+    const assignment = existingByAgentId.get(agentId);
+    if (assignment) {
+      if (assignment.IsResolved) {
+        assignment.IsResolved = false;
+        assignment.ResolvedBy = null;
+        assignment.ResolvedAt = null;
+      }
+      assignment.AssignedBy = actorId || assignment.AssignedBy;
+      assignment.AssignedAt = assignment.AssignedAt || now;
+      await assignment.save(queryOptions);
+    } else {
+      await CallAssignment.create({
+        CallId: call.id,
+        AgentId: agentId,
+        AssignedBy: actorId || call.createdBy || call.agentId,
+        AssignedAt: now,
+        IsResolved: false
+      }, queryOptions);
+    }
+  }
+
+  const deselectedAgentIds = existing
+    .map((row) => Number(row.AgentId))
+    .filter((agentId) => !desiredAgentIds.includes(agentId));
+
+  if (deselectedAgentIds.length) {
+    await CallAssignment.update(
+      {
+        IsResolved: true,
+        ResolvedBy: actorId || null,
+        ResolvedAt: now
+      },
+      {
+        where: {
+          CallId: call.id,
+          AgentId: { [Op.in]: deselectedAgentIds },
+          IsResolved: false
+        },
+        ...queryOptions
+      }
+    );
+  }
+
+  if (call.agentId !== desiredAgentIds[0]) {
+    call.agentId = desiredAgentIds[0];
+  }
+
+  return desiredAgentIds;
+}
+
+async function resolveAssignmentsForCall(callId, actorId, transaction) {
+  const queryOptions = transaction ? { transaction } : {};
+  await CallAssignment.update(
+    {
+      IsResolved: true,
+      ResolvedBy: actorId || null,
+      ResolvedAt: new Date()
+    },
+    {
+      where: {
+        CallId: callId,
+        IsResolved: false
+      },
+      ...queryOptions
+    }
+  );
+}
+
+async function canUserViewCall(call, user) {
+  if (!call || !user) return false;
+  const visibility = await getVisibility(user);
+  if (visibility.scope === 'admin') return true;
+  if (visibility.scope === 'manager') {
+    return visibility.allowedAgentIds.includes(call.agentId)
+      || visibility.allowedAgentIds.includes(call.createdBy)
+      || visibility.allowedAgentIds.includes(call.updatedBy);
+  }
+  return call.createdBy === user.id
+    || call.updatedBy === user.id
+    || ((!call.createdBy && !call.updatedBy) && call.agentId === user.id);
+}
+
 // @desc    Get calls with server-side pagination and filters
 // @route   GET /api/calls
 // @access  Private
@@ -58,7 +190,11 @@ exports.getCalls = async (req, res) => {
 
     const where = {};
     if (status) where.outcome = status; // map UI status to outcome
-    if (type) where.callType = type;
+    if (type) {
+      where.callType = type;
+    } else {
+      where.callType = { [Op.notIn]: [IMPORTANT_CALL_UPLOAD_TYPE] };
+    }
     if (customerId) where.customerId = customerId;
     if (orderId) where.orderId = { [Op.like]: `%${orderId}%` };
     if (hasOrderDetails) where.orderDetails = { [Op.ne]: null };
@@ -69,23 +205,42 @@ exports.getCalls = async (req, res) => {
       if (endDate) where.date[Op.lte] = endDate;
     }
 
-    // Role-based visibility
     const visibility = await getVisibility(req.user);
-    // if (visibility.scope === 'agent') {
-    //   // Agents can only see their own calls; ignore requestedAgentId
-    //   where.agentId = req.user.id;
-    // } else if (visibility.scope === 'manager') {
-    //   // Managers can filter by a specific agent within their team
-    //   if (requestedAgentId && visibility.allowedAgentIds.includes(requestedAgentId)) {
-    //     where.agentId = requestedAgentId;
-    //   } else {
-    //     where.agentId = { [Op.in]: visibility.allowedAgentIds };
-    //   }
-    // } else if (visibility.scope === 'admin') {
-    //   if (requestedAgentId) {
-    //     where.agentId = requestedAgentId;
-    //   }
-    // }
+    const visibilityFilters = [];
+    if (visibility.scope === 'agent') {
+      visibilityFilters.push({
+        [Op.or]: [
+          { createdBy: req.user.id },
+          { updatedBy: req.user.id },
+          {
+            [Op.and]: [
+              { createdBy: null },
+              { updatedBy: null },
+              { agentId: req.user.id }
+            ]
+          }
+        ]
+      });
+    } else if (visibility.scope === 'manager') {
+      const visibleAgentIds = requestedAgentId && visibility.allowedAgentIds.includes(requestedAgentId)
+        ? [requestedAgentId]
+        : visibility.allowedAgentIds;
+      visibilityFilters.push({
+        [Op.or]: [
+          { createdBy: { [Op.in]: visibleAgentIds } },
+          { updatedBy: { [Op.in]: visibleAgentIds } },
+          { agentId: { [Op.in]: visibleAgentIds } }
+        ]
+      });
+    } else if (visibility.scope === 'admin' && requestedAgentId) {
+      visibilityFilters.push({
+        [Op.or]: [
+          { createdBy: requestedAgentId },
+          { updatedBy: requestedAgentId },
+          { agentId: requestedAgentId }
+        ]
+      });
+    }
 
     let customerWhere = undefined;
     const callSearchWhere = [];
@@ -112,11 +267,16 @@ exports.getCalls = async (req, res) => {
     const allowedSort = ['createdAt', 'date', 'outcome', 'duration'];
     const order = allowedSort.includes(sortBy) ? [[sortBy, sortOrder]] : [['date', 'DESC']];
     const { rows, count } = await Call.findAndCountAll({
-      where: searchTerm ? { [Op.and]: [where, { [Op.or]: callSearchWhere }] } : where,
+      where: searchTerm
+        ? { [Op.and]: [where, { [Op.or]: callSearchWhere }, ...visibilityFilters] }
+        : (visibilityFilters.length ? { [Op.and]: [where, ...visibilityFilters] } : where),
       include: [
         customerWhere ? { model: Customer, where: customerWhere, required: true } : { model: Customer },
         { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
       ],
+      attributes: {
+        include: ['createdBy', 'updatedBy', 'resolvedBy', 'resolvedAt']
+      },
       order,
       limit: pageSize,
       offset
@@ -134,6 +294,10 @@ exports.getCalls = async (req, res) => {
 // @access  Admins only
 exports.uploadFollowUps = async (req, res) => {
   try {
+    const uploadKind = (req.query.kind || 'followup').toString().trim().toLowerCase();
+    const isImportantUpload = uploadKind === 'important';
+    const importedCallType = isImportantUpload ? IMPORTANT_CALL_UPLOAD_TYPE : 'Follow-up Upload';
+    const importLabel = isImportantUpload ? 'Important Calls' : 'Follow-ups';
     const file = req.file;
     if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
@@ -277,10 +441,10 @@ exports.uploadFollowUps = async (req, res) => {
           agentId: assignedAgentId,
           orderId: orderId,
           date: new Date(),
-          callType: 'Follow-up Upload',
+          callType: importedCallType,
           category: typeRaw || 'Follow-up',
           outcome: 'Follow-up',
-          notes: `Imported via Follow-ups upload. Type: ${typeRaw}. Agent: ${agentName}. File: ${path.basename(file.path)}`,
+          notes: `Imported via ${importLabel} upload. Type: ${typeRaw}. Agent: ${agentName}. File: ${path.basename(file.path)}`,
           followUpRequired: true,
           followUpDate: followDateStr || null
         });
@@ -297,6 +461,11 @@ exports.uploadFollowUps = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: error.message || 'Server error' });
   }
+};
+
+exports.uploadImportantCalls = async (req, res) => {
+  req.query = { ...(req.query || {}), kind: 'important' };
+  return exports.uploadFollowUps(req, res);
 };
 
 // @desc    List follow-ups created via file upload
@@ -377,7 +546,7 @@ exports.getUploadedFollowUps = async (req, res) => {
           AND CONVERT(date, DATEADD(MINUTE, 330, c.followUpDate)) <= CONVERT(date, :toDate)
           AND c.followUpRequired = 1
           AND c.outcome NOT IN ('Lead', 'Order', 'Order Already Placed', 'Reorder')
-          AND c.callType <> 'Order Upload'
+          AND LOWER(c.callType) NOT IN ('order upload', 'important upload', 'important call upload', 'important calls upload')
           ${agentScopeSql}
           ${searchSql}
       ),
@@ -770,7 +939,7 @@ exports.getImportantCalls = async (req, res) => {
           AND CONVERT(date, DATEADD(MINUTE, 330, c.followUpDate)) <= CONVERT(date, :toDate)
           AND c.followUpRequired = 1
           AND c.outcome NOT IN ('Lead', 'Order', 'Order Already Placed', 'Reorder')
-          AND LOWER(c.callType) IN ('follow-up upload', 'followup upload', 'followups upload')
+          AND LOWER(c.callType) IN ('important upload', 'important call upload', 'important calls upload')
           ${agentScopeSql}
           ${searchSql}
       ),
@@ -893,16 +1062,42 @@ exports.getFollowUps = async (req, res) => {
       outcome: { [Op.notIn]: ['Lead', 'Order', 'Order Already Placed', 'Reorder'] }
     };
 
-    // Role-based filtering
+    let assignmentScopeWhere = null;
     if (visibility.scope === 'agent') {
-      where.agentId = req.user.id;
+      assignmentScopeWhere = { AgentId: req.user.id, IsResolved: false };
     } else if (visibility.scope === 'manager') {
-      where.agentId = { [Op.in]: visibility.allowedAgentIds };
+      assignmentScopeWhere = {
+        AgentId: { [Op.in]: visibility.allowedAgentIds },
+        IsResolved: false
+      };
+    }
+
+    if (assignmentScopeWhere) {
+      const assignedCallRows = await CallAssignment.findAll({
+        attributes: ['CallId'],
+        where: assignmentScopeWhere,
+        group: ['CallId']
+      });
+      const assignedCallIds = assignedCallRows.map((row) => row.CallId);
+      if (!assignedCallIds.length) {
+        return res.json({ data: [], total: 0, page, pageSize });
+      }
+      where.id = { [Op.in]: assignedCallIds };
     }
 
     const include = [
       { model: Customer },
-      { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+      { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] },
+      {
+        model: CallAssignment,
+        as: 'assignments',
+        required: false,
+        where: { IsResolved: false },
+        attributes: ['id', 'AgentId', 'AssignedBy', 'AssignedAt'],
+        include: [
+          { model: User, as: 'assignedAgent', attributes: ['id', 'firstName', 'lastName'] }
+        ]
+      }
     ];
 
     if (hasSearch) {
@@ -947,10 +1142,20 @@ exports.getFollowUps = async (req, res) => {
       order: [['followUpDate', 'ASC']],
       limit: pageSize,
       offset,
-      subQuery: false
+      subQuery: false,
+      distinct: true
     });
 
-    res.json({ data: rows, total: count, page, pageSize });
+    const data = rows.map((row) => {
+      const json = row.toJSON();
+      json.assignedAgents = (json.assignments || []).map((assignment) => ({
+        id: assignment.AgentId,
+        name: `${assignment.assignedAgent?.firstName || ''} ${assignment.assignedAgent?.lastName || ''}`.trim()
+      }));
+      return json;
+    });
+
+    res.json({ data, total: count, page, pageSize });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message || 'Server error' });
@@ -973,15 +1178,42 @@ exports.updateFollowUpStatus = async (req, res) => {
       return res.status(404).json({ message: 'Call not found' });
     }
 
-    const previousOutcome = call.outcome || null;
+    await ensureLegacyAssignment(call, agentId, transaction);
+    const visibility = await getVisibility(req.user);
+    if (visibility.scope === 'agent') {
+      const assigned = await CallAssignment.count({
+        where: { CallId: call.id, AgentId: agentId, IsResolved: false },
+        transaction
+      });
+      if (!assigned && call.agentId !== agentId) {
+        await transaction.rollback();
+        return res.status(403).json({ message: 'You are not assigned to this follow-up' });
+      }
+    } else if (visibility.scope === 'manager') {
+      const assigned = await CallAssignment.count({
+        where: {
+          CallId: call.id,
+          AgentId: { [Op.in]: visibility.allowedAgentIds },
+          IsResolved: false
+        },
+        transaction
+      });
+      if (!assigned && !visibility.allowedAgentIds.includes(call.agentId)) {
+        await transaction.rollback();
+        return res.status(403).json({ message: 'You are not allowed to update this follow-up' });
+      }
+    }
 
-    // Update current call
+    const previousOutcome = call.outcome || null;
+    const keepsPending = ['Re-Follow-up', 'No Answer'].includes(status);
+
     call.outcome = status;
     call.reason = reason;
+    call.updatedBy = agentId;
     if (notes) {
       call.notes = (call.notes ? call.notes + '\n' : '') + `[${new Date().toISOString()}] ${notes}`;
     }
-    if (status === 'Re-Follow-up') {
+    if (keepsPending) {
       if (followUpDate) {
         const d = new Date(followUpDate);
         if (!isNaN(d.getTime())) {
@@ -991,11 +1223,15 @@ exports.updateFollowUpStatus = async (req, res) => {
           const normalized = new Date(y, m, day, 0, 0, 0, 0);
           call.followUpRequired = true;
           call.followUpDate = normalized;
+          call.resolvedBy = null;
+          call.resolvedAt = null;
         }
       }
-    } else if (['Lead', 'Order', 'Order Already Placed', 'Reorder'].includes(status)) {
+    } else {
       call.followUpRequired = false;
       call.followUpDate = null;
+      call.resolvedBy = agentId;
+      call.resolvedAt = new Date();
     }
 
     await call.save({ transaction });
@@ -1033,11 +1269,23 @@ exports.updateFollowUpStatus = async (req, res) => {
         .filter(c => toLast10Digits(c.phone) === last10)
         .map(c => c.id);
       if (customerIds.length) {
+        const otherCalls = await Call.findAll({
+          attributes: ['id'],
+          where: {
+            customerId: { [Op.in]: customerIds },
+            id: { [Op.ne]: id },
+            followUpRequired: true
+          },
+          transaction
+        });
         await Call.update(
           {
             followUpRequired: false,
             followUpDate: null,
-            reason: 'Follow-up rescheduled by another agent'
+            reason: 'Follow-up rescheduled by another agent',
+            updatedBy: agentId,
+            resolvedBy: agentId,
+            resolvedAt: new Date()
           },
           {
             where: {
@@ -1048,6 +1296,22 @@ exports.updateFollowUpStatus = async (req, res) => {
             transaction
           }
         );
+        if (otherCalls.length) {
+          await CallAssignment.update(
+            {
+              IsResolved: true,
+              ResolvedBy: agentId,
+              ResolvedAt: new Date()
+            },
+            {
+              where: {
+                CallId: { [Op.in]: otherCalls.map((row) => row.id) },
+                IsResolved: false
+              },
+              transaction
+            }
+          );
+        }
       }
     }
 
@@ -1069,8 +1333,11 @@ exports.updateFollowUpStatus = async (req, res) => {
         {
           outcome: 'Order Already Placed',
           reason: 'Order placed by another agent',
-        followUpRequired: false,
-        followUpDate: null
+          followUpRequired: false,
+          followUpDate: null,
+          updatedBy: agentId,
+          resolvedBy: agentId,
+          resolvedAt: new Date()
         },
         {
           where: {
@@ -1082,6 +1349,19 @@ exports.updateFollowUpStatus = async (req, res) => {
           transaction
         }
       );
+    }
+
+    if (keepsPending) {
+      const activeAssignments = await CallAssignment.findAll({
+        attributes: ['AgentId'],
+        where: { CallId: call.id, IsResolved: false },
+        transaction
+      });
+      const fallbackAssignedAgentIds = activeAssignments.map((row) => row.AgentId);
+      await syncCallAssignments(call, fallbackAssignedAgentIds, agentId, transaction);
+      await call.save({ transaction });
+    } else {
+      await resolveAssignmentsForCall(call.id, agentId, transaction);
     }
 
     await transaction.commit();
@@ -1102,15 +1382,33 @@ exports.getCallById = async (req, res) => {
     const call = await Call.findByPk(req.params.id, {
       include: [
         { model: Customer },
-        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] }
+        { model: User, as: 'agent', attributes: ['id', 'firstName', 'lastName'] },
+        {
+          model: CallAssignment,
+          as: 'assignments',
+          required: false,
+          where: { IsResolved: false },
+          attributes: ['AgentId', 'AssignedAt'],
+          include: [{ model: User, as: 'assignedAgent', attributes: ['id', 'firstName', 'lastName'] }]
+        }
       ]
     });
 
-    if (call) {
-      res.json(call);
-    } else {
+    if (!call) {
       res.status(404).json({ message: 'Call not found' });
+      return;
     }
+
+    if (!(await canUserViewCall(call, req.user))) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const data = call.toJSON();
+    data.assignedAgents = (data.assignments || []).map((assignment) => ({
+      id: assignment.AgentId,
+      name: `${assignment.assignedAgent?.firstName || ''} ${assignment.assignedAgent?.lastName || ''}`.trim()
+    }));
+    res.json(data);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message || 'Server error' });
@@ -1123,10 +1421,10 @@ exports.getCallById = async (req, res) => {
 exports.transferFollowup = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newAgentId } = req.body || {};
-
-    if (!newAgentId) {
-      return res.status(400).json({ message: 'newAgentId is required' });
+    const { newAgentId, agentIds } = req.body || {};
+    const desiredAgentIds = normalizeAgentIds(agentIds, newAgentId);
+    if (!desiredAgentIds.length) {
+      return res.status(400).json({ message: 'At least one target agent is required' });
     }
 
     const call = await Call.findByPk(id);
@@ -1134,15 +1432,20 @@ exports.transferFollowup = async (req, res) => {
       return res.status(404).json({ message: 'Follow-up not found' });
     }
 
-    const agent = await User.findByPk(newAgentId);
-    if (!agent) {
-      return res.status(400).json({ message: 'Target agent not found' });
+    const agents = await User.findAll({
+      where: { id: { [Op.in]: desiredAgentIds } },
+      attributes: ['id']
+    });
+    if (agents.length !== desiredAgentIds.length) {
+      return res.status(400).json({ message: 'One or more target agents were not found' });
     }
 
-    call.agentId = newAgentId;
+    await ensureLegacyAssignment(call, req.user?.id, null);
+    await syncCallAssignments(call, desiredAgentIds, req.user?.id, null);
+    call.updatedBy = req.user?.id || call.updatedBy;
     await call.save();
 
-    res.json({ message: 'Follow-up transferred successfully' });
+    res.json({ message: 'Follow-up assignment updated successfully' });
   } catch (error) {
     console.error('Transfer follow-up failed:', error);
     res.status(500).json({ message: error.message || 'Server error' });
@@ -1158,6 +1461,7 @@ exports.createCall = async (req, res) => {
     const {
       customerId,
       agentId,
+      assignedAgentIds,
       callType,
       category,
       date,
@@ -1197,6 +1501,8 @@ exports.createCall = async (req, res) => {
     }
 
     const finalAgentId = agentId || (req.user ? req.user.id : null);
+    const actorId = req.user ? req.user.id : finalAgentId;
+    const finalAssignedAgentIds = normalizeAgentIds(assignedAgentIds, finalAgentId);
 
     const call = await Call.create({
       customerId,
@@ -1211,8 +1517,17 @@ exports.createCall = async (req, res) => {
       orderDetails: sanitizedOrderDetails,
       refundDetails,
       followUpRequired: mustHaveFollowUpDate ? true : !!followUpRequired,
-      followUpDate: followUpDate || null
+      followUpDate: followUpDate || null,
+      createdBy: actorId,
+      updatedBy: actorId,
+      resolvedBy: null,
+      resolvedAt: null
     }, { transaction });
+
+    if (call.followUpRequired) {
+      await syncCallAssignments(call, finalAssignedAgentIds, actorId, transaction);
+      await call.save({ transaction });
+    }
 
     // Append status history for initial creation
     if (outcome) {
@@ -1221,7 +1536,7 @@ exports.createCall = async (req, res) => {
         CallId: call.id,
         PreviousStatus: null,
         NewStatus: outcome,
-        ChangedBy: finalAgentId
+        ChangedBy: actorId
       }, { transaction });
     }
 
@@ -1244,8 +1559,23 @@ exports.createCall = async (req, res) => {
         .map(c => c.id);
 
       if (call.followUpRequired && customerIds.length) {
+        const supersededCalls = await Call.findAll({
+          attributes: ['id'],
+          where: {
+            customerId: { [Op.in]: customerIds },
+            id: { [Op.ne]: call.id },
+            followUpRequired: true
+          },
+          transaction
+        });
         await Call.update(
-          { followUpRequired: false, followUpDate: null },
+          {
+            followUpRequired: false,
+            followUpDate: null,
+            updatedBy: actorId,
+            resolvedBy: actorId,
+            resolvedAt: new Date()
+          },
           {
             where: {
               customerId: { [Op.in]: customerIds },
@@ -1255,11 +1585,45 @@ exports.createCall = async (req, res) => {
             transaction
           }
         );
+        if (supersededCalls.length) {
+          await CallAssignment.update(
+            {
+              IsResolved: true,
+              ResolvedBy: actorId,
+              ResolvedAt: new Date()
+            },
+            {
+              where: {
+                CallId: { [Op.in]: supersededCalls.map((row) => row.id) },
+                IsResolved: false
+              },
+              transaction
+            }
+          );
+        }
       }
 
       if ((call.outcome || '') === 'Order' && customerIds.length) {
+        const orderClearedCalls = await Call.findAll({
+          attributes: ['id'],
+          where: {
+            customerId: { [Op.in]: customerIds },
+            id: { [Op.ne]: call.id },
+            followUpRequired: true,
+            outcome: { [Op.notIn]: ['Order', 'Order Already Placed'] }
+          },
+          transaction
+        });
         await Call.update(
-          { outcome: 'Order Already Placed', reason: 'Order placed by another agent', followUpRequired: false, followUpDate: null },
+          {
+            outcome: 'Order Already Placed',
+            reason: 'Order placed by another agent',
+            followUpRequired: false,
+            followUpDate: null,
+            updatedBy: actorId,
+            resolvedBy: actorId,
+            resolvedAt: new Date()
+          },
           {
             where: {
               customerId: { [Op.in]: customerIds },
@@ -1270,6 +1634,22 @@ exports.createCall = async (req, res) => {
             transaction
           }
         );
+        if (orderClearedCalls.length) {
+          await CallAssignment.update(
+            {
+              IsResolved: true,
+              ResolvedBy: actorId,
+              ResolvedAt: new Date()
+            },
+            {
+              where: {
+                CallId: { [Op.in]: orderClearedCalls.map((row) => row.id) },
+                IsResolved: false
+              },
+              transaction
+            }
+          );
+        }
       }
     }
 
@@ -1340,6 +1720,7 @@ exports.updateCall = async (req, res) => {
     const {
       customerId,
       agentId,
+      assignedAgentIds,
       callType,
       category,
       date,
@@ -1397,8 +1778,25 @@ exports.updateCall = async (req, res) => {
     if (followUpRequired !== undefined) call.followUpRequired = mustHaveFollowUpDate ? true : !!followUpRequired;
     if (followUpDate !== undefined) call.followUpDate = followUpDate || null;
     if (followUpRequired !== undefined && !call.followUpRequired) call.followUpDate = null;
+    call.updatedBy = req.user ? req.user.id : call.updatedBy;
+    if (call.followUpRequired) {
+      call.resolvedBy = null;
+      call.resolvedAt = null;
+    } else {
+      call.resolvedBy = req.user ? req.user.id : call.resolvedBy;
+      call.resolvedAt = new Date();
+    }
 
     await call.save();
+
+    await ensureLegacyAssignment(call, req.user?.id, null);
+    if (call.followUpRequired) {
+      const nextAssignedAgentIds = normalizeAgentIds(assignedAgentIds, call.agentId);
+      await syncCallAssignments(call, nextAssignedAgentIds, req.user?.id, null);
+      await call.save();
+    } else {
+      await resolveAssignmentsForCall(call.id, req.user?.id, null);
+    }
 
     if (call.followUpRequired && call.customerId) {
       try {
@@ -1418,11 +1816,22 @@ exports.updateCall = async (req, res) => {
             .filter(c => toLast10Digits(c.phone) === last10)
             .map(c => c.id);
           if (customerIds.length) {
+            const supersededCalls = await Call.findAll({
+              attributes: ['id'],
+              where: {
+                customerId: { [Op.in]: customerIds },
+                id: { [Op.ne]: call.id },
+                followUpRequired: true
+              }
+            });
             await Call.update(
               {
                 followUpRequired: false,
                 followUpDate: null,
-                reason: 'Superseded by newer follow-up date'
+                reason: 'Superseded by newer follow-up date',
+                updatedBy: req.user ? req.user.id : null,
+                resolvedBy: req.user ? req.user.id : null,
+                resolvedAt: new Date()
               },
               {
                 where: {
@@ -1432,6 +1841,21 @@ exports.updateCall = async (req, res) => {
                 }
               }
             );
+            if (supersededCalls.length) {
+              await CallAssignment.update(
+                {
+                  IsResolved: true,
+                  ResolvedBy: req.user ? req.user.id : null,
+                  ResolvedAt: new Date()
+                },
+                {
+                  where: {
+                    CallId: { [Op.in]: supersededCalls.map((row) => row.id) },
+                    IsResolved: false
+                  }
+                }
+              );
+            }
           }
         }
       } catch (e) {
@@ -1626,10 +2050,11 @@ exports.getRecentOrderDetails = async (req, res) => {
         {
           [Op.or]: [
             // Allow any call that has non-empty structured orderDetails
-            sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2"),
+            sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2 AND LOWER(callType) NOT IN ('important upload', 'important call upload', 'important calls upload')"),
             // Allow orderId-only calls except FollowUp outcomes
             {
               [Op.and]: [
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['important upload', 'important call upload', 'important calls upload'] }),
                 { orderId: { [Op.ne]: null } },
                 { outcome: { [Op.notIn]: ['No', 'follow-up-scheduled'] } }
               ]
@@ -1749,7 +2174,7 @@ exports.getRecentOrderCount = async (req, res) => {
             // Non-reorder orders with HasOrder flag
             {
               [Op.and]: [
-                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.ne]: 'order upload' }),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['order upload', 'important upload', 'important call upload', 'important calls upload'] }),
                 sequelize.where(sequelize.col('HasOrder'), 1)
               ]
             },
@@ -2035,6 +2460,16 @@ exports.getCallFiles = async (req, res) => {
 exports.getCallHistory = async (req, res) => {
   try {
     const callId = req.params.id;
+    const call = await Call.findByPk(callId, {
+      attributes: ['id', 'agentId', 'createdBy', 'updatedBy']
+    });
+    if (!call) {
+      res.set('X-Data-Source', 'none');
+      return res.json([]);
+    }
+    if (!(await canUserViewCall(call, req.user))) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
     // Try SQL via Sequelize
     try {
       const { CallStatusHistory } = require('../models');
@@ -2168,6 +2603,7 @@ exports.getCustomerStatusHistory = async (req, res) => {
         INNER JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
         LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
         WHERE c.customerId = :customerId
+          AND LOWER(ISNULL(c.callType, '')) NOT IN ('important upload', 'important call upload', 'important calls upload')
         ORDER BY h.ChangedAt DESC, h.Id DESC
       `,
       {

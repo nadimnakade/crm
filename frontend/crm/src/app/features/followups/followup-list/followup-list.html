@@ -63,7 +63,7 @@
                   {{ item.Customer?.firstName }} {{ item.Customer?.lastName }}
                 </a>
               </td>
-              <td>{{ item.Customer?.mobileNumber }}</td>
+              <td>{{ item.Customer?.phone || item.Customer?.mobileNumber }}</td>
               <td>{{ item.followUpDate | date:'medium' }}</td>
               <td>
                 <div class="text-truncate" style="max-width: 200px;" title="{{ item.notes }}">
@@ -75,7 +75,7 @@
                   {{ item.outcome || 'Pending' }}
                 </span>
               </td>
-              <td>{{ item.Agent?.name }}</td>
+              <td>{{ getAssignedAgentNames(item) }}</td>
               <td class="text-right">
                 <button class="btn btn-sm btn-outline-success me-1" 
                         (click)="callCustomer(item)"
@@ -92,7 +92,7 @@
                   class="btn btn-sm btn-outline-secondary ms-1"
                   *ngIf="isAdmin"
                   (click)="openTransferModal(item)">
-                  Transfer
+                  Assign Agents
                 </button>
               </td>
             </tr>
@@ -134,18 +134,18 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Transfer Follow-up</h5>
+        <h5 class="modal-title">Assign Follow-up Agents</h5>
         <button type="button" class="btn-close" (click)="closeTransferModal()"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">Select Agent</label>
-          <select class="form-select" [(ngModel)]="selectedAgentId">
-            <option [ngValue]="''">Select agent</option>
+          <label class="form-label">Select Agents</label>
+          <select class="form-select" [(ngModel)]="selectedAgentIds" multiple size="8">
             <option *ngFor="let agent of agents" [ngValue]="agent.id">
               {{ agent.firstName }} {{ agent.lastName }}
             </option>
           </select>
+          <small class="text-muted">Hold `Ctrl` to select multiple agents.</small>
         </div>
       </div>
       <div class="modal-footer">
@@ -154,8 +154,8 @@
           type="button"
           class="btn btn-primary"
           (click)="transferFollowup()"
-          [disabled]="!selectedAgentId">
-          Transfer
+          [disabled]="!selectedAgentIds.length">
+          Save Assignments
         </button>
       </div>
     </div>
