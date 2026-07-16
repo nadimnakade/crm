@@ -194,6 +194,13 @@ BEGIN
   CREATE INDEX IX_Calls_AgentId_FollowUpDate ON dbo.Calls (agentId, followUpDate);
 END
 
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes WHERE name = 'IX_Calls_CallType_FollowUpRequired_FollowUpDate' AND object_id = OBJECT_ID('dbo.Calls')
+)
+BEGIN
+  CREATE INDEX IX_Calls_CallType_FollowUpRequired_FollowUpDate ON dbo.Calls (callType, followUpRequired, followUpDate);
+END
+
 -- CreatedAt and HasOrder performance helpers for Recent Orders
 IF NOT EXISTS (
   SELECT 1 FROM sys.columns WHERE Name = N'HasOrder' AND Object_ID = Object_ID(N'dbo.Calls')

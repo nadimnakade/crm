@@ -34,7 +34,7 @@ crm-app/
 │               ├── medicine/
 │               ├── my-base/
 │               ├── orders/
-│               ├── portfolio/
+│               ├── folio/
 │               ├── reports/
 │               ├── roles/
 │               ├── search/

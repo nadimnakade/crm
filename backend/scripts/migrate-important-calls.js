@@ -34,7 +34,7 @@ async function main() {
       `
         UPDATE dbo.Calls
         SET
-          callType = 'Important Upload',
+          callType = 'Imp Call Upload',
           notes = CASE
             WHEN notes LIKE 'Imported via Follow-ups upload.%'
               THEN REPLACE(notes, 'Imported via Follow-ups upload.', 'Imported via Important Calls upload.')

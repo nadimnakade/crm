@@ -1,4 +1,6 @@
-const { Call, CallAssignment, Customer, User, Role, sequelize } = require('../models');
+const models = require('../models');
+const { Call, Customer, User, Role, sequelize } = models;
+const CallAssignment = models.CallAssignment || require('../models/CallAssignment');
 const { Op, QueryTypes } = require('sequelize');
 const xlsx = require('xlsx');
 const path = require('path');
@@ -36,9 +38,20 @@ function getCurrentISTYMD() {
   return `${map.year}-${map.month}-${map.day}`;
 }
 
+function getISTDayRangeUtc(dateStr) {
+  const [year, month, day] = String(dateStr || '').split('-').map((value) => parseInt(value, 10));
+  const istOffsetMinutes = 330;
+  const startUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0) - (istOffsetMinutes * 60 * 1000);
+  const endUtcMs = Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0) - (istOffsetMinutes * 60 * 1000);
+  return {
+    startUtc: new Date(startUtcMs),
+    endUtcExclusive: new Date(endUtcMs)
+  };
+}
+
 const FOLLOWUP_UPLOAD_TYPES = ['follow-up upload', 'followup upload', 'followups upload'];
-const IMPORTANT_CALL_UPLOAD_TYPE = 'Important Upload';
-const IMPORTANT_CALL_UPLOAD_TYPES = ['important upload', 'important call upload', 'important calls upload'];
+const IMPORTANT_CALL_UPLOAD_TYPE = 'Imp Call Upload';
+const IMPORTANT_CALL_UPLOAD_TYPES = ['Imp Call Upload', 'Imp Calls Upload'];
 
 function normalizeAgentIds(agentIds, fallbackAgentId) {
   const raw = Array.isArray(agentIds)
@@ -165,7 +178,7 @@ async function canUserViewCall(call, user) {
   }
   return call.createdBy === user.id
     || call.updatedBy === user.id
-    || ((!call.createdBy && !call.updatedBy) && call.agentId === user.id);
+    || call.agentId === user.id;
 }
 
 // @desc    Get calls with server-side pagination and filters
@@ -193,7 +206,7 @@ exports.getCalls = async (req, res) => {
     if (type) {
       where.callType = type;
     } else {
-      where.callType = { [Op.notIn]: [IMPORTANT_CALL_UPLOAD_TYPE] };
+      where.callType = { [Op.notIn]: IMPORTANT_CALL_UPLOAD_TYPES };
     }
     if (customerId) where.customerId = customerId;
     if (orderId) where.orderId = { [Op.like]: `%${orderId}%` };
@@ -212,13 +225,7 @@ exports.getCalls = async (req, res) => {
         [Op.or]: [
           { createdBy: req.user.id },
           { updatedBy: req.user.id },
-          {
-            [Op.and]: [
-              { createdBy: null },
-              { updatedBy: null },
-              { agentId: req.user.id }
-            ]
-          }
+          { agentId: req.user.id }
         ]
       });
     } else if (visibility.scope === 'manager') {
@@ -531,11 +538,9 @@ exports.getUploadedFollowUps = async (req, res) => {
           cu.lastName AS customerLastName,
           cu.phone AS customerPhone,
           CASE
+            WHEN cu.PhoneDigits IS NOT NULL AND LTRIM(RTRIM(cu.PhoneDigits)) <> '' THEN RIGHT(cu.PhoneDigits, 10)
             WHEN cu.phone IS NULL OR LTRIM(RTRIM(cu.phone)) = '' THEN CONCAT('cust:', c.customerId)
-            ELSE RIGHT(
-              REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cu.phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''),
-              10
-            )
+            ELSE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cu.phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), 10)
           END AS phoneKey,
           u.firstName AS agentFirstName,
           u.lastName AS agentLastName
@@ -546,7 +551,7 @@ exports.getUploadedFollowUps = async (req, res) => {
           AND CONVERT(date, DATEADD(MINUTE, 330, c.followUpDate)) <= CONVERT(date, :toDate)
           AND c.followUpRequired = 1
           AND c.outcome NOT IN ('Lead', 'Order', 'Order Already Placed', 'Reorder')
-          AND LOWER(c.callType) NOT IN ('order upload', 'important upload', 'important call upload', 'important calls upload')
+          AND LOWER(c.callType) NOT IN ('order upload', 'imp call upload', 'imp calls upload')
           ${agentScopeSql}
           ${searchSql}
       ),
@@ -879,6 +884,8 @@ exports.getImportantCalls = async (req, res) => {
     const todayYmd = getCurrentISTYMD();
     const fromDate = fromStr || todayYmd;
     const toDate = toStr || fromStr || todayYmd;
+    const { startUtc: fromDateUtc } = getISTDayRangeUtc(fromDate);
+    const { endUtcExclusive: toDateUtcExclusive } = getISTDayRangeUtc(toDate);
 
     const digitsOnly = rawSearch.replace(/[^0-9]/g, '');
     const searchLike = `%${rawSearch}%`;
@@ -935,11 +942,11 @@ exports.getImportantCalls = async (req, res) => {
         FROM dbo.Calls c WITH (NOLOCK)
         LEFT JOIN dbo.Customers cu WITH (NOLOCK) ON cu.id = c.customerId
         LEFT JOIN dbo.Users u WITH (NOLOCK) ON u.id = c.agentId
-        WHERE CONVERT(date, DATEADD(MINUTE, 330, c.followUpDate)) >= CONVERT(date, :fromDate)
-          AND CONVERT(date, DATEADD(MINUTE, 330, c.followUpDate)) <= CONVERT(date, :toDate)
+        WHERE c.followUpDate >= :fromDateUtc
+          AND c.followUpDate < :toDateUtcExclusive
           AND c.followUpRequired = 1
           AND c.outcome NOT IN ('Lead', 'Order', 'Order Already Placed', 'Reorder')
-          AND LOWER(c.callType) IN ('important upload', 'important call upload', 'important calls upload')
+          AND c.callType IN ('Imp Call Upload', 'Imp Calls Upload')
           ${agentScopeSql}
           ${searchSql}
       ),
@@ -957,6 +964,8 @@ exports.getImportantCalls = async (req, res) => {
     const replacements = {
       fromDate,
       toDate,
+      fromDateUtc,
+      toDateUtcExclusive,
       offset,
       pageSize,
       searchLike,
@@ -973,7 +982,7 @@ exports.getImportantCalls = async (req, res) => {
           SELECT *
           FROM Ranked
           WHERE rn = 1
-          ORDER BY CONVERT(date, DATEADD(MINUTE, 330, followUpDate)) ASC, followUpDate ASC, updatedAt DESC
+          ORDER BY followUpDate ASC, updatedAt DESC
         `,
         { type: QueryTypes.SELECT, raw: true, replacements }
       );
@@ -1019,7 +1028,7 @@ exports.getImportantCalls = async (req, res) => {
         SELECT *
         FROM Ranked
         WHERE rn = 1
-        ORDER BY CONVERT(date, DATEADD(MINUTE, 330, followUpDate)) ASC, followUpDate ASC, updatedAt DESC
+        ORDER BY followUpDate ASC, updatedAt DESC
         OFFSET :offset ROWS FETCH NEXT :pageSize ROWS ONLY
       `,
       { type: QueryTypes.SELECT, raw: true, replacements }
@@ -1937,8 +1946,8 @@ const getVisibility = async (user) => {
     return { scope: 'admin' };
   }
 
-  // Managers by name or roleId (3)
-  if (roleNameLower === 'manager' || roleId === 3) {
+  // Managers / team leaders by name or roleId (3)
+  if (['manager', 'team leader', 'teamleader', 'team_leader'].includes(roleNameLower) || roleId === 3) {
     const teamIds = await getManagedAgentIds(user.id);
     return { scope: 'manager', allowedAgentIds: [...teamIds, user.id] };
   }
@@ -2050,11 +2059,11 @@ exports.getRecentOrderDetails = async (req, res) => {
         {
           [Op.or]: [
             // Allow any call that has non-empty structured orderDetails
-            sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2 AND LOWER(callType) NOT IN ('important upload', 'important call upload', 'important calls upload')"),
+            sequelize.literal("orderDetails IS NOT NULL AND LEN(orderDetails) > 2 AND LOWER(callType) NOT IN ('imp call upload', 'imp calls upload')"),
             // Allow orderId-only calls except FollowUp outcomes
             {
               [Op.and]: [
-                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['important upload', 'important call upload', 'important calls upload'] }),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['imp call upload', 'imp calls upload'] }),
                 { orderId: { [Op.ne]: null } },
                 { outcome: { [Op.notIn]: ['No', 'follow-up-scheduled'] } }
               ]
@@ -2174,7 +2183,7 @@ exports.getRecentOrderCount = async (req, res) => {
             // Non-reorder orders with HasOrder flag
             {
               [Op.and]: [
-                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['order upload', 'important upload', 'important call upload', 'important calls upload'] }),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('callType')), { [Op.notIn]: ['order upload', 'imp call upload', 'imp calls upload'] }),
                 sequelize.where(sequelize.col('HasOrder'), 1)
               ]
             },
@@ -2584,6 +2593,35 @@ exports.getCustomerStatusHistory = async (req, res) => {
       return res.status(400).json({ message: 'customerId is required' });
     }
 
+    const visibility = await getVisibility(req.user);
+    let visibilitySql = '';
+    const replacements = { customerId };
+
+    if (visibility.scope === 'agent') {
+      visibilitySql = `
+          AND (
+            c.createdBy = :viewerId
+            OR c.updatedBy = :viewerId
+            OR h.ChangedBy = :viewerId
+            OR ((c.createdBy IS NULL AND c.updatedBy IS NULL) AND c.agentId = :viewerId)
+          )
+      `;
+      replacements.viewerId = req.user.id;
+    } else if (visibility.scope === 'manager') {
+      const allowedAgentIds = visibility.allowedAgentIds && visibility.allowedAgentIds.length
+        ? visibility.allowedAgentIds
+        : [0];
+      visibilitySql = `
+          AND (
+            c.createdBy IN (:allowedAgentIds)
+            OR c.updatedBy IN (:allowedAgentIds)
+            OR h.ChangedBy IN (:allowedAgentIds)
+            OR c.agentId IN (:allowedAgentIds)
+          )
+      `;
+      replacements.allowedAgentIds = allowedAgentIds;
+    }
+
     const rows = await sequelize.query(
       `
         SELECT
@@ -2603,13 +2641,14 @@ exports.getCustomerStatusHistory = async (req, res) => {
         INNER JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
         LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
         WHERE c.customerId = :customerId
-          AND LOWER(ISNULL(c.callType, '')) NOT IN ('important upload', 'important call upload', 'important calls upload')
+          AND LOWER(ISNULL(c.callType, '')) NOT IN ('imp call upload', 'imp calls upload')
+          ${visibilitySql}
         ORDER BY h.ChangedAt DESC, h.Id DESC
       `,
       {
         raw: true,
         type: QueryTypes.SELECT,
-        replacements: { customerId }
+        replacements
       }
     );
 
