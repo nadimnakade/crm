@@ -1,0 +1,226 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-0">Call Recordings</h2>
+      <small class="text-muted">Filtered on the backend based on the logged-in user's role.</small>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label mb-1">Search</label>
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search agent, caller, status, call ID"
+            [(ngModel)]="searchTerm"
+            (keyup.enter)="applyFilters()"
+          />
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">From</label>
+          <input type="date" class="form-control" [(ngModel)]="fromDate" />
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">To</label>
+          <input type="date" class="form-control" [(ngModel)]="toDate" />
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">Agent</label>
+          <select class="form-select" [(ngModel)]="selectedAgentId">
+            <option value="">All Allowed Agents</option>
+            <option *ngFor="let agent of agentOptions" [value]="agent.id">{{ agent.name }}</option>
+          </select>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label mb-1">Caller Number</label>
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Customer number"
+            [(ngModel)]="callerNumber"
+            (keyup.enter)="applyFilters()"
+          />
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">Call Type</label>
+          <select class="form-select" [(ngModel)]="callType">
+            <option *ngFor="let option of callTypeOptions" [value]="option.value">{{ option.label }}</option>
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">Call Status</label>
+          <select class="form-select" [(ngModel)]="callStatus">
+            <option *ngFor="let option of statusOptions" [value]="option.value">{{ option.label }}</option>
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">Page Size</label>
+          <select class="form-select" [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+            <option *ngFor="let option of pageSizeOptions" [ngValue]="option">{{ option }}</option>
+          </select>
+        </div>
+
+        <div class="col-lg-6 col-md-12">
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" (click)="applyFilters()" [disabled]="isLoading">
+              <i class="fa-solid fa-search me-1"></i>
+              Search
+            </button>
+            <button class="btn btn-outline-secondary" (click)="clearFilters()" [disabled]="isLoading">
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-danger" *ngIf="errorMessage">
+    {{ errorMessage }}
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th role="button" (click)="onSort('callDateTime')">
+                Call Date & Time
+                <i [class]="getSortIcon('callDateTime')" class="ms-1"></i>
+              </th>
+              <th role="button" (click)="onSort('agentName')">
+                Agent Name
+                <i [class]="getSortIcon('agentName')" class="ms-1"></i>
+              </th>
+              <th role="button" (click)="onSort('customerNumber')">
+                Customer Number
+                <i [class]="getSortIcon('customerNumber')" class="ms-1"></i>
+              </th>
+              <th role="button" (click)="onSort('duration')">
+                Duration
+                <i [class]="getSortIcon('duration')" class="ms-1"></i>
+              </th>
+              <th role="button" (click)="onSort('status')">
+                Call Status
+                <i [class]="getSortIcon('status')" class="ms-1"></i>
+              </th>
+              <th>Type</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="7" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+
+            <tr *ngIf="!isLoading && hasLoaded && rows.length === 0">
+              <td colspan="7" class="text-center py-5 text-muted">
+                No call recordings found for the selected filters.
+              </td>
+            </tr>
+
+            <tr *ngFor="let row of rows">
+              <td>
+                <div>{{ row.callDateTime | date:'medium' }}</div>
+                <small class="text-muted" *ngIf="row.callId">Call ID: {{ row.callId }}</small>
+              </td>
+              <td>
+                <div>{{ row.agentName || '-' }}</div>
+                <small class="text-muted" *ngIf="row.agentNumber">{{ row.agentNumber }}</small>
+              </td>
+              <td>{{ row.customerNumber || '-' }}</td>
+              <td>{{ formatDuration(row.duration) }}</td>
+              <td>
+                <span class="badge text-bg-light border">{{ row.status || '-' }}</span>
+              </td>
+              <td class="text-capitalize">{{ row.callType || '-' }}</td>
+              <td class="text-end">
+                <button
+                  class="btn btn-sm btn-outline-primary me-2"
+                  (click)="openRecording(row)"
+                  [disabled]="!row.recordingUrl">
+                  Play Recording
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  (click)="downloadRecording(row)"
+                  [disabled]="!row.recordingUrl">
+                  Download
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card-footer d-flex flex-column flex-md-row justify-content-between align-items-center gap-2" *ngIf="total > 0">
+      <div class="text-muted small">
+        Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ ((currentPage - 1) * pageSize) + rows.length }} of {{ total }} recordings
+      </div>
+
+      <nav aria-label="Call recordings pagination">
+        <ul class="pagination mb-0">
+          <li class="page-item" [class.disabled]="currentPage === 1">
+            <button class="page-link" (click)="onPageChange(currentPage - 1)">Previous</button>
+          </li>
+          <li class="page-item" *ngFor="let page of pages" [class.active]="page === currentPage">
+            <button class="page-link" (click)="onPageChange(page)">{{ page }}</button>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage === totalPages">
+            <button class="page-link" (click)="onPageChange(currentPage + 1)">Next</button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div
+  class="modal fade"
+  tabindex="-1"
+  [ngClass]="{ 'show': !!selectedRecording }"
+  [style.display]="selectedRecording ? 'block' : 'none'"
+  role="dialog"
+  *ngIf="selectedRecording">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">Play Recording</h5>
+          <small class="text-muted">{{ selectedRecording.agentName || 'Unknown Agent' }} | {{ selectedRecording.customerNumber || '-' }}</small>
+        </div>
+        <button type="button" class="btn-close" (click)="closeRecording()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="small text-muted mb-1">Call Date & Time</div>
+          <div>{{ selectedRecording.callDateTime | date:'medium' }}</div>
+        </div>
+        <audio controls class="w-100" [src]="selectedRecording.recordingUrl">
+          Your browser does not support audio playback.
+        </audio>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="downloadRecording(selectedRecording)">Download</button>
+        <button class="btn btn-primary" (click)="closeRecording()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="selectedRecording" (click)="closeRecording()"></div>

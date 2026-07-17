@@ -55,6 +55,14 @@
           <i class="fa-solid fa-clock nav-icon"></i>
           <span class="label">Recent</span>
         </a>
+        <a *ngIf="!isOrdersOnlyRole"
+           routerLink="/reports/call-recordings"
+           routerLinkActive="active"
+           class="submenu-item"
+           title="Call Recordings">
+          <i class="fa-solid fa-headphones nav-icon"></i>
+          <span class="label">Call Recordings</span>
+        </a>
         <a *ngIf="canManageUsersAndRoles || isOrdersOnlyRole"
            routerLink="/reports"
            routerLinkActive="active"

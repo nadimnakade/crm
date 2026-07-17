@@ -37,6 +37,7 @@ export const routes: Routes = [
       { path: 'reports', loadComponent: () => import('./features/reports/reports-menu/reports-menu').then(m => m.ReportsMenuComponent), canActivate: [AuthGuard] },
       { path: 'reports/followups', loadComponent: () => import('./features/reports/followup-report/followup-report').then(m => m.FollowupReportComponent), canActivate: [AuthGuard] },
       { path: 'reports/order-status', loadComponent: () => import('./features/reports/order-status-report/order-status-report').then(m => m.OrderStatusReportComponent), canActivate: [AuthGuard] },
+      { path: 'reports/call-recordings', loadComponent: () => import('./features/reports/call-recordings/call-recordings').then(m => m.CallRecordingsComponent), canActivate: [AuthGuard] },
       { path: 'followups', loadComponent: () => import('./features/followups/followup-list/followup-list').then(m => m.FollowupListComponent), canActivate: [AuthGuard] },
       { path: 'followups/upload', loadComponent: () => import('./features/followups/followup-upload/followup-upload').then(m => m.FollowupUploadComponent), canActivate: [AuthGuard, AdminGuard] },
       { path: 'followups/uploaded', loadComponent: () => import('./features/followups/followup-uploaded-list/followup-uploaded-list').then(m => m.FollowupUploadedListComponent), canActivate: [AuthGuard] },

@@ -142,4 +142,8 @@ export class CallService {
       { from: fromNumber, to: toNumber }
     );
   }
+
+  getCallRecordings(params: any): Observable<any> {
+    return this.http.get<any>(`${this.smartfloUrl}/call-recordings`, { params });
+  }
 }
