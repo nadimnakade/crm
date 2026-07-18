@@ -52,6 +52,7 @@ function getISTDayRangeUtc(dateStr) {
 const FOLLOWUP_UPLOAD_TYPES = ['follow-up upload', 'followup upload', 'followups upload'];
 const IMPORTANT_CALL_UPLOAD_TYPE = 'Imp Call Upload';
 const IMPORTANT_CALL_UPLOAD_TYPES = ['Imp Call Upload', 'Imp Calls Upload'];
+const ALL_UPLOAD_TYPES = ['Order Upload', ...IMPORTANT_CALL_UPLOAD_TYPES, ...FOLLOWUP_UPLOAD_TYPES];
 
 function normalizeAgentIds(agentIds, fallbackAgentId) {
   const raw = Array.isArray(agentIds)
@@ -206,7 +207,7 @@ exports.getCalls = async (req, res) => {
     if (type) {
       where.callType = type;
     } else {
-      where.callType = { [Op.notIn]: IMPORTANT_CALL_UPLOAD_TYPES };
+      where.callType = { [Op.notIn]: ALL_UPLOAD_TYPES };
     }
     if (customerId) where.customerId = customerId;
     if (orderId) where.orderId = { [Op.like]: `%${orderId}%` };
@@ -326,10 +327,14 @@ exports.uploadFollowUps = async (req, res) => {
 
     const requiredMissing = [colFollow, colName, colNumber].some(i => i === -1);
     if (requiredMissing) {
-      return res.status(422).json({ message: 'Missing required headers. Expected: Follow up, Name, Number, [Order ID], [Type], [Agent]' });
+      const missing = [];
+      if (colFollow === -1) missing.push('Follow up');
+      if (colName === -1) missing.push('Name');
+      if (colNumber === -1) missing.push('Number');
+      return res.status(422).json({ message: `Missing required headers: ${missing.join(', ')}. Expected: Follow up, Name, Number, [Order ID], [Type], [Agent]` });
     }
 
-    const results = { inserted: 0, skipped: 0, errors: [] };
+    const results = { inserted: 0, skipped: 0, errors: [], warnings: [] };
     const seenKeys = new Set();
 
     for (let r = 1; r < rows.length; r++) {
@@ -344,7 +349,8 @@ exports.uploadFollowUps = async (req, res) => {
 
         if (!nameRaw || !numberRaw || numberRaw.length < 10) {
           results.skipped++;
-          results.errors.push({ row: r + 1, message: 'Invalid name/number' });
+          const reason = !nameRaw ? 'Missing name' : (!numberRaw ? 'Missing phone number' : `Phone too short (${numberRaw.length} digits, need 10)`);
+          results.errors.push({ row: r + 1, message: reason, name: nameRaw, phone: numberRaw || '' });
           continue;
         }
 
@@ -398,7 +404,7 @@ exports.uploadFollowUps = async (req, res) => {
         const duplicateKey = `${phone10}|${orderIdRaw || ''}|${followDateStr}`;
         if (seenKeys.has(duplicateKey)) {
           results.skipped++;
-          results.errors.push({ row: r + 1, message: 'Duplicate in file for same customer/order/date' });
+          results.errors.push({ row: r + 1, message: `Duplicate: same phone/order/date already in this file`, name: nameRaw, phone: numberRaw });
           continue;
         }
 
@@ -456,12 +462,23 @@ exports.uploadFollowUps = async (req, res) => {
           followUpDate: followDateStr || null
         });
 
+        if (!followDateStr) {
+          results.warnings.push({ row: r + 1, message: 'Follow-up date not recognized — record created but may not appear in date-filtered views', name: nameRaw, phone: numberRaw, rawDate: String(fuRaw || '').trim() });
+        }
         results.inserted++;
       } catch (e) {
         results.skipped++;
-        results.errors.push({ row: r + 1, message: e.message || 'Row failed' });
+        results.errors.push({ row: r + 1, message: e.message || 'Row failed', name: nameRaw, phone: numberRaw });
       }
     }
+
+    const errorSummary = {};
+    for (const e of results.errors) {
+      const key = e.message.split(':')[0].trim();
+      errorSummary[key] = (errorSummary[key] || 0) + 1;
+    }
+    results.errorSummary = errorSummary;
+    results.totalRows = rows.length - 1;
 
     res.status(results.inserted > 0 ? 201 : 422).json(results);
   } catch (error) {
@@ -2593,34 +2610,7 @@ exports.getCustomerStatusHistory = async (req, res) => {
       return res.status(400).json({ message: 'customerId is required' });
     }
 
-    const visibility = await getVisibility(req.user);
-    let visibilitySql = '';
     const replacements = { customerId };
-
-    if (visibility.scope === 'agent') {
-      visibilitySql = `
-          AND (
-            c.createdBy = :viewerId
-            OR c.updatedBy = :viewerId
-            OR h.ChangedBy = :viewerId
-            OR ((c.createdBy IS NULL AND c.updatedBy IS NULL) AND c.agentId = :viewerId)
-          )
-      `;
-      replacements.viewerId = req.user.id;
-    } else if (visibility.scope === 'manager') {
-      const allowedAgentIds = visibility.allowedAgentIds && visibility.allowedAgentIds.length
-        ? visibility.allowedAgentIds
-        : [0];
-      visibilitySql = `
-          AND (
-            c.createdBy IN (:allowedAgentIds)
-            OR c.updatedBy IN (:allowedAgentIds)
-            OR h.ChangedBy IN (:allowedAgentIds)
-            OR c.agentId IN (:allowedAgentIds)
-          )
-      `;
-      replacements.allowedAgentIds = allowedAgentIds;
-    }
 
     const rows = await sequelize.query(
       `
@@ -2641,8 +2631,7 @@ exports.getCustomerStatusHistory = async (req, res) => {
         INNER JOIN dbo.Calls c WITH (NOLOCK) ON c.id = h.CallId
         LEFT JOIN dbo.Users changer WITH (NOLOCK) ON changer.id = h.ChangedBy
         WHERE c.customerId = :customerId
-          AND LOWER(ISNULL(c.callType, '')) NOT IN ('imp call upload', 'imp calls upload')
-          ${visibilitySql}
+          AND LOWER(ISNULL(c.callType, '')) NOT IN ('imp call upload', 'imp calls upload', 'order upload')
         ORDER BY h.ChangedAt DESC, h.Id DESC
       `,
       {

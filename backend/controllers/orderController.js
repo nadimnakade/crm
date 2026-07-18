@@ -60,10 +60,8 @@ exports.uploadOrders = async (req, res) => {
     // Validate required headers
     // Note: 'Order ID' and 'Order Type' columns are expected, but values can be optional depending on logic below
     const missing = REQUIRED_HEADERS.filter(h => idxMap[h.toLowerCase()] === undefined);
-    // Relax validation if only 'Order Type' is missing (for backward compatibility if needed, but user asked for it)
-    // However, user said "will have... order type", so we enforce column presence but maybe not value.
     if (missing.length) {
-      return res.status(422).json({ message: 'Invalid or missing headers', missing, required: REQUIRED_HEADERS });
+      return res.status(422).json({ message: `Missing required headers: ${missing.join(', ')}. Required columns: ${REQUIRED_HEADERS.join(', ')}`, missing, required: REQUIRED_HEADERS });
     }
 
     let inserted = 0;
@@ -87,7 +85,7 @@ exports.uploadOrders = async (req, res) => {
       
       // Validate Mandatory Fields
       if (!mobile || mobile.length < 10) {
-        errors.push({ row: i + 1, message: 'Invalid Mobile Number' });
+        errors.push({ row: i + 1, message: `Invalid Mobile Number (got "${mobileRaw}")` });
         continue;
       }
       if (!customerName) {
@@ -180,15 +178,23 @@ exports.uploadOrders = async (req, res) => {
         inserted++;
       } catch (e) {
         console.error(e);
-        errors.push({ row: i + 1, message: e.message || 'Insert failed' });
+        const detail = e.message || 'Insert failed';
+        errors.push({ row: i + 1, message: `DB error: ${detail}`, customerName, mobile: mobileRaw, orderId });
       }
     }
 
     const skipped = errors.length;
+    const errorSummary = {};
+    for (const e of errors) {
+      const key = e.message.replace(/\s*\(got ".*"\)/, '');
+      errorSummary[key] = (errorSummary[key] || 0) + 1;
+    }
     return res.status(inserted > 0 ? 201 : 422).json({ 
         message: `Processed ${rows.length - 1} rows`,
         inserted, 
         skipped, 
+        totalRows: rows.length - 1,
+        errorSummary,
         errors 
     });
 
@@ -395,7 +401,7 @@ exports.getUploadedOrders = async (req, res) => {
     const offset = (page - 1) * pageSize;
 
     const dateCondition = sequelize.where(
-      sequelize.literal('CAST(DATEADD(MINUTE, 330, createdAt) AS DATE)'),
+      sequelize.literal('CAST(DATEADD(MINUTE, 330, [Call].[createdAt]) AS DATE)'),
       { [Op.between]: [fd, td] }
     );
     const finalWhere = { [Op.and]: [where, dateCondition] };
